@@ -6,7 +6,7 @@ import {
   ShoppingCart, Sparkles, Cpu, Boxes, Truck, ClipboardCheck, PackageCheck,
   ArrowRight, Search, Sun, Moon, Menu, X, Lock, KeyRound, FileCheck2,
   ScrollText, Network, ChevronRight, TrendingUp, TrendingDown, AlertTriangle,
-  CheckCircle2, Radio, Gauge, Layers, Database, Zap,
+  CheckCircle2, Radio, Gauge, Layers, Database, Zap, Cog,
 } from "lucide-react";
 import {
   LineChart, Line, ResponsiveContainer, AreaChart, Area, BarChart, Bar,
