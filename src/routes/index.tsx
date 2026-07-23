@@ -20,7 +20,7 @@ export const Route = createFileRoute("/")({
       { title: "FactoryOS AI — Factory Command Center" },
       { name: "description", content: "Enterprise Smart Manufacturing Operating System. Production, inventory, warehouses, procurement, quality, maintenance, finance, HR and AI — in one control room." },
       { property: "og:title", content: "FactoryOS AI — Factory Command Center" },
-      { property: "og:description", content: "Enter the control room of a modern factory. One platform for every plant, every shift, every KPI." },
+      { property: "og:description", content: "Enterprise Smart Manufacturing Operating System. Production, inventory, warehouses, procurement, quality, maintenance, finance, HR and AI — in one control room." },
     ],
   }),
   component: LandingPage,
