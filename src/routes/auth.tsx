@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ROLES, ROLE_MAP, DEMO_PASSWORD, type AppRole } from "@/lib/roles";
+import { ROLES, ROLE_MAP, type AppRole } from "@/lib/roles";
 
 const searchSchema = z.object({ role: z.string().optional(), redirect: z.string().optional() });
 
