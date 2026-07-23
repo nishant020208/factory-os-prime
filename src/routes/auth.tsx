@@ -213,14 +213,6 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : `Sign in as ${meta.label}`}
               </Button>
             </form>
-            {meta.demoEmail && (
-              <div className="mt-4 text-xs text-muted-foreground glass rounded-xl p-3 border-white/5">
-                <div className="font-medium text-foreground mb-0.5">Demo credentials</div>
-                <div>Email: <code className="text-foreground">{meta.demoEmail}</code></div>
-                <div>Password: <code className="text-foreground">{DEMO_PASSWORD}</code></div>
-                <div className="mt-1 opacity-80">First sign-in? Use the Register tab — the whitelist provisions your role automatically.</div>
-              </div>
-            )}
           </TabsContent>
 
           <TabsContent value="signup">
