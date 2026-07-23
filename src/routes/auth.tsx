@@ -127,8 +127,8 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
   const meta = ROLE_MAP[role];
   const navigate = useNavigate();
   const [tab, setTab] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState(meta.demoEmail ?? "");
-  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
 
