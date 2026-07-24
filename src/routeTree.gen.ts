@@ -30,6 +30,8 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAiCenterRouteImport } from './routes/_authenticated/ai-center'
+import { Route as AuthenticatedPlatformIndexRouteImport } from './routes/_authenticated/platform/index'
+import { Route as AuthenticatedPlatformWhitelistRouteImport } from './routes/_authenticated/platform/whitelist'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -137,6 +139,18 @@ const AuthenticatedAiCenterRoute = AuthenticatedAiCenterRouteImport.update({
   path: '/ai-center',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPlatformIndexRoute =
+  AuthenticatedPlatformIndexRouteImport.update({
+    id: '/platform/',
+    path: '/platform/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPlatformWhitelistRoute =
+  AuthenticatedPlatformWhitelistRouteImport.update({
+    id: '/platform/whitelist',
+    path: '/platform/whitelist',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -159,6 +173,8 @@ export interface FileRoutesByFullPath {
   '/team': typeof AuthenticatedTeamRoute
   '/warehouse': typeof AuthenticatedWarehouseRoute
   '/whitelist': typeof AuthenticatedWhitelistRoute
+  '/platform/whitelist': typeof AuthenticatedPlatformWhitelistRoute
+  '/platform/': typeof AuthenticatedPlatformIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -181,6 +197,8 @@ export interface FileRoutesByTo {
   '/team': typeof AuthenticatedTeamRoute
   '/warehouse': typeof AuthenticatedWarehouseRoute
   '/whitelist': typeof AuthenticatedWhitelistRoute
+  '/platform/whitelist': typeof AuthenticatedPlatformWhitelistRoute
+  '/platform': typeof AuthenticatedPlatformIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -205,6 +223,8 @@ export interface FileRoutesById {
   '/_authenticated/team': typeof AuthenticatedTeamRoute
   '/_authenticated/warehouse': typeof AuthenticatedWarehouseRoute
   '/_authenticated/whitelist': typeof AuthenticatedWhitelistRoute
+  '/_authenticated/platform/whitelist': typeof AuthenticatedPlatformWhitelistRoute
+  '/_authenticated/platform/': typeof AuthenticatedPlatformIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -229,6 +249,8 @@ export interface FileRouteTypes {
     | '/team'
     | '/warehouse'
     | '/whitelist'
+    | '/platform/whitelist'
+    | '/platform/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -251,6 +273,8 @@ export interface FileRouteTypes {
     | '/team'
     | '/warehouse'
     | '/whitelist'
+    | '/platform/whitelist'
+    | '/platform'
   id:
     | '__root__'
     | '/'
@@ -274,6 +298,8 @@ export interface FileRouteTypes {
     | '/_authenticated/team'
     | '/_authenticated/warehouse'
     | '/_authenticated/whitelist'
+    | '/_authenticated/platform/whitelist'
+    | '/_authenticated/platform/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -431,6 +457,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAiCenterRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/platform/': {
+      id: '/_authenticated/platform/'
+      path: '/platform'
+      fullPath: '/platform/'
+      preLoaderRoute: typeof AuthenticatedPlatformIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/platform/whitelist': {
+      id: '/_authenticated/platform/whitelist'
+      path: '/platform/whitelist'
+      fullPath: '/platform/whitelist'
+      preLoaderRoute: typeof AuthenticatedPlatformWhitelistRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -453,6 +493,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
   AuthenticatedWarehouseRoute: typeof AuthenticatedWarehouseRoute
   AuthenticatedWhitelistRoute: typeof AuthenticatedWhitelistRoute
+  AuthenticatedPlatformWhitelistRoute: typeof AuthenticatedPlatformWhitelistRoute
+  AuthenticatedPlatformIndexRoute: typeof AuthenticatedPlatformIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -474,6 +516,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTeamRoute: AuthenticatedTeamRoute,
   AuthenticatedWarehouseRoute: AuthenticatedWarehouseRoute,
   AuthenticatedWhitelistRoute: AuthenticatedWhitelistRoute,
+  AuthenticatedPlatformWhitelistRoute: AuthenticatedPlatformWhitelistRoute,
+  AuthenticatedPlatformIndexRoute: AuthenticatedPlatformIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
