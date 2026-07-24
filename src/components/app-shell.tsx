@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState, useMemo } from "react";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
@@ -11,7 +11,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -24,7 +23,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { ROLE_MAP } from "@/lib/roles";
-import { NAV_SECTIONS } from "@/components/nav-config";
+import { navForRole } from "@/components/nav-config";
+import { primaryRole, homeForRole } from "@/lib/route-access";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -49,35 +49,40 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-/* ─────────── SIDEBAR ─────────── */
 function FactorySidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { roles } = useAuth();
+  const role = useMemo(() => primaryRole(roles), [roles]);
+  const sections = useMemo(() => navForRole(role), [role]);
+  const home = homeForRole(role);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border">
-        <Link to="/dashboard" className="flex items-center gap-2 px-2 py-2">
+        <Link to={home} className="flex items-center gap-2 px-2 py-2">
           <div className="h-8 w-8 rounded-lg bg-[image:var(--gradient-primary)] shadow-glow grid place-items-center shrink-0">
             <Factory className="h-4 w-4 text-white" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
               <div className="text-sm font-semibold truncate">FactoryOS</div>
-              <div className="text-[10px] text-muted-foreground truncate">AI Manufacturing OS</div>
+              <div className="text-[10px] text-muted-foreground truncate">
+                {role === "root_super_admin" ? "Platform Console" : "AI Manufacturing OS"}
+              </div>
             </div>
           )}
         </Link>
       </SidebarHeader>
       <SidebarContent className="scrollbar-thin">
-        {NAV_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <SidebarGroup key={section.label}>
             {!collapsed && <SidebarGroupLabel>{section.label}</SidebarGroupLabel>}
             <SidebarGroupContent>
               <SidebarMenu>
                 {section.items.map((it) => {
-                  const active = pathname === it.to || (it.to !== "/dashboard" && pathname.startsWith(it.to));
+                  const active = pathname === it.to || (it.to !== home && pathname.startsWith(it.to + "/"));
                   return (
                     <SidebarMenuItem key={it.to}>
                       <SidebarMenuButton asChild isActive={active} tooltip={it.label}>
@@ -108,7 +113,8 @@ function UserBadge({ collapsed }: { collapsed: boolean }) {
   const { profile, roles } = useAuth();
   const initials = (profile?.full_name ?? profile?.email ?? "?")
     .split(/[.\s@]/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase()).join("");
-  const roleLabel = roles[0] ? ROLE_MAP[roles[0]]?.label : "User";
+  const role = primaryRole(roles);
+  const roleLabel = role ? ROLE_MAP[role]?.label : "User";
   return (
     <div className="flex items-center gap-2 p-2">
       <Avatar className="h-8 w-8"><AvatarFallback className="text-xs bg-primary/20 text-primary">{initials || "U"}</AvatarFallback></Avatar>
@@ -122,12 +128,13 @@ function UserBadge({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-/* ─────────── TOPBAR ─────────── */
 function TopBar() {
   const router = useRouter();
   const { profile, roles, companyId } = useAuth();
   const [cmdOpen, setCmdOpen] = useState(false);
   const [dark, setDark] = useState(true);
+  const role = useMemo(() => primaryRole(roles), [roles]);
+  const sections = useMemo(() => navForRole(role), [role]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("light", !dark);
@@ -149,7 +156,8 @@ function TopBar() {
     router.navigate({ to: "/auth", replace: true });
   }
 
-  const roleLabel = roles[0] ? ROLE_MAP[roles[0]]?.label : "";
+  const roleLabel = role ? ROLE_MAP[role]?.label : "";
+  const tenantLabel = role === "root_super_admin" ? "Platform" : (companyId ? "Your Company" : "—");
 
   return (
     <>
@@ -157,7 +165,7 @@ function TopBar() {
       <div className="flex items-center gap-3 px-3 sm:px-4 h-14">
         <SidebarTrigger />
         <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="px-2 py-0.5 rounded-md bg-card border border-white/5">{companyId ? "ABC Manufacturing" : "Platform"}</span>
+          <span className="px-2 py-0.5 rounded-md bg-card border border-white/5">{tenantLabel}</span>
           {roleLabel && <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">{roleLabel}</span>}
         </div>
 
@@ -166,7 +174,7 @@ function TopBar() {
           className="ml-auto flex items-center gap-2 text-xs text-muted-foreground bg-card/60 border border-white/5 rounded-lg px-3 h-9 hover:border-primary/30 transition min-w-[220px]"
         >
           <Search className="h-3.5 w-3.5" />
-          <span className="flex-1 text-left">Search factory data…</span>
+          <span className="flex-1 text-left">Search…</span>
           <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 flex items-center gap-0.5">
             <Command className="h-2.5 w-2.5" />K
           </kbd>
@@ -195,7 +203,12 @@ function TopBar() {
               <div className="text-[11px] text-muted-foreground font-normal">{profile?.email}</div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild><Link to="/settings"><Settings className="h-3.5 w-3.5 mr-2" />Settings</Link></DropdownMenuItem>
+            {role !== "root_super_admin" && (
+              <DropdownMenuItem asChild><Link to="/settings"><Settings className="h-3.5 w-3.5 mr-2" />Settings</Link></DropdownMenuItem>
+            )}
+            {role === "root_super_admin" && (
+              <DropdownMenuItem asChild><Link to="/platform/settings"><Settings className="h-3.5 w-3.5 mr-2" />Platform Settings</Link></DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={signOut} className="text-destructive"><LogOut className="h-3.5 w-3.5 mr-2" />Sign out</DropdownMenuItem>
           </DropdownMenuContent>
@@ -204,10 +217,10 @@ function TopBar() {
     </header>
 
     <CommandDialog open={cmdOpen} onOpenChange={setCmdOpen}>
-      <CommandInput placeholder="Search products, orders, machines, suppliers…" />
+      <CommandInput placeholder="Jump to…" />
       <CommandList>
         <CommandEmpty>Nothing matched. Try a different keyword.</CommandEmpty>
-        {NAV_SECTIONS.map(s => (
+        {sections.map(s => (
           <CommandGroup key={s.label} heading={s.label}>
             {s.items.map(it => (
               <CommandItem key={it.to} value={`${s.label} ${it.label}`} onSelect={() => { setCmdOpen(false); router.navigate({ to: it.to }); }}>

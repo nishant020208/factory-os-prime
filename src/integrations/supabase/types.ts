@@ -826,6 +826,15 @@ export type Database = {
     }
     Functions: {
       current_company_id: { Args: never; Returns: string }
+      emit_notification: {
+        Args: {
+          _body: string
+          _company_id: string
+          _severity: string
+          _title: string
+        }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
