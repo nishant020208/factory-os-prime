@@ -102,6 +102,34 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useEffect(() => {
+    // Cross-module realtime sync: any change in a core table invalidates
+    // every dashboard/report the user has open. RLS filters what they see.
+    import("@/integrations/supabase/client").then(({ supabase }) => {
+      const channel = supabase
+        .channel("factoryos-sync")
+        .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
+          queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "production_orders" }, () => {
+          queryClient.invalidateQueries({ queryKey: ["prod-orders"] });
+          queryClient.invalidateQueries({ queryKey: ["prod-orders-recent"] });
+          queryClient.invalidateQueries({ queryKey: ["production_orders"] });
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "machines" }, () => {
+          queryClient.invalidateQueries({ queryKey: ["machines-recent"] });
+          queryClient.invalidateQueries({ queryKey: ["m-machines"] });
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "inventory" }, () => {
+          queryClient.invalidateQueries({ queryKey: ["inv"] });
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "purchase_orders" }, () => {
+          queryClient.invalidateQueries({ queryKey: ["pos"] });
+        })
+        .subscribe();
+      return () => { supabase.removeChannel(channel); };
+    });
+  }, [queryClient]);
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
