@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Factory, Boxes, ShieldCheck, Cog, TrendingUp, Activity, BrainCircuit, Zap,
+  Warehouse, ShoppingCart, Users, Landmark, Wrench, ClipboardList, Timer,
+  Truck, UserRound, ScrollText, Package,
 } from "lucide-react";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart,
@@ -10,104 +12,138 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { Kpi, PageHeader, Panel, StatusBadge } from "@/components/ui-parts";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
+import { primaryRole } from "@/lib/route-access";
+import type { AppRole } from "@/lib/roles";
+import { ROLE_MAP } from "@/lib/roles";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({
-    meta: [
-      { title: "Operations Dashboard — FactoryOS AI" },
-      { name: "description", content: "Real-time operations, OEE, production and AI insights across every plant." },
-    ],
-  }),
-  component: Dashboard,
+  head: () => ({ meta: [
+    { title: "Dashboard — FactoryOS AI" },
+    { name: "description", content: "Your role-specific operations command center." },
+  ]}),
+  component: DashboardRouter,
 });
 
-function Dashboard() {
-  const production = useQuery({
-    queryKey: ["prod-orders-recent"],
-    queryFn: async () => (await supabase.from("production_orders").select("*").order("created_at", { ascending: false }).limit(6)).data ?? [],
-  });
-  const machines = useQuery({
-    queryKey: ["machines-recent"],
-    queryFn: async () => (await supabase.from("machines").select("*").order("name")).data ?? [],
-  });
-  const products = useQuery({
-    queryKey: ["products-count"],
-    queryFn: async () => (await supabase.from("products").select("*", { count: "exact", head: true })).count ?? 0,
-  });
+function DashboardRouter() {
+  const { roles } = useAuth();
+  const role = primaryRole(roles);
+  switch (role) {
+    case "company_admin":       return <CompanyAdminDashboard />;
+    case "plant_admin":         return <PlantAdminDashboard />;
+    case "plant_manager":       return <PlantManagerDashboard />;
+    case "production_manager":  return <ProductionManagerDashboard />;
+    case "warehouse_manager":   return <WarehouseDashboard />;
+    case "procurement_manager": return <ProcurementDashboard />;
+    case "quality_inspector":   return <QualityDashboard />;
+    case "maintenance_engineer":return <MaintenanceDashboard />;
+    case "finance_manager":     return <FinanceDashboard />;
+    case "hr_manager":          return <HRDashboard />;
+    case "production_operator": return <OperatorDashboard />;
+    case "customer_portal":     return <CustomerDashboard />;
+    case "supplier_portal":     return <SupplierDashboard />;
+    case "auditor":             return <AuditorDashboard />;
+    default:                    return <GenericDashboard role={role} />;
+  }
+}
 
-  const outputTrend = Array.from({ length: 14 }, (_, i) => ({
-    d: `D-${13 - i}`, output: 800 + Math.round(Math.sin(i / 2) * 120 + i * 22 + Math.random() * 60), scrap: 6 + Math.round(Math.random() * 10),
+/* ─────────── SHARED HELPERS ─────────── */
+const trend = (n: number, base = 800, jitter = 60) =>
+  Array.from({ length: n }, (_, i) => ({
+    d: `D-${n - 1 - i}`,
+    a: base + Math.round(Math.sin(i / 2) * 120 + i * 22 + Math.random() * jitter),
+    b: 6 + Math.round(Math.random() * 10),
   }));
+
+function Shell({ title, sub, eyebrow, children }: { title: string; sub: string; eyebrow: string; children: React.ReactNode }) {
+  return (
+    <div className="max-w-[1600px] mx-auto">
+      <PageHeader eyebrow={eyebrow} title={title} sub={sub}
+        actions={<>
+          <Button variant="outline" className="glass border-white/5"><Activity className="h-4 w-4 mr-1.5" />Live</Button>
+          <Button className="bg-[image:var(--gradient-primary)] shadow-glow"><BrainCircuit className="h-4 w-4 mr-1.5" />Ask Copilot</Button>
+        </>}
+      />
+      {children}
+    </div>
+  );
+}
+
+function OutputChart({ data }: { data: ReturnType<typeof trend> }) {
+  return (
+    <div className="h-64">
+      <ResponsiveContainer>
+        <AreaChart data={data}>
+          <defs><linearGradient id="dg" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="oklch(0.58 0.22 259)" stopOpacity={0.6} />
+            <stop offset="100%" stopColor="oklch(0.58 0.22 259)" stopOpacity={0} />
+          </linearGradient></defs>
+          <CartesianGrid stroke="rgba(255,255,255,0.05)" />
+          <XAxis dataKey="d" stroke="rgba(255,255,255,0.4)" fontSize={10} />
+          <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} />
+          <Tooltip contentStyle={{ background: "oklch(0.20 0.025 260)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }} />
+          <Area type="monotone" dataKey="a" stroke="oklch(0.58 0.22 259)" strokeWidth={2} fill="url(#dg)" />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function AIInsights({ items }: { items: { t: string; c: number }[] }) {
+  return (
+    <Panel title="AI Copilot" right={<span className="text-[10px] text-primary">{items.length} insights</span>}>
+      <div className="space-y-3">
+        {items.map((r, i) => (
+          <div key={i} className="rounded-xl bg-card/60 border border-white/5 p-3">
+            <div className="flex items-center justify-between text-[10px] text-primary">
+              <span className="flex items-center gap-1"><Zap className="h-3 w-3" /> Copilot</span>
+              <span>{r.c}% conf.</span>
+            </div>
+            <div className="mt-1 text-sm">{r.t}</div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+/* ─────────── COMPANY ADMIN ─────────── */
+function CompanyAdminDashboard() {
+  const production = useQuery({ queryKey: ["prod-orders-recent"],
+    queryFn: async () => (await supabase.from("production_orders").select("*").order("created_at", { ascending: false }).limit(6)).data ?? [] });
+  const machines = useQuery({ queryKey: ["machines-recent"],
+    queryFn: async () => (await supabase.from("machines").select("*").order("name")).data ?? [] });
+  const products = useQuery({ queryKey: ["products-count"],
+    queryFn: async () => (await supabase.from("products").select("*", { count: "exact", head: true })).count ?? 0 });
+
+  const outputTrend = trend(14);
   const oeeSeries = Array.from({ length: 12 }, (_, i) => ({
     h: `${i * 2}:00`, oee: 78 + Math.round(Math.sin(i / 2) * 6 + Math.random() * 4),
     availability: 88 + Math.round(Math.random() * 4), performance: 82 + Math.round(Math.random() * 6),
   }));
-  const mixData = [
-    { name: "Precision", value: 42 }, { name: "Assemblies", value: 30 },
-    { name: "Raw", value: 18 }, { name: "Other", value: 10 },
-  ];
+  const mixData = [{ name: "Precision", value: 42 }, { name: "Assemblies", value: 30 }, { name: "Raw", value: 18 }, { name: "Other", value: 10 }];
   const COLORS = ["oklch(0.58 0.22 259)","oklch(0.62 0.19 300)","oklch(0.72 0.14 210)","oklch(0.72 0.19 145)"];
 
   return (
-    <div className="max-w-[1600px] mx-auto">
-      <PageHeader
-        eyebrow="Operations"
-        title="Command Center"
-        sub="A single pane of glass across your plants, machines, orders and AI recommendations."
-        actions={
-          <>
-            <Button variant="outline" className="glass border-white/5"><Activity className="h-4 w-4 mr-1.5" />Live</Button>
-            <Button className="bg-[image:var(--gradient-primary)] shadow-glow"><BrainCircuit className="h-4 w-4 mr-1.5" />Ask Copilot</Button>
-          </>
-        }
-      />
-
+    <Shell eyebrow="Executive" title="Command Center" sub="Company-wide operations, plants, machines and AI recommendations.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Active Production Orders" value={String(production.data?.filter(p => p.status === "in_progress").length ?? 0)} delta="+4" icon={Factory} tone="primary" />
+        <Kpi label="Active Orders" value={String(production.data?.filter(p => p.status === "in_progress").length ?? 0)} delta="+4" icon={Factory} tone="primary" />
         <Kpi label="Machine Uptime" value="94.1%" delta="+1.2%" icon={Cog} tone="success" />
         <Kpi label="OEE" value="87.4%" delta="+3.2%" icon={TrendingUp} tone="info" />
-        <Kpi label="Open Quality NCRs" value="7" delta="-2" icon={ShieldCheck} tone="warning" />
+        <Kpi label="Open NCRs" value="7" delta="-2" icon={ShieldCheck} tone="warning" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2">
-          <Panel title="Production Output · Last 14 days" right={<span className="text-[10px] text-success">▲ 12.4% vs prior</span>}>
-            <div className="h-64">
-              <ResponsiveContainer>
-                <AreaChart data={outputTrend}>
-                  <defs>
-                    <linearGradient id="out" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="oklch(0.58 0.22 259)" stopOpacity={0.6} />
-                      <stop offset="100%" stopColor="oklch(0.58 0.22 259)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="d" stroke="rgba(255,255,255,0.4)" fontSize={10} />
-                  <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} />
-                  <Tooltip contentStyle={{ background: "oklch(0.20 0.025 260)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }} />
-                  <Area type="monotone" dataKey="output" stroke="oklch(0.58 0.22 259)" strokeWidth={2} fill="url(#out)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+          <Panel title="Production Output · 14 days" right={<span className="text-[10px] text-success">▲ 12.4%</span>}>
+            <OutputChart data={outputTrend} />
           </Panel>
         </div>
-        <Panel title="AI Insights" right={<span className="text-[10px] text-primary">3 active</span>}>
-          <div className="space-y-3">
-            {[
-              { t: "Bearing wear predicted on CNC Mill Alpha-1 within 72h", c: 94, tone: "warning" },
-              { t: "Reorder SKU-A1003 · consumption up 22% WoW", c: 88, tone: "info" },
-              { t: "Supplier Kyoto Precision beat SLA by 6% this month", c: 91, tone: "success" },
-            ].map((r, i) => (
-              <div key={i} className="rounded-xl bg-card/60 border border-white/5 p-3">
-                <div className="flex items-center justify-between text-[10px] text-primary">
-                  <span className="flex items-center gap-1"><Zap className="h-3 w-3" /> Copilot</span>
-                  <span>{r.c}% conf.</span>
-                </div>
-                <div className="mt-1 text-sm">{r.t}</div>
-              </div>
-            ))}
-          </div>
-        </Panel>
+        <AIInsights items={[
+          { t: "Bearing wear predicted on CNC Mill Alpha-1 within 72h", c: 94 },
+          { t: "Reorder SKU-A1003 · consumption up 22% WoW", c: 88 },
+          { t: "Supplier Kyoto Precision beat SLA by 6% this month", c: 91 },
+        ]} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
@@ -147,7 +183,7 @@ function Dashboard() {
                 <XAxis dataKey="d" stroke="rgba(255,255,255,0.4)" fontSize={10} />
                 <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} />
                 <Tooltip contentStyle={{ background: "oklch(0.20 0.025 260)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, fontSize: 12 }} />
-                <Bar dataKey="scrap" fill="oklch(0.62 0.23 25)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="b" fill="oklch(0.62 0.23 25)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -171,7 +207,6 @@ function Dashboard() {
                   <div className="text-xs tabular-nums w-10 text-right text-muted-foreground">{Math.round(Number(o.progress ?? 0))}%</div>
                 </div>
               ))}
-              {production.isLoading && <div className="p-4 text-xs text-muted-foreground">Loading…</div>}
             </div>
           </Panel>
         </div>
@@ -186,10 +221,6 @@ function Dashboard() {
                 <div className="mt-2 h-1.5 rounded-full bg-white/5 overflow-hidden">
                   <div className="h-full bg-[image:var(--gradient-primary)]" style={{ width: `${m.utilization ?? 0}%` }} />
                 </div>
-                <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
-                  <span>{m.type ?? "—"}</span>
-                  <span className="tabular-nums">{Number(m.utilization ?? 0).toFixed(1)}% util</span>
-                </div>
               </div>
             ))}
           </div>
@@ -197,8 +228,332 @@ function Dashboard() {
       </div>
 
       <div className="text-xs text-muted-foreground mt-6">
-        {products.isFetched && <>Catalog: {products.data} SKUs · Company scoped by RLS · Realtime ready</>}
+        {products.isFetched && <>Catalog: {products.data} SKUs · Company-scoped by RLS · Realtime ready</>}
       </div>
-    </div>
+    </Shell>
   );
+}
+
+/* ─────────── PLANT ADMIN / MANAGER ─────────── */
+function PlantAdminDashboard() {
+  return (
+    <Shell eyebrow="Plant" title="Plant Overview" sub="Everything happening inside your plant right now.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="Departments" value="12" icon={Users} tone="primary" />
+        <Kpi label="Employees" value="248" delta="+6" icon={Users} tone="info" />
+        <Kpi label="Active Machines" value="34/38" icon={Cog} tone="success" />
+        <Kpi label="Open Issues" value="3" icon={ShieldCheck} tone="warning" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <div className="lg:col-span-2"><Panel title="Plant output · last 14 days"><OutputChart data={trend(14)} /></Panel></div>
+        <AIInsights items={[
+          { t: "Line B utilization down 8% vs last week", c: 82 },
+          { t: "Shift 2 productivity best of the quarter", c: 91 },
+        ]} />
+      </div>
+    </Shell>
+  );
+}
+function PlantManagerDashboard() {
+  return (
+    <Shell eyebrow="Plant" title="Plant Performance" sub="Live KPIs across production, maintenance and quality.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="OEE" value="86.2%" delta="+2.1%" icon={TrendingUp} tone="primary" />
+        <Kpi label="Throughput" value="1,842" delta="+140" icon={Factory} tone="success" />
+        <Kpi label="Machine Uptime" value="92.7%" icon={Cog} tone="info" />
+        <Kpi label="First Pass Yield" value="97.4%" icon={ShieldCheck} tone="warning" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <div className="lg:col-span-2"><Panel title="Throughput trend"><OutputChart data={trend(14, 1600)} /></Panel></div>
+        <AIInsights items={[
+          { t: "CNC-A3 vibration anomaly — schedule inspection", c: 87 },
+          { t: "Optimize batching on line C for +6% throughput", c: 79 },
+        ]} />
+      </div>
+    </Shell>
+  );
+}
+
+/* ─────────── PRODUCTION MANAGER ─────────── */
+function ProductionManagerDashboard() {
+  const orders = useQuery({ queryKey: ["prod-orders"],
+    queryFn: async () => (await supabase.from("production_orders").select("*").order("due_date").limit(8)).data ?? [] });
+  return (
+    <Shell eyebrow="Production" title="Production Planning" sub="Schedule, work orders and capacity for the next 14 days.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="Planned Orders" value={String(orders.data?.length ?? 0)} icon={ClipboardList} tone="primary" />
+        <Kpi label="In Progress" value={String(orders.data?.filter(o => o.status === "in_progress").length ?? 0)} icon={Factory} tone="info" />
+        <Kpi label="Capacity Used" value="78%" icon={TrendingUp} tone="warning" />
+        <Kpi label="On-Time %" value="94.2%" delta="+1.1%" icon={Timer} tone="success" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <div className="lg:col-span-2">
+          <Panel title="Upcoming production orders">
+            <div className="divide-y divide-white/5 text-sm">
+              {(orders.data ?? []).map(o => (
+                <div key={o.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 py-2.5">
+                  <div><div className="font-medium">{o.order_number}</div><div className="text-[11px] text-muted-foreground">Qty {o.quantity}</div></div>
+                  <StatusBadge status={o.status} />
+                  <div className="text-xs text-muted-foreground">{o.due_date ? new Date(o.due_date).toLocaleDateString() : "—"}</div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </div>
+        <AIInsights items={[
+          { t: "Reschedule PO-1042 → save 6 setup hours", c: 88 },
+          { t: "Material shortage predicted for W-42", c: 76 },
+        ]} />
+      </div>
+    </Shell>
+  );
+}
+
+/* ─────────── WAREHOUSE MANAGER ─────────── */
+function WarehouseDashboard() {
+  const inv = useQuery({ queryKey: ["inv"],
+    queryFn: async () => (await supabase.from("inventory").select("*").limit(200)).data ?? [] });
+  const low = inv.data?.filter(i => Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0)).length ?? 0;
+  return (
+    <Shell eyebrow="Logistics" title="Warehouse Control" sub="Stock movements, receiving, dispatch and cycle counts.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="SKUs in Stock" value={String(inv.data?.length ?? 0)} icon={Boxes} tone="primary" />
+        <Kpi label="Low Stock" value={String(low)} icon={Warehouse} tone="warning" />
+        <Kpi label="Received Today" value="18" icon={Package} tone="success" />
+        <Kpi label="Dispatched Today" value="24" icon={Truck} tone="info" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <div className="lg:col-span-2"><Panel title="Warehouse throughput"><OutputChart data={trend(14, 240, 20)} /></Panel></div>
+        <AIInsights items={[
+          { t: `${low} SKUs are at or below reorder level`, c: 100 },
+          { t: "Suggest bin re-slotting for A-class items", c: 84 },
+        ]} />
+      </div>
+    </Shell>
+  );
+}
+
+/* ─────────── PROCUREMENT MANAGER ─────────── */
+function ProcurementDashboard() {
+  const pos = useQuery({ queryKey: ["pos"],
+    queryFn: async () => (await supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }).limit(10)).data ?? [] });
+  return (
+    <Shell eyebrow="Procurement" title="Procurement Center" sub="Suppliers, POs, RFQs and goods receipt live view.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="Open POs" value={String(pos.data?.filter(p => p.status !== "received").length ?? 0)} icon={ShoppingCart} tone="primary" />
+        <Kpi label="Approved" value={String(pos.data?.filter(p => p.status === "approved").length ?? 0)} icon={ShieldCheck} tone="success" />
+        <Kpi label="Pending" value={String(pos.data?.filter(p => p.status === "pending").length ?? 0)} icon={Timer} tone="warning" />
+        <Kpi label="Supplier OTIF" value="94%" delta="+2%" icon={Truck} tone="info" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <div className="lg:col-span-2">
+          <Panel title="Recent purchase orders">
+            <div className="divide-y divide-white/5 text-sm">
+              {(pos.data ?? []).map(p => (
+                <div key={p.id} className="grid grid-cols-[1fr_auto_auto] gap-3 py-2.5 items-center">
+                  <div><div className="font-medium">{p.po_number ?? p.id.slice(0,8)}</div><div className="text-[11px] text-muted-foreground">Total ${Number(p.total_amount ?? 0).toLocaleString()}</div></div>
+                  <StatusBadge status={p.status} />
+                  <div className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleDateString()}</div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </div>
+        <AIInsights items={[
+          { t: "Consolidate SKU-A1003 orders → save 8%", c: 89 },
+          { t: "Alt supplier available for critical Ti stock", c: 76 },
+        ]} />
+      </div>
+    </Shell>
+  );
+}
+
+/* ─────────── QUALITY INSPECTOR ─────────── */
+function QualityDashboard() {
+  return (
+    <Shell eyebrow="Quality" title="Quality Control" sub="Incoming, in-process and final inspection at a glance.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="First-Pass Yield" value="97.8%" delta="+0.4%" icon={ShieldCheck} tone="success" />
+        <Kpi label="Defect Rate" value="0.82%" delta="-0.3%" icon={ShieldCheck} tone="warning" />
+        <Kpi label="Open NCRs" value="7" icon={ClipboardList} tone="info" />
+        <Kpi label="CAPA On Track" value="94%" icon={ShieldCheck} tone="primary" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <div className="lg:col-span-2"><Panel title="Yield trend"><OutputChart data={trend(14, 940, 30)} /></Panel></div>
+        <AIInsights items={[
+          { t: "Predicted micro-crack on batch B-2287", c: 88 },
+          { t: "Housing dimensional drift approaching limit", c: 76 },
+        ]} />
+      </div>
+    </Shell>
+  );
+}
+
+/* ─────────── MAINTENANCE ENGINEER ─────────── */
+function MaintenanceDashboard() {
+  const machines = useQuery({ queryKey: ["m-machines"],
+    queryFn: async () => (await supabase.from("machines").select("*").order("name")).data ?? [] });
+  const down = machines.data?.filter(m => m.status === "down" || m.status === "maintenance").length ?? 0;
+  return (
+    <Shell eyebrow="Maintenance" title="Reliability & Uptime" sub="Predictive maintenance, breakdowns and spare parts.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="MTBF" value="184h" delta="+12h" icon={Timer} tone="success" />
+        <Kpi label="MTTR" value="2.4h" delta="-0.3h" icon={Wrench} tone="info" />
+        <Kpi label="Down / Maint" value={String(down)} icon={Cog} tone="warning" />
+        <Kpi label="PM Compliance" value="96%" icon={ShieldCheck} tone="primary" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <div className="lg:col-span-2">
+          <Panel title="Machine status">
+            <div className="space-y-2">
+              {(machines.data ?? []).slice(0, 8).map(m => (
+                <div key={m.id} className="rounded-xl bg-card/60 border border-white/5 p-3 text-sm flex items-center justify-between">
+                  <div><div className="font-medium">{m.name}</div><div className="text-[11px] text-muted-foreground">{m.type ?? "—"}</div></div>
+                  <StatusBadge status={m.status} />
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </div>
+        <AIInsights items={[
+          { t: "Bearing wear on CNC-A1 — 72h", c: 94 },
+          { t: "Coolant pump inlet blockage risk on Line B", c: 81 },
+        ]} />
+      </div>
+    </Shell>
+  );
+}
+
+/* ─────────── FINANCE MANAGER ─────────── */
+function FinanceDashboard() {
+  const cash = trend(14, 120000, 4000);
+  return (
+    <Shell eyebrow="Finance" title="Finance Center" sub="Cash, revenue, AP/AR and budgets in real time.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="Revenue MTD" value="$1.42M" delta="+7.4%" icon={TrendingUp} tone="success" />
+        <Kpi label="Cash Position" value="$4.82M" delta="+2.1%" icon={Landmark} tone="primary" />
+        <Kpi label="AP Outstanding" value="$318k" icon={ClipboardList} tone="warning" />
+        <Kpi label="AR Outstanding" value="$612k" icon={ClipboardList} tone="info" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <div className="lg:col-span-2"><Panel title="Cash flow"><OutputChart data={cash} /></Panel></div>
+        <AIInsights items={[
+          { t: "Late-paying customer detected — 42 DSO", c: 84 },
+          { t: "Reallocate $60k opex to CAPEX for +ROI", c: 71 },
+        ]} />
+      </div>
+    </Shell>
+  );
+}
+
+/* ─────────── HR MANAGER ─────────── */
+function HRDashboard() {
+  return (
+    <Shell eyebrow="People" title="HR Command" sub="Headcount, attendance and workforce analytics.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="Headcount" value="248" delta="+6" icon={Users} tone="primary" />
+        <Kpi label="Attendance" value="96.4%" icon={Timer} tone="success" />
+        <Kpi label="Open Reqs" value="8" icon={ClipboardList} tone="info" />
+        <Kpi label="Training %" value="88%" icon={ShieldCheck} tone="warning" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <div className="lg:col-span-2"><Panel title="Headcount trend"><OutputChart data={trend(14, 240, 3)} /></Panel></div>
+        <AIInsights items={[
+          { t: "Attrition risk: 3 employees in Line B", c: 74 },
+          { t: "Overtime spike on Shift 2 — 14% above target", c: 82 },
+        ]} />
+      </div>
+    </Shell>
+  );
+}
+
+/* ─────────── OPERATOR ─────────── */
+function OperatorDashboard() {
+  return (
+    <Shell eyebrow="My Shift" title="Today's Work" sub="Your assigned work orders, machines and tasks.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="My Work Orders" value="4" icon={ClipboardList} tone="primary" />
+        <Kpi label="Assigned Machines" value="2" icon={Cog} tone="info" />
+        <Kpi label="Completed Today" value="12" delta="+2" icon={ShieldCheck} tone="success" />
+        <Kpi label="Open Issues" value="1" icon={ShieldCheck} tone="warning" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+        <Panel title="Your work orders">
+          <div className="text-sm text-muted-foreground">Assigned work orders will appear here in real time as your manager releases them.</div>
+        </Panel>
+        <Panel title="Machine status">
+          <div className="text-sm text-muted-foreground">Live status and utilization of your assigned machines.</div>
+        </Panel>
+      </div>
+    </Shell>
+  );
+}
+
+/* ─────────── CUSTOMER ─────────── */
+function CustomerDashboard() {
+  return (
+    <Shell eyebrow="Customer" title="Your Orders" sub="Track orders, shipments and invoices.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="Open Orders" value="3" icon={ShoppingCart} tone="primary" />
+        <Kpi label="In Transit" value="1" icon={Truck} tone="info" />
+        <Kpi label="Delivered YTD" value="18" icon={ShieldCheck} tone="success" />
+        <Kpi label="Outstanding Invoices" value="$14k" icon={Landmark} tone="warning" />
+      </div>
+    </Shell>
+  );
+}
+
+/* ─────────── SUPPLIER ─────────── */
+function SupplierDashboard() {
+  return (
+    <Shell eyebrow="Supplier" title="Supplier Portal" sub="Purchase orders, deliveries and payments.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="Open POs" value="4" icon={ShoppingCart} tone="primary" />
+        <Kpi label="Delivered YTD" value="42" icon={Truck} tone="success" />
+        <Kpi label="OTIF" value="94%" delta="+2%" icon={Timer} tone="info" />
+        <Kpi label="Awaiting Payment" value="$28k" icon={Landmark} tone="warning" />
+      </div>
+    </Shell>
+  );
+}
+
+/* ─────────── AUDITOR ─────────── */
+function AuditorDashboard() {
+  const logs = useQuery({ queryKey: ["audit-recent"],
+    queryFn: async () => (await supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(20)).data ?? [] });
+  return (
+    <Shell eyebrow="Audit" title="Compliance Overview" sub="Read-only view of activity and compliance across the company.">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="Events (24h)" value={String(logs.data?.length ?? 0)} icon={ScrollText} tone="primary" />
+        <Kpi label="Critical" value="0" icon={ShieldCheck} tone="success" />
+        <Kpi label="Warnings" value="3" icon={ShieldCheck} tone="warning" />
+        <Kpi label="Docs Pending" value="2" icon={ClipboardList} tone="info" />
+      </div>
+      <div className="mt-4">
+        <Panel title="Recent audit events">
+          <div className="divide-y divide-white/5 text-sm">
+            {(logs.data ?? []).map(l => (
+              <div key={l.id} className="grid grid-cols-[auto_1fr_auto] gap-3 py-2 items-center">
+                <ScrollText className="h-4 w-4 text-muted-foreground" />
+                <div><span className="font-medium">{l.action}</span> <span className="text-muted-foreground">· {l.entity ?? "system"}</span></div>
+                <div className="text-xs text-muted-foreground tabular-nums">{new Date(l.created_at).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </div>
+    </Shell>
+  );
+}
+
+function GenericDashboard({ role }: { role: AppRole | null }) {
+  const label = role ? ROLE_MAP[role]?.label : "Dashboard";
+  return <Shell eyebrow="Overview" title={`${label} Dashboard`} sub="Your personalized command center.">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <Kpi label="Activity" value="—" icon={Activity} tone="primary" />
+      <Kpi label="Tasks" value="—" icon={ClipboardList} tone="info" />
+      <Kpi label="Alerts" value="—" icon={ShieldCheck} tone="warning" />
+      <Kpi label="Team" value="—" icon={Users} tone="success" />
+    </div>
+  </Shell>;
 }
