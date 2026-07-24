@@ -313,7 +313,7 @@ function ProductionManagerDashboard() {
 function WarehouseDashboard() {
   const inv = useQuery({ queryKey: ["inv"],
     queryFn: async () => (await supabase.from("inventory").select("*").limit(200)).data ?? [] });
-  const low = inv.data?.filter(i => Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0)).length ?? 0;
+  const low = inv.data?.filter(i => Number(i.quantity ?? 0) <= 10).length ?? 0;
   return (
     <Shell eyebrow="Logistics" title="Warehouse Control" sub="Stock movements, receiving, dispatch and cycle counts.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
