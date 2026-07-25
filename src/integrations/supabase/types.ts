@@ -14,6 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      approvals: {
+        Row: {
+          approver_id: string | null
+          company_id: string
+          created_at: string
+          entity: string
+          entity_id: string | null
+          id: string
+          notes: string | null
+          requester_id: string | null
+          resolved_at: string | null
+          status: string
+        }
+        Insert: {
+          approver_id?: string | null
+          company_id: string
+          created_at?: string
+          entity: string
+          entity_id?: string | null
+          id?: string
+          notes?: string | null
+          requester_id?: string | null
+          resolved_at?: string | null
+          status?: string
+        }
+        Update: {
+          approver_id?: string | null
+          company_id?: string
+          created_at?: string
+          entity?: string
+          entity_id?: string | null
+          id?: string
+          notes?: string | null
+          requester_id?: string | null
+          resolved_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      attendance: {
+        Row: {
+          check_in: string | null
+          check_out: string | null
+          company_id: string
+          created_at: string
+          date: string
+          employee_id: string
+          hours_worked: number | null
+          id: string
+          status: string
+        }
+        Insert: {
+          check_in?: string | null
+          check_out?: string | null
+          company_id: string
+          created_at?: string
+          date?: string
+          employee_id: string
+          hours_worked?: number | null
+          id?: string
+          status?: string
+        }
+        Update: {
+          check_in?: string | null
+          check_out?: string | null
+          company_id?: string
+          created_at?: string
+          date?: string
+          employee_id?: string
+          hours_worked?: number | null
+          id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -54,6 +129,77 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bom: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          product_id: string
+          status: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          product_id: string
+          status?: string
+          updated_at?: string
+          version?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          product_id?: string
+          status?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      bom_items: {
+        Row: {
+          bom_id: string
+          company_id: string
+          component_product_id: string
+          created_at: string
+          id: string
+          quantity: number
+          unit: string | null
+        }
+        Insert: {
+          bom_id: string
+          company_id: string
+          component_product_id: string
+          created_at?: string
+          id?: string
+          quantity?: number
+          unit?: string | null
+        }
+        Update: {
+          bom_id?: string
+          company_id?: string
+          component_product_id?: string
+          created_at?: string
+          id?: string
+          quantity?: number
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_items_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bom"
             referencedColumns: ["id"]
           },
         ]
@@ -183,6 +329,105 @@ export type Database = {
           },
         ]
       }
+      documents: {
+        Row: {
+          category: string | null
+          company_id: string
+          created_at: string
+          description: string | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          status: string | null
+          tags: string[] | null
+          title: string
+          uploaded_by: string | null
+          version: string | null
+          visibility: string | null
+        }
+        Insert: {
+          category?: string | null
+          company_id: string
+          created_at?: string
+          description?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          status?: string | null
+          tags?: string[] | null
+          title: string
+          uploaded_by?: string | null
+          version?: string | null
+          visibility?: string | null
+        }
+        Update: {
+          category?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          status?: string | null
+          tags?: string[] | null
+          title?: string
+          uploaded_by?: string | null
+          version?: string | null
+          visibility?: string | null
+        }
+        Relationships: []
+      }
+      employees: {
+        Row: {
+          company_id: string
+          created_at: string
+          department: string | null
+          department_id: string | null
+          email: string | null
+          employee_code: string
+          full_name: string
+          hire_date: string | null
+          id: string
+          job_title: string | null
+          phone: string | null
+          plant_id: string | null
+          salary: number | null
+          status: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          department?: string | null
+          department_id?: string | null
+          email?: string | null
+          employee_code: string
+          full_name: string
+          hire_date?: string | null
+          id?: string
+          job_title?: string | null
+          phone?: string | null
+          plant_id?: string | null
+          salary?: number | null
+          status?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          department?: string | null
+          department_id?: string | null
+          email?: string | null
+          employee_code?: string
+          full_name?: string
+          hire_date?: string | null
+          id?: string
+          job_title?: string | null
+          phone?: string | null
+          plant_id?: string | null
+          salary?: number | null
+          status?: string
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           company_id: string
@@ -231,6 +476,96 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      invoices: {
+        Row: {
+          company_id: string
+          created_at: string
+          currency: string | null
+          customer_id: string | null
+          due_date: string | null
+          id: string
+          invoice_number: string
+          issue_date: string
+          paid_date: string | null
+          sales_order_id: string | null
+          status: string
+          tax_amount: number | null
+          total_amount: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          currency?: string | null
+          customer_id?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number: string
+          issue_date?: string
+          paid_date?: string | null
+          sales_order_id?: string | null
+          status?: string
+          tax_amount?: number | null
+          total_amount?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          currency?: string | null
+          customer_id?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number?: string
+          issue_date?: string
+          paid_date?: string | null
+          sales_order_id?: string | null
+          status?: string
+          tax_amount?: number | null
+          total_amount?: number
+        }
+        Relationships: []
+      }
+      knowledge_articles: {
+        Row: {
+          author_id: string | null
+          body: string | null
+          category: string | null
+          company_id: string
+          created_at: string
+          id: string
+          status: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          views: number | null
+        }
+        Insert: {
+          author_id?: string | null
+          body?: string | null
+          category?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          status?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          views?: number | null
+        }
+        Update: {
+          author_id?: string | null
+          body?: string | null
+          category?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          status?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          views?: number | null
+        }
+        Relationships: []
       }
       machines: {
         Row: {
@@ -326,6 +661,87 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          customer_id: string | null
+          id: string
+          invoice_id: string | null
+          method: string | null
+          paid_at: string
+          payment_number: string
+          reference: string | null
+          status: string
+        }
+        Insert: {
+          amount?: number
+          company_id: string
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          method?: string | null
+          paid_at?: string
+          payment_number: string
+          reference?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          method?: string | null
+          paid_at?: string
+          payment_number?: string
+          reference?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      payroll: {
+        Row: {
+          company_id: string
+          created_at: string
+          deductions: number | null
+          employee_id: string
+          gross_amount: number
+          id: string
+          net_amount: number
+          paid_at: string | null
+          period: string
+          status: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          deductions?: number | null
+          employee_id: string
+          gross_amount?: number
+          id?: string
+          net_amount?: number
+          paid_at?: string | null
+          period: string
+          status?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          deductions?: number | null
+          employee_id?: string
+          gross_amount?: number
+          id?: string
+          net_amount?: number
+          paid_at?: string | null
+          period?: string
+          status?: string
+        }
+        Relationships: []
       }
       plants: {
         Row: {
@@ -641,6 +1057,188 @@ export type Database = {
           },
         ]
       }
+      quality_inspections: {
+        Row: {
+          company_id: string
+          created_at: string
+          defects_found: number | null
+          id: string
+          inspection_number: string
+          inspection_type: string
+          inspector_id: string | null
+          notes: string | null
+          product_id: string | null
+          production_order_id: string | null
+          quantity_checked: number | null
+          result: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          defects_found?: number | null
+          id?: string
+          inspection_number: string
+          inspection_type?: string
+          inspector_id?: string | null
+          notes?: string | null
+          product_id?: string | null
+          production_order_id?: string | null
+          quantity_checked?: number | null
+          result?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          defects_found?: number | null
+          id?: string
+          inspection_number?: string
+          inspection_type?: string
+          inspector_id?: string | null
+          notes?: string | null
+          product_id?: string | null
+          production_order_id?: string | null
+          quantity_checked?: number | null
+          result?: string
+        }
+        Relationships: []
+      }
+      sales_order_items: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          line_total: number
+          product_id: string
+          quantity: number
+          sales_order_id: string
+          unit_price: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          line_total?: number
+          product_id: string
+          quantity?: number
+          sales_order_id: string
+          unit_price?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          line_total?: number
+          product_id?: string
+          quantity?: number
+          sales_order_id?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_order_items_sales_order_id_fkey"
+            columns: ["sales_order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_orders: {
+        Row: {
+          company_id: string
+          created_at: string
+          currency: string | null
+          customer_id: string
+          due_date: string | null
+          id: string
+          notes: string | null
+          order_date: string
+          priority: string | null
+          progress: number | null
+          so_number: string
+          status: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          currency?: string | null
+          customer_id: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          priority?: string | null
+          progress?: number | null
+          so_number: string
+          status?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          currency?: string | null
+          customer_id?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string
+          priority?: string | null
+          progress?: number | null
+          so_number?: string
+          status?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      shipments: {
+        Row: {
+          carrier: string | null
+          company_id: string
+          created_at: string
+          customer_id: string | null
+          delivered_date: string | null
+          destination: string | null
+          id: string
+          sales_order_id: string | null
+          shipment_number: string
+          shipped_date: string | null
+          status: string
+          tracking_number: string | null
+        }
+        Insert: {
+          carrier?: string | null
+          company_id: string
+          created_at?: string
+          customer_id?: string | null
+          delivered_date?: string | null
+          destination?: string | null
+          id?: string
+          sales_order_id?: string | null
+          shipment_number: string
+          shipped_date?: string | null
+          status?: string
+          tracking_number?: string | null
+        }
+        Update: {
+          carrier?: string | null
+          company_id?: string
+          created_at?: string
+          customer_id?: string | null
+          delivered_date?: string | null
+          destination?: string | null
+          id?: string
+          sales_order_id?: string | null
+          shipment_number?: string
+          shipped_date?: string | null
+          status?: string
+          tracking_number?: string | null
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           company_id: string
@@ -681,6 +1279,90 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      support_tickets: {
+        Row: {
+          assignee_id: string | null
+          company_id: string
+          created_at: string
+          customer_id: string | null
+          description: string | null
+          id: string
+          priority: string | null
+          resolved_at: string | null
+          status: string
+          subject: string
+          ticket_number: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          company_id: string
+          created_at?: string
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          priority?: string | null
+          resolved_at?: string | null
+          status?: string
+          subject: string
+          ticket_number: string
+        }
+        Update: {
+          assignee_id?: string | null
+          company_id?: string
+          created_at?: string
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          priority?: string | null
+          resolved_at?: string | null
+          status?: string
+          subject?: string
+          ticket_number?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          assignee_id: string | null
+          company_id: string
+          created_at: string
+          description: string | null
+          due_date: string | null
+          entity: string | null
+          entity_id: string | null
+          id: string
+          priority: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          company_id: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          entity?: string | null
+          entity_id?: string | null
+          id?: string
+          priority?: string | null
+          status?: string
+          title: string
+        }
+        Update: {
+          assignee_id?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          entity?: string | null
+          entity_id?: string | null
+          id?: string
+          priority?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
@@ -819,6 +1501,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      work_orders: {
+        Row: {
+          company_id: string
+          created_at: string
+          end_time: string | null
+          id: string
+          machine_id: string | null
+          operation: string | null
+          operator_id: string | null
+          production_order_id: string | null
+          quantity: number | null
+          start_time: string | null
+          status: string
+          wo_number: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          machine_id?: string | null
+          operation?: string | null
+          operator_id?: string | null
+          production_order_id?: string | null
+          quantity?: number | null
+          start_time?: string | null
+          status?: string
+          wo_number: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          machine_id?: string | null
+          operation?: string | null
+          operator_id?: string | null
+          production_order_id?: string | null
+          quantity?: number | null
+          start_time?: string | null
+          status?: string
+          wo_number?: string
+        }
+        Relationships: []
       }
     }
     Views: {
