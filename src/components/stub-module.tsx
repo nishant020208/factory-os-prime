@@ -1,49 +1,30 @@
-import { PageHeader, Panel } from "@/components/ui-parts";
-import { Sparkles, Wrench } from "lucide-react";
+import { useRouterState } from "@tanstack/react-router";
+import { PageHeader, Panel, EmptyState } from "@/components/ui-parts";
+import { LiveModule } from "@/components/live-module";
+import { moduleForPath } from "@/lib/module-registry";
 
+/**
+ * Backwards-compatible entry point used by every legacy route file.
+ * If the current route is registered in MODULE_REGISTRY, we render the
+ * real data-driven LiveModule. Otherwise we still render a clean page
+ * header — no more "Scaffolded / Interconnection / Copilot" placeholder cards.
+ */
 export function StubModule({
   eyebrow, title, sub,
 }: { eyebrow: string; title: string; sub?: string }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const cfg = moduleForPath(pathname);
+  if (cfg) return <LiveModule config={cfg} />;
+
   return (
     <div className="max-w-[1600px] mx-auto">
-      <PageHeader
-        eyebrow={eyebrow}
-        title={title}
-        sub={sub ?? "This module is wired into your role sidebar and permissions. Rich CRUD, charts, and AI insights are being built out next."}
-      />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Panel title="Status">
-          <div className="flex items-start gap-3">
-            <div className="h-9 w-9 rounded-xl bg-primary/15 text-primary border border-primary/20 grid place-items-center">
-              <Wrench className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-sm font-medium">Scaffolded</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Route is protected by RLS and role permissions. Ready for the domain UI.
-              </div>
-            </div>
-          </div>
-        </Panel>
-        <Panel title="Interconnection">
-          <div className="text-xs text-muted-foreground leading-relaxed">
-            This module receives realtime events from related modules
-            (Inventory ↔ Procurement ↔ Warehouse ↔ Finance ↔ AI) via Postgres
-            triggers + Supabase Realtime; any change elsewhere invalidates
-            queries here automatically.
-          </div>
-        </Panel>
-        <Panel title="AI Copilot" right={<span className="text-[10px] text-primary">Available</span>}>
-          <div className="flex items-start gap-3">
-            <div className="h-9 w-9 rounded-xl bg-primary/15 text-primary border border-primary/20 grid place-items-center">
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Ask the Copilot for a natural-language rollup of this module's KPIs, anomalies and recommendations.
-            </div>
-          </div>
-        </Panel>
-      </div>
+      <PageHeader eyebrow={eyebrow} title={title} sub={sub} />
+      <Panel title={title}>
+        <EmptyState
+          title="Nothing here yet"
+          body="This surface is enabled for your role. Records will appear here as your team or connected modules create them."
+        />
+      </Panel>
     </div>
   );
 }

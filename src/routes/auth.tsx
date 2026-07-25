@@ -2,14 +2,14 @@ import { createFileRoute, useNavigate, useSearch, Link } from "@tanstack/react-r
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { z } from "zod";
-import { ArrowLeft, Factory, Loader2, Lock, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowLeft, Factory, Loader2, Lock, Mail, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ROLES, ROLE_MAP, type AppRole } from "@/lib/roles";
+import { ROLES, ROLE_MAP, DEMO_PASSWORD, type AppRole } from "@/lib/roles";
 
 const searchSchema = z.object({ role: z.string().optional(), redirect: z.string().optional() });
 
@@ -132,14 +132,22 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function signIn(e: React.FormEvent) {
-    e.preventDefault();
+  async function doSignIn(withEmail: string, withPassword: string) {
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email: withEmail, password: withPassword });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     toast.success(`Welcome back to FactoryOS`);
     navigate({ to: redirect ?? "/dashboard" });
+  }
+
+  async function signIn(e: React.FormEvent) {
+    e.preventDefault();
+    await doSignIn(email, password);
+  }
+
+  async function oneClickDemo() {
+    await doSignIn(meta.demoEmail, DEMO_PASSWORD);
   }
 
   async function signUp(e: React.FormEvent) {
@@ -151,7 +159,6 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
     });
     setBusy(false);
     if (error) {
-      // Whitelist trigger returns a friendly message via RAISE EXCEPTION
       toast.error(error.message.includes("whitelisted")
         ? "Your email isn't whitelisted for this role. Ask your Company Admin for an invitation."
         : error.message);
@@ -206,7 +213,18 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
           </TabsList>
 
           <TabsContent value="signin">
-            <form onSubmit={signIn} className="mt-5 space-y-4">
+            <Button
+              type="button"
+              onClick={oneClickDemo}
+              disabled={busy}
+              className="mt-5 w-full h-11 bg-gradient-to-r from-primary via-primary/90 to-accent shadow-glow"
+            >
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Zap className="h-4 w-4 mr-1.5" /> One-click sign in as {meta.label}</>}
+            </Button>
+            <div className="my-4 flex items-center gap-3 text-[11px] uppercase tracking-wider text-muted-foreground">
+              <div className="h-px flex-1 bg-border/60" /> or use credentials <div className="h-px flex-1 bg-border/60" />
+            </div>
+            <form onSubmit={signIn} className="space-y-4">
               <Field icon={Mail} label="Work email" value={email} onChange={setEmail} type="email" />
               <Field icon={Lock} label="Password" value={password} onChange={setPassword} type="password" />
               <Button type="submit" disabled={busy} className="w-full bg-[image:var(--gradient-primary)] shadow-glow">
