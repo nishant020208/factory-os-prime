@@ -1,58 +1,61 @@
-This is a large multi-part refactor. I'll ship it in ordered phases so you can review each before I move on. All existing UI, animations, tables, and RLS stay intact — I'm layering scoping and eventing on top.
 
-## Phase 1 — Role scoping & Root Super Admin isolation
+Massive scope — I'll ship in ordered phases, each independently reviewable. Approve and I start Phase 1.
 
-**Nav config becomes role-driven** (`src/components/nav-config.ts`)
-- Replace the single flat nav with `NAV_BY_ROLE: Record<AppRole, NavItem[]>` matching the sidebars you listed (Company Admin, Plant Admin, Plant Manager, Production Manager, Warehouse Manager, Procurement Manager, Quality Inspector, Maintenance Engineer, Finance Manager, HR Manager, Production Operator, Customer, Supplier, Auditor, Root Super Admin).
-- `AppShell` picks the current user's highest-priority role from `useAuth().roles` and renders only that sidebar.
+## Phase 1 — Data reset & 3-customer demo seed (foundational)
 
-**Route guard by role** (new `src/lib/route-access.ts` + update `_authenticated/route.tsx`)
-- Map every route path → allowed roles.
-- In `beforeLoad`, after `getUser()`, load roles and `throw redirect({ to: '/' })` (their own dashboard) if the path isn't allowed. Root Super Admin trying to hit `/inventory` etc. bounces to `/platform`.
+- Migration that:
+  - Wipes existing generic demo rows for ABC Manufacturing (keep companies, plants, departments, whitelist, auth users, roles).
+  - Seeds 3 realistic customers under ABC:
+    - Kirloskar Pumps Pvt Ltd — Completed (delivered + invoiced + paid)
+    - Bajaj Auto Components — Completed (delivered + invoiced + paid)
+    - Tata Steel Precision Division — Production In Progress
+  - For each customer: sales order → material reservation → PO to supplier → goods receipt → production order + work orders + machine assignment → quality inspection → finished goods → dispatch/shipment → invoice → payment → support tickets → documents → audit logs → notifications.
+  - Adds missing tables needed for the lifecycle: `sales_orders`, `sales_order_items`, `work_orders`, `quality_inspections`, `shipments`, `invoices`, `payments`, `support_tickets`, `documents`, `bom`, `bom_items`, `attendance`, `payroll`, `tasks`, `approvals`. All with `company_id`, GRANTs, RLS scoped to `current_company_id()`, and `service_role` full access.
+  - Adds Postgres triggers so a customer order automatically decrements inventory, creates PO recommendations on shortage, emits notifications, and writes audit logs.
 
-**Root Super Admin console** (new routes under `src/routes/_authenticated/platform/*`)
-- `platform/index.tsx` — platform overview (companies count, pending requests, MRR-style placeholders using live counts).
-- `platform/whitelist.tsx` — whitelist Company Admins (reuses existing whitelist table filtered to `role = 'company_admin'`).
-- `platform/pending.tsx`, `platform/companies.tsx` (approved), `platform/suspended.tsx` — company management with Approve / Suspend / Activate / Delete actions.
-- `platform/audit.tsx` — platform-wide audit logs.
-- `platform/settings.tsx`, `platform/profile.tsx`.
-- Root Super Admin's sidebar shows ONLY these. All ERP modules are hidden and blocked at the route guard.
+## Phase 2 — Kill every stub, wire real UIs
 
-**Per-role dashboards** (`src/routes/_authenticated/dashboard.tsx` becomes a router)
-- Split into role-specific dashboard components: `PlantManagerDashboard`, `ProductionManagerDashboard`, `WarehouseDashboard`, `ProcurementDashboard`, `QualityDashboard`, `MaintenanceDashboard`, `FinanceDashboard`, `HRDashboard`, `OperatorDashboard`, `CustomerDashboard`, `SupplierDashboard`, `AuditorDashboard`, `CompanyAdminDashboard`. Each shows only KPIs/widgets relevant to that role, all fed by live Supabase queries.
+Every route currently rendering `<StubModule>` gets replaced with a real module using the existing `ResourceView` / `PageHeader` / `Panel` / `Kpi` primitives. Each gets:
+- Live Supabase query scoped to `company_id`
+- Working New / Edit / Delete / Approve / Export (CSV + PDF via `jspdf`) / Print buttons
+- Filters, search, sort, pagination
+- Related-module cross-links (e.g. Sales Order → Production Order → Shipment → Invoice)
 
-## Phase 2 — Company isolation hardening
+Modules covered: BOM, Work Orders, Sales, Dispatch, Shipments, Invoices, Payments, Customer Invoices, Support, Documents, Tasks, Approvals, Attendance, Payroll, Recruitment, Training, Performance, RFQ, Purchase Requests, Goods Receipt, Vendor Comparison, CAPA, Defects, Incoming/In-Process/Final Inspection, Schedules, Breakdowns, Spare Parts, Machine History, Cycle Count, Transfers, Receiving, Stock Movement, Production Planning, Capacity Planning, Scheduling, Production Logs, Issue Reporting, Assigned Work Orders, Assigned Machines, Budgets, Expenses, Taxes, Profit & Loss, Compliance, Knowledge Center, Plant Overview, Plant Performance, all `-reports` pages, Orders, Deliveries, Supplier POs/Invoices/Performance.
 
-- Audit every table for `company_id` and every RLS policy for `company_id = current_company_id()`.
-- Add a `withCompany()` helper that asserts `companyId` from `useAuth` is present before any insert/update; server-side, keep relying on RLS + `current_company_id()`.
-- Add missing `company_id` filter on any client query that currently does bare `.select("*")`.
+## Phase 3 — Interconnection & realtime (already partial)
 
-## Phase 3 — Event-driven interconnection
+- Extend `src/routes/__root.tsx` realtime subscriber to cover every new table so cross-module updates invalidate React Query keys instantly.
+- Confirm triggers from Phase 1 fire correctly (linter + spot checks).
+- Every dashboard (all 14 role dashboards + platform + executive) reads live counts from the seeded data — no random numbers.
 
-New `src/lib/events.ts` — a lightweight typed event bus over Supabase Realtime + a local pub/sub for UI invalidation.
+## Phase 4 — Copilot upgrade + one-click login + polish
 
-- Whenever a mutation completes (production order status change, PO received, quality fail, machine breakdown, employee added, etc.), it:
-  1. Writes the row.
-  2. Inserts an `audit_logs` row (already exists).
-  3. Publishes an event via a new `events` table (or via Realtime channels on the source table).
-  4. React Query invalidates related keys via a subscription registered in `__root.tsx`.
+- One-click login: on `/auth`, each role card gets a "Sign in as demo" button that hits the seeded demo creds for that role (no typing).
+- Platform Copilot: real natural-language handler backed by Lovable AI (`google/gemini-3.6-flash`) with tools for `navigate`, `create_purchase_order`, `list_low_inventory`, `summarize_today`. Available from every page via `Ctrl+K` and floating action.
+- Tab transitions: preload on hover (`defaultPreload: "intent"`) + `defaultPreloadStaleTime: 0` + suspense-friendly loaders so navigation feels instant.
+- Global export helper `src/lib/export.ts` (CSV/Excel via `xlsx`, PDF via `jspdf`, print via `window.print`).
+- Remove the "Scaffolded / Interconnection / AI Copilot Available" status card from `stub-module.tsx` (moot once stubs are gone; kept only as a fallback that renders nothing user-visible).
 
-- Cross-module reactions run as Postgres triggers on the relevant tables, e.g.:
-  - `production_orders` insert with `status='completed'` → increment `inventory` for the finished-goods SKU + insert a `notifications` row.
-  - `inventory` update where `quantity < reorder_level` → insert `notifications` row targeted at procurement.
-  - `machines.status = 'breakdown'` → insert maintenance work order + notification.
-  - `purchase_orders.status = 'received'` → bump `inventory` + finance AP entry (placeholder row).
+## Phase 5 — QA matrix
 
-- Realtime subscriptions in `__root.tsx` listen to `notifications`, `audit_logs`, and each user's `company_id`-scoped changes, and call `queryClient.invalidateQueries()` on the affected keys so every open dashboard/report refreshes without manual reload.
+- Playwright script signs in as each role, screenshots the dashboard + 2 module pages, asserts no empty states and no stub markers. Report table in chat.
+- Run `supabase--linter`, fix findings related to new tables.
+- Verify Company A ≠ Company B isolation with a second seeded tenant probe.
 
-## Phase 4 — Verification
+## Technical notes
 
-- Playwright script that signs in as each demo role (root, company_admin, plant_manager, operator, customer, supplier, auditor), screenshots the sidebar, and asserts blocked routes redirect. Report a matrix in chat.
-- Run `supabase--linter` after migrations.
+- Frontend-only tables use existing `resource-view` + `ui-parts`; no new component libraries.
+- New npm deps: `xlsx`, `jspdf`, `jspdf-autotable`, `qrcode.react`.
+- All migrations follow: CREATE TABLE → GRANT authenticated + service_role → ENABLE RLS → POLICY (`company_id = current_company_id()`).
+- Copilot lives in a server function `src/lib/copilot.functions.ts` using `requireSupabaseAuth` so it reads the caller's tenant only.
 
-## Scope notes
+## Scope check before I start
 
-- I'm not creating brand-new "Knowledge Center", "BOM", "Recruitment", "Payroll" tables/pages in this pass — those would each need their own build. The sidebars will link to placeholder pages with "Coming soon" panels using the existing PageHeader/Panel design so nothing is broken, and I'll flag which ones are stubs vs. wired.
-- If you'd rather I ALSO build out full CRUD for the new stub pages (BOM, Recruitment, Payroll, Knowledge Center, RFQ, CAPA, etc.), say the word and I'll do that as Phase 5 in a follow-up turn — it's another large chunk.
+Each phase is a large single turn. Options:
 
-Approve and I'll start with Phase 1.
+1. **Approve as-is** — I run Phase 1 next turn (schema + seed), then message you for the go-ahead on Phase 2.
+2. **Squeeze order** — e.g. do Phase 4's one-click login + tab-preload first (fastest visible wins), then Phase 1.
+3. **Trim** — drop any modules you don't care about for the demo so Phase 2 stays under one turn.
+
+Which?
