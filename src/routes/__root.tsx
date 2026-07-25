@@ -105,30 +105,30 @@ function RootComponent() {
   useEffect(() => {
     // Cross-module realtime sync: any change in a core table invalidates
     // every dashboard/report the user has open. RLS filters what they see.
+    const TABLES = [
+      "notifications", "production_orders", "machines", "inventory",
+      "purchase_orders", "sales_orders", "shipments", "invoices",
+      "payments", "quality_inspections", "work_orders", "support_tickets",
+      "tasks", "documents", "employees", "attendance", "payroll",
+      "approvals", "knowledge_articles",
+    ];
+    let cleanup: (() => void) | undefined;
     import("@/integrations/supabase/client").then(({ supabase }) => {
-      const channel = supabase
-        .channel("factoryos-sync")
-        .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
-          queryClient.invalidateQueries({ queryKey: ["notifications"] });
-        })
-        .on("postgres_changes", { event: "*", schema: "public", table: "production_orders" }, () => {
-          queryClient.invalidateQueries({ queryKey: ["prod-orders"] });
-          queryClient.invalidateQueries({ queryKey: ["prod-orders-recent"] });
-          queryClient.invalidateQueries({ queryKey: ["production_orders"] });
-        })
-        .on("postgres_changes", { event: "*", schema: "public", table: "machines" }, () => {
-          queryClient.invalidateQueries({ queryKey: ["machines-recent"] });
-          queryClient.invalidateQueries({ queryKey: ["m-machines"] });
-        })
-        .on("postgres_changes", { event: "*", schema: "public", table: "inventory" }, () => {
-          queryClient.invalidateQueries({ queryKey: ["inv"] });
-        })
-        .on("postgres_changes", { event: "*", schema: "public", table: "purchase_orders" }, () => {
-          queryClient.invalidateQueries({ queryKey: ["pos"] });
-        })
-        .subscribe();
-      return () => { supabase.removeChannel(channel); };
+      let ch = supabase.channel("factoryos-sync");
+      for (const t of TABLES) {
+        ch = ch.on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: t },
+          () => {
+            queryClient.invalidateQueries({ queryKey: [t] });
+            queryClient.invalidateQueries({ predicate: (q: { queryKey: readonly unknown[] }) => q.queryKey?.[0] === t });
+          },
+        );
+      }
+      const channel = ch.subscribe();
+      cleanup = () => { void supabase.removeChannel(channel); };
     });
+    return () => { cleanup?.(); };
   }, [queryClient]);
   return (
     <QueryClientProvider client={queryClient}>

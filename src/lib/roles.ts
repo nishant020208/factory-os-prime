@@ -26,10 +26,10 @@ export interface RoleMeta {
   label: string;
   tagline: string;
   icon: LucideIcon;
-  accent: string; // tailwind gradient utility fragment
+  accent: string;
   ring: string;
   group: "platform" | "company" | "operations" | "external";
-  demoEmail?: string;
+  demoEmail: string;
 }
 
 export const ROLES: RoleMeta[] = [
@@ -81,4 +81,4 @@ export const ROLES: RoleMeta[] = [
 ];
 
 export const ROLE_MAP = Object.fromEntries(ROLES.map(r => [r.id, r])) as Record<AppRole, RoleMeta>;
-export const DEMO_PASSWORD = "Factory@2026";
+export const DEMO_PASSWORD = "Factory2026!";
