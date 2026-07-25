@@ -179,8 +179,8 @@ export function LiveModule({ config }: { config: ModuleConfig }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
         <Kpi label={`Total ${title.toLowerCase()}`} value={kpis.total.toLocaleString()} />
-        <Kpi label="Top status" value={kpis.top[0]?.[0] ?? "—"} sub={kpis.top[0] ? `${kpis.top[0][1]} record(s)` : "no status field"} />
-        <Kpi label="Company scope" value="RLS on" sub="Company-isolated via row-level security" />
+        <Kpi label="Top status" value={kpis.top[0] ? `${kpis.top[0][0]} (${kpis.top[0][1]})` : "—"} />
+        <Kpi label="Company scope" value="RLS on" />
       </div>
 
       <Panel
@@ -204,7 +204,7 @@ export function LiveModule({ config }: { config: ModuleConfig }) {
         ) : filtered.length === 0 ? (
           <EmptyState
             title={`No ${title.toLowerCase()} yet`}
-            body={`Click "New" to create your first ${singular.toLowerCase()}. Records are scoped to your company via RLS.`}
+            sub={`Click "New" to create your first ${singular.toLowerCase()}. Records are scoped to your company via RLS.`}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -229,7 +229,7 @@ export function LiveModule({ config }: { config: ModuleConfig }) {
                     {columns.map(c => (
                       <td key={c.key} className="px-3 py-2.5 align-middle whitespace-nowrap">
                         {c.kind === "status" || c.kind === "badge"
-                          ? <StatusBadge value={fmt("text", r[c.key])} />
+                          ? <StatusBadge status={fmt("text", r[c.key])} />
                           : <span className={c.kind === "currency" || c.kind === "number" ? "tabular-nums" : ""}>
                               {fmt(c.kind, r[c.key])}
                             </span>}

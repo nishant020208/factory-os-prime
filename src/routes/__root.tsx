@@ -121,7 +121,7 @@ function RootComponent() {
           { event: "*", schema: "public", table: t },
           () => {
             queryClient.invalidateQueries({ queryKey: [t] });
-            queryClient.invalidateQueries({ predicate: (q) => q.queryKey?.[0] === t });
+            queryClient.invalidateQueries({ predicate: (q: { queryKey: readonly unknown[] }) => q.queryKey?.[0] === t });
           },
         );
       }

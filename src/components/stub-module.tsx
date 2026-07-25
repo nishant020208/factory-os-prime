@@ -22,7 +22,7 @@ export function StubModule({
       <Panel title={title}>
         <EmptyState
           title="Nothing here yet"
-          body="This surface is enabled for your role. Records will appear here as your team or connected modules create them."
+          sub="This surface is enabled for your role. Records will appear here as your team or connected modules create them."
         />
       </Panel>
     </div>
