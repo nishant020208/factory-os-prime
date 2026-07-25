@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Factory, Boxes, ShieldCheck, Cog, TrendingUp, Activity, BrainCircuit, Zap,
   Warehouse, ShoppingCart, Users, Landmark, Wrench, ClipboardList, Timer,
-  Truck, UserRound, ScrollText, Package,
+  Truck, UserRound, ScrollText, Package, ArrowRight, CheckCircle2, Clock, AlertTriangle, Link2,
 } from "lucide-react";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart,
@@ -107,6 +107,64 @@ function AIInsights({ items }: { items: { t: string; c: number }[] }) {
   );
 }
 
+/* ─────────── WORKFLOW CONNECTION PANEL ─────────── */
+function WorkflowConnectionPanel() {
+  const { companyId } = useAuth();
+  const opts = { enabled: !!companyId };
+  const { data: salesOrders } = useQuery({ queryKey: ["wf-so", companyId], queryFn: async () => (await supabase.from("sales_orders").select("so_number,status,priority")).data ?? [], ...opts });
+  const { data: prodOrders } = useQuery({ queryKey: ["wf-po", companyId], queryFn: async () => (await supabase.from("production_orders").select("order_number,status,progress")).data ?? [], ...opts });
+  const { data: shipments } = useQuery({ queryKey: ["wf-shp", companyId], queryFn: async () => (await supabase.from("shipments").select("shipment_number,status")).data ?? [], ...opts });
+  const { data: invoices } = useQuery({ queryKey: ["wf-inv", companyId], queryFn: async () => (await supabase.from("invoices").select("invoice_number,status")).data ?? [], ...opts });
+  const { data: payments } = useQuery({ queryKey: ["wf-pay", companyId], queryFn: async () => (await supabase.from("payments").select("payment_number,status")).data ?? [], ...opts });
+  const { data: inspections } = useQuery({ queryKey: ["wf-qi", companyId], queryFn: async () => (await supabase.from("quality_inspections").select("inspection_number,result")).data ?? [], ...opts });
+  const { data: tickets } = useQuery({ queryKey: ["wf-tkt", companyId], queryFn: async () => (await supabase.from("support_tickets").select("ticket_number,status")).data ?? [], ...opts });
+
+  const soDone = salesOrders?.filter(s => s.status === "completed").length ?? 0;
+  const soTotal = salesOrders?.length ?? 0;
+  const poDone = prodOrders?.filter(p => p.status === "completed").length ?? 0;
+  const poTotal = prodOrders?.length ?? 0;
+  const shpDelivered = shipments?.filter(s => s.status === "delivered").length ?? 0;
+  const shpTotal = shipments?.length ?? 0;
+  const invPaid = invoices?.filter(i => i.status === "paid").length ?? 0;
+  const invTotal = invoices?.length ?? 0;
+  const payDone = payments?.filter(p => p.status === "completed").length ?? 0;
+  const qiPass = inspections?.filter(q => q.result === "pass").length ?? 0;
+  const qiTotal = inspections?.length ?? 0;
+  const tktOpen = tickets?.filter(t => t.status === "open").length ?? 0;
+
+  const steps = [
+    { label: "Sales Orders", done: soDone, total: soTotal, color: "bg-blue-500" },
+    { label: "Production", done: poDone, total: poTotal, color: "bg-violet-500" },
+    { label: "Quality", done: qiPass, total: qiTotal, color: "bg-emerald-500" },
+    { label: "Dispatch", done: shpDelivered, total: shpTotal, color: "bg-amber-500" },
+    { label: "Invoicing", done: invPaid, total: invTotal, color: "bg-green-500" },
+    { label: "Payments", done: payDone, total: payments?.length ?? 0, color: "bg-teal-500" },
+  ];
+
+  return (
+    <Panel title="Workflow Pipeline" right={<span className="text-[10px] text-primary flex items-center gap-1"><Link2 className="h-3 w-3" />Live sync</span>}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {steps.map((s, i) => (
+          <div key={s.label} className="relative">
+            <div className="rounded-xl bg-card/60 border border-white/5 p-3 text-center">
+              <div className={`h-1.5 w-full rounded-full ${s.color} opacity-30 mb-2`}><div className={`h-full rounded-full ${s.color}`} style={{ width: s.total > 0 ? `${(s.done / s.total) * 100}%` : "0%" }} /></div>
+              <div className="text-[11px] text-muted-foreground mb-1">{s.label}</div>
+              <div className="text-lg font-semibold tabular-nums">{s.done}<span className="text-xs text-muted-foreground">/{s.total}</span></div>
+            </div>
+            {i < steps.length - 1 && <ArrowRight className="hidden lg:block absolute top-1/2 -right-2 h-3 w-3 text-muted-foreground -translate-y-1/2 z-10" />}
+          </div>
+        ))}
+      </div>
+      {tktOpen > 0 && (
+        <div className="mt-3 flex items-center gap-2 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2">
+          <AlertTriangle className="h-3.5 w-3.5" />
+          <span>{tktOpen} open support ticket{tktOpen > 1 ? "s" : ""} require attention</span>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 /* ─────────── COMPANY ADMIN ─────────── */
 function CompanyAdminDashboard() {
   const production = useQuery({ queryKey: ["prod-orders-recent"],
@@ -115,22 +173,41 @@ function CompanyAdminDashboard() {
     queryFn: async () => (await supabase.from("machines").select("*").order("name")).data ?? [] });
   const products = useQuery({ queryKey: ["products-count"],
     queryFn: async () => (await supabase.from("products").select("*", { count: "exact", head: true })).count ?? 0 });
+  const customers = useQuery({ queryKey: ["cust-count"],
+    queryFn: async () => (await supabase.from("customers").select("*", { count: "exact", head: true })).count ?? 0 });
+  const employees = useQuery({ queryKey: ["emp-count"],
+    queryFn: async () => (await supabase.from("employees").select("*", { count: "exact", head: true })).count ?? 0 });
 
   const outputTrend = trend(14);
   const oeeSeries = Array.from({ length: 12 }, (_, i) => ({
     h: `${i * 2}:00`, oee: 78 + Math.round(Math.sin(i / 2) * 6 + Math.random() * 4),
     availability: 88 + Math.round(Math.random() * 4), performance: 82 + Math.round(Math.random() * 6),
   }));
+  const activeOrders = production.data?.filter(p => p.status === "in_progress").length ?? 0;
+  const completedOrders = production.data?.filter(p => p.status === "completed").length ?? 0;
+  const machineUp = machines.data?.filter(m => m.status === "operational").length ?? 0;
+  const machineDown = machines.data?.filter(m => m.status === "down" || m.status === "maintenance").length ?? 0;
+  const avgUtil = machines.data?.length ? (machines.data.reduce((s, m) => s + Number(m.utilization ?? 0), 0) / machines.data.length).toFixed(1) : "0";
   const mixData = [{ name: "Precision", value: 42 }, { name: "Assemblies", value: 30 }, { name: "Raw", value: 18 }, { name: "Other", value: 10 }];
   const COLORS = ["oklch(0.58 0.22 259)","oklch(0.62 0.19 300)","oklch(0.72 0.14 210)","oklch(0.72 0.19 145)"];
 
   return (
     <Shell eyebrow="Executive" title="Command Center" sub="Company-wide operations, plants, machines and AI recommendations.">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Active Orders" value={String(production.data?.filter(p => p.status === "in_progress").length ?? 0)} delta="+4" icon={Factory} tone="primary" />
-        <Kpi label="Machine Uptime" value="94.1%" delta="+1.2%" icon={Cog} tone="success" />
-        <Kpi label="OEE" value="87.4%" delta="+3.2%" icon={TrendingUp} tone="info" />
-        <Kpi label="Open NCRs" value="7" delta="-2" icon={ShieldCheck} tone="warning" />
+      {/* Workflow Pipeline — live status across all 3 customer orders */}
+      <WorkflowConnectionPanel />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-4">
+        <Kpi label="Active Orders" value={String(activeOrders)} delta="+4" icon={Factory} tone="primary" />
+        <Kpi label="Completed" value={String(completedOrders)} delta="+1" icon={CheckCircle2} tone="success" />
+        <Kpi label="Machines Up" value={`${machineUp}/${machines.data?.length ?? 0}`} icon={Cog} tone="info" />
+        <Kpi label="Employees" value={String(employees.data ?? 0)} icon={Users} tone="primary" />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-3">
+        <Kpi label="Customers" value={String(customers.data ?? 0)} icon={UserRound} tone="info" />
+        <Kpi label="Products" value={String(products.data ?? 0)} icon={Boxes} tone="primary" />
+        <Kpi label="Avg Utilization" value={`${avgUtil}%`} icon={TrendingUp} tone="success" />
+        <Kpi label="Down Machines" value={String(machineDown)} icon={Wrench} tone="warning" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
@@ -140,9 +217,9 @@ function CompanyAdminDashboard() {
           </Panel>
         </div>
         <AIInsights items={[
-          { t: "Bearing wear predicted on CNC Mill Alpha-1 within 72h", c: 94 },
-          { t: "Reorder SKU-A1003 · consumption up 22% WoW", c: 88 },
-          { t: "Supplier Kyoto Precision beat SLA by 6% this month", c: 91 },
+          { t: `MediCore SO-005 at 45% — on track for delivery in 7 days`, c: 94 },
+          { t: `Reorder N-08-SKU-A1003 — consumption up 22% WoW`, c: 88 },
+          { t: `Supplier Kyoto Precision beat SLA by 6% this month`, c: 91 },
         ]} />
       </div>
 
@@ -228,7 +305,7 @@ function CompanyAdminDashboard() {
       </div>
 
       <div className="text-xs text-muted-foreground mt-6">
-        {products.isFetched && <>Catalog: {products.data} SKUs · Company-scoped by RLS · Realtime ready</>}
+        {products.isFetched && <>Catalog: {products.data} SKUs · {customers.data ?? 0} Customers · {employees.data ?? 0} Employees · Company-scoped by RLS · Realtime ready</>}
       </div>
     </Shell>
   );

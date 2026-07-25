@@ -1,15 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion, useMotionValue, useSpring, useTransform, AnimatePresence, useScroll } from "framer-motion";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, useMotionValue, useSpring, useTransform, AnimatePresence, useScroll, useVelocity } from "framer-motion";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   Activity, Factory, Warehouse, Package, ShieldCheck, Wrench, Landmark, Users,
-  ShoppingCart, Sparkles, Cpu, Boxes, Truck, ClipboardCheck, PackageCheck,
-  ArrowRight, Search, Sun, Moon, Menu, X, Lock, KeyRound, FileCheck2,
+  ShoppingCart, Sparkles, Boxes, Truck, PackageCheck,
+  ArrowRight, Search, Sun, Moon, Menu, X, Lock, FileCheck2,
   ScrollText, Network, ChevronRight, TrendingUp, TrendingDown, AlertTriangle,
-  CheckCircle2, Radio, Gauge, Layers, Database, Zap, Cog,
+  CheckCircle2, Radio, Database, Zap, Cog,
+  BarChart3, Clock, Globe, HardDrive,
+  UserCheck, Building2, Server, KeyRound,
 } from "lucide-react";
 import {
-  LineChart, Line, ResponsiveContainer, AreaChart, Area, BarChart, Bar,
+  LineChart as RechartLine, Line, ResponsiveContainer, AreaChart, Area,
   XAxis, YAxis, Tooltip,
 } from "recharts";
 import { ROLES } from "@/lib/roles";
@@ -17,88 +19,1064 @@ import { ROLES } from "@/lib/roles";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "FactoryOS AI — Factory Command Center" },
-      { name: "description", content: "Enterprise Smart Manufacturing Operating System. Production, inventory, warehouses, procurement, quality, maintenance, finance, HR and AI — in one control room." },
-      { property: "og:title", content: "FactoryOS AI — Factory Command Center" },
-      { property: "og:description", content: "Enterprise Smart Manufacturing Operating System. Production, inventory, warehouses, procurement, quality, maintenance, finance, HR and AI — in one control room." },
+      { title: "FactoryOS AI — Intelligent Manufacturing Platform" },
+      { name: "description", content: "AI-powered Smart Manufacturing ERP. Production, inventory, quality, maintenance, finance, HR and AI in one platform." },
+      { property: "og:title", content: "FactoryOS AI — Intelligent Manufacturing Platform" },
+      { property: "og:description", content: "AI-powered Smart Manufacturing ERP built for modern enterprise operations." },
     ],
   }),
   component: LandingPage,
 });
 
 /* ────────────────────────────────────────────────────────── */
-/*  BACKGROUND — animated blueprint / CAD grid                */
+/*  SECTION 1 — INTERACTIVE NETWORK CANVAS                    */
 /* ────────────────────────────────────────────────────────── */
-function BlueprintBackground() {
-  return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-      {/* radial gradients */}
-      <div className="absolute inset-0 aurora-bg" />
-      {/* grid */}
-      <div className="absolute inset-0 grid-bg opacity-60" />
-      {/* fine blueprint grid */}
-      <svg className="absolute inset-0 h-full w-full opacity-[0.18]">
-        <defs>
-          <pattern id="fine" width="22" height="22" patternUnits="userSpaceOnUse">
-            <path d="M22 0H0V22" fill="none" stroke="oklch(0.72 0.14 210 / 0.35)" strokeWidth="0.4" />
-          </pattern>
-          <pattern id="cad" width="220" height="220" patternUnits="userSpaceOnUse">
-            <path d="M0 110H220M110 0V220" fill="none" stroke="oklch(0.58 0.22 259 / 0.35)" strokeWidth="0.6" />
-            <circle cx="110" cy="110" r="2" fill="oklch(0.72 0.14 210 / 0.6)" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#fine)" />
-        <rect width="100%" height="100%" fill="url(#cad)" />
-      </svg>
+const NETWORK_NODES = [
+  { id: "inventory", label: "Inventory", icon: Boxes, x: 10, y: 30 },
+  { id: "warehouse", label: "Warehouse", icon: Warehouse, x: 30, y: 15 },
+  { id: "production", label: "Production", icon: Cog, x: 50, y: 30 },
+  { id: "quality", label: "Quality", icon: ShieldCheck, x: 70, y: 15 },
+  { id: "finance", label: "Finance", icon: Landmark, x: 90, y: 30 },
+  { id: "hr", label: "HR", icon: Users, x: 10, y: 65 },
+  { id: "crm", label: "CRM", icon: Network, x: 30, y: 80 },
+  { id: "ai", label: "AI", icon: Sparkles, x: 50, y: 65 },
+  { id: "analytics", label: "Analytics", icon: Activity, x: 70, y: 80 },
+  { id: "procurement", label: "Procurement", icon: ShoppingCart, x: 90, y: 65 },
+] as const;
 
-      {/* moving connection lines */}
-      <svg className="absolute inset-0 h-full w-full">
-        {Array.from({ length: 6 }).map((_, i) => {
-          const y = 80 + i * 130;
+const CONNECTIONS = [
+  [0, 1], [1, 2], [2, 3], [3, 4],
+  [5, 6], [6, 7], [7, 8], [8, 9],
+  [0, 5], [2, 7], [4, 9], [1, 6],
+  [2, 7], [3, 8],
+];
+
+function NetworkCanvas() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const [hovered, setHovered] = useState<number | null>(null);
+  const [activePulse, setActivePulse] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setActivePulse(p => (p + 1) % CONNECTIONS.length), 1800);
+    return () => clearInterval(t);
+  }, []);
+
+  const onMove = useCallback((e: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) { mouseX.set((e.clientX - rect.left) / rect.width); mouseY.set((e.clientY - rect.top) / rect.height); }
+  }, [mouseX, mouseY]);
+
+  return (
+    <section ref={containerRef} onMouseMove={onMove} className="relative w-full h-[420px] sm:h-[520px] overflow-hidden select-none">
+      {/* Blueprint grid */}
+      <div className="absolute inset-0 opacity-[0.07]">
+        <svg className="w-full h-full">
+          <defs>
+            <pattern id="net-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+              <path d="M32 0H0V32" fill="none" stroke="currentColor" strokeWidth="0.5" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#net-grid)" />
+        </svg>
+      </div>
+
+      {/* SVG Connections */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+        {CONNECTIONS.map(([from, to], i) => {
+          const a = NETWORK_NODES[from], b = NETWORK_NODES[to];
+          const cx = `${(a.x + b.x) / 2}%`, cy = `${(a.y + b.y) / 2}%`;
+          const isPulsing = activePulse === i;
           return (
             <g key={i}>
-              <line x1="-10%" y1={y} x2="110%" y2={y}
-                stroke="oklch(0.58 0.22 259 / 0.18)" strokeWidth="1" strokeDasharray="4 10" />
-              <motion.circle
-                r="2.4" fill="oklch(0.72 0.14 210 / 0.9)"
-                initial={{ cx: "-5%", cy: y }}
-                animate={{ cx: "105%" }}
-                transition={{ duration: 14 + i * 2, repeat: Infinity, ease: "linear", delay: i * 1.5 }}
+              <line
+                x1={`${a.x}%`} y1={`${a.y}%`} x2={`${b.x}%`} y2={`${b.y}%`}
+                className="stroke-white/[0.08]" strokeWidth="1"
               />
+              {/* Animated pulse dot */}
+              {isPulsing && (
+                <motion.circle
+                  r="2.5" fill="oklch(0.58 0.22 259)"
+                  initial={{ cx: `${a.x}%`, cy: `${a.y}%`, opacity: 0 }}
+                  animate={{
+                    cx: [`${a.x}%`, `${b.x}%`], cy: [`${a.y}%`, `${b.y}%`],
+                    opacity: [0, 1, 0],
+                  }}
+                  transition={{ duration: 1.2, ease: "easeInOut" }}
+                />
+              )}
+              {/* Mouse-reactive glow on connection */}
+              <ClosestLine cx={cx} cy={cy} mouseX={mouseX} mouseY={mouseY} />
             </g>
           );
         })}
       </svg>
 
-      {/* subtle particles */}
-      <svg className="absolute inset-0 h-full w-full opacity-70">
-        {Array.from({ length: 40 }).map((_, i) => {
-          const cx = (i * 97) % 100;
-          const cy = (i * 53) % 100;
-          return (
-            <motion.circle
-              key={i} cx={`${cx}%`} cy={`${cy}%`} r="1"
-              fill="oklch(0.98 0.005 250 / 0.5)"
-              animate={{ opacity: [0.1, 0.7, 0.1] }}
-              transition={{ duration: 4 + (i % 5), repeat: Infinity, delay: i * 0.1 }}
+      {/* Nodes */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="relative w-[90%] h-[90%] max-w-5xl">
+          {NETWORK_NODES.map((node, i) => (
+            <NodeItem
+              key={node.id}
+              node={node}
+              index={i}
+              hovered={hovered}
+              onHover={setHovered}
+              mouseX={mouseX}
+              mouseY={mouseY}
+              containerRef={containerRef}
             />
-          );
-        })}
-      </svg>
+          ))}
+        </div>
+      </div>
+
+      {/* Scroll hint */}
+      <motion.div
+        animate={{ y: [0, 4, 0] }}
+        transition={{ duration: 2, repeat: Infinity }}
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 text-[11px] text-white/20 flex flex-col items-center gap-1"
+      >
+        <span>Explore the platform</span>
+        <div className="w-4 h-[1px] bg-white/20" />
+      </motion.div>
+    </section>
+  );
+}
+
+function ClosestLine({ cx, cy, mouseX, mouseY }: { cx: string; cy: string; mouseX: any; mouseY: any }) {
+  const dist = useTransform(
+    useVelocity(useTransform(mouseX, (v: number) => Math.abs(parseFloat(cx) / 100 - v))),
+    [0, 0.3], [1, 0]
+  );
+  return (
+    <motion.circle
+      cx={cx} cy={cy} r="0"
+      className="fill-primary/20"
+      style={{ opacity: dist }}
+    />
+  );
+}
+
+function NodeItem({ node, index, hovered, onHover, mouseX, mouseY, containerRef }: {
+  node: typeof NETWORK_NODES[number];
+  index: number;
+  hovered: number | null;
+  onHover: (i: number | null) => void;
+  mouseX: any; mouseY: any; containerRef: any;
+}) {
+  const springX = useSpring(useMotionValue(0), { stiffness: 120, damping: 12 });
+  const springY = useSpring(useMotionValue(0), { stiffness: 120, damping: 12 });
+
+  useEffect(() => {
+    const unsubX = mouseX.on("change", (v: number) => {
+      const dx = (v - node.x / 100) * 20;
+      springX.set(hovered === index ? dx * 0.5 : dx * 0.15);
+    });
+    const unsubY = mouseY.on("change", (v: number) => {
+      const dy = (v - node.y / 100) * 20;
+      springY.set(hovered === index ? dy * 0.5 : dy * 0.15);
+    });
+    return () => { unsubX(); unsubY(); };
+  }, [mouseX, mouseY, node.x, node.y, hovered, index, springX, springY]);
+
+  const isHovered = hovered === index;
+  const Icon = node.icon;
+
+  return (
+    <motion.button
+      style={{ x: springX, y: springY, left: `${node.x}%`, top: `${node.y}%` }}
+      onMouseEnter={() => onHover(index)}
+      onMouseLeave={() => onHover(null)}
+      onClick={() => {
+        const id = node.id === "ai" ? "ai" : node.id === "analytics" ? "analytics" : node.id === "crm" ? "modules" : "modules";
+        document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+      }}
+      className="absolute -translate-x-1/2 -translate-y-1/2"
+    >
+      <motion.div
+        animate={{
+          scale: isHovered ? 1.15 : 1,
+          borderColor: isHovered ? "oklch(0.58 0.22 259 / 0.5)" : "oklch(1 0 0 / 0.08)",
+        }}
+        transition={{ duration: 0.2 }}
+        className="flex items-center gap-2.5 px-3 py-2 rounded-lg border bg-card/80 backdrop-blur-sm cursor-pointer whitespace-nowrap"
+      >
+        <div className={`h-6 w-6 rounded grid place-items-center transition-colors ${isHovered ? "bg-primary" : "bg-white/5"}`}>
+          <Icon className={`h-3 w-3 ${isHovered ? "text-white" : "text-white/60"}`} />
+        </div>
+        <span className={`text-xs font-medium transition-colors ${isHovered ? "text-white" : "text-white/50"}`}>
+          {node.label}
+        </span>
+      </motion.div>
+    </motion.button>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  SECTION 2 — HERO                                           */
+/* ────────────────────────────────────────────────────────── */
+function Hero() {
+  const btnRef = useRef<HTMLAnchorElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5;
+    const y = (e.clientY - r.top) / r.height - 0.5;
+    el.style.transform = `translate(${x * 8}px, ${y * 6}px)`;
+  };
+
+  const handleMouseLeave = () => {
+    if (btnRef.current) btnRef.current.style.transform = "translate(0, 0)";
+  };
+
+  return (
+    <section className="pb-16 sm:pb-24 max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-3xl">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+        >
+          <div className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-white/[0.06] bg-white/[0.03] text-white/40">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            v4.2.1 · Production ready
+          </div>
+        </motion.div>
+
+        <motion.h1
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15 }}
+          className="mt-6 text-[32px] sm:text-[44px] lg:text-[52px] font-semibold tracking-tight leading-[1.08] text-white"
+        >
+          Every Operation.<br />
+          <span className="text-white/40">One Intelligent Platform.</span>
+        </motion.h1>
+
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="mt-4 text-[15px] text-white/50 max-w-xl leading-relaxed"
+        >
+          AI-powered Smart Manufacturing ERP built for modern enterprise operations.
+          Production, inventory, quality, maintenance, finance, HR and AI — unified.
+        </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.25 }}
+          className="mt-8 flex items-center gap-3 flex-wrap"
+        >
+          <Link
+            ref={btnRef}
+            to="/auth"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            className="relative inline-flex items-center gap-1.5 h-10 px-5 rounded-lg text-[13px] font-medium text-white bg-primary hover:bg-primary/90 transition-all duration-150 active:scale-[0.97]"
+          >
+            Explore Platform <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+          <Link
+            to="/auth"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-[13px] font-medium border border-white/[0.08] text-white/60 hover:text-white hover:border-white/[0.15] transition-all duration-150 active:scale-[0.97]"
+          >
+            Sign in
+          </Link>
+          <button className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-[13px] text-white/40 hover:text-white/60 transition-all duration-150">
+            <span className="h-5 w-5 rounded border border-white/[0.1] grid place-items-center">
+              <PlayIcon className="h-3 w-3" />
+            </span>
+            Watch workflow
+          </button>
+        </motion.div>
+
+        {/* Metrics row */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.35 }}
+          className="mt-10 flex items-center gap-6 sm:gap-10 text-[12px]"
+        >
+          {[
+            { label: "Plants", value: "128" },
+            { label: "Machines", value: "9.4k" },
+            { label: "Users", value: "2.1k" },
+            { label: "Uptime", value: "99.9%" },
+          ].map(m => (
+            <div key={m.label}>
+              <div className="text-white/30">{m.label}</div>
+              <div className="text-white font-semibold text-sm mt-0.5">{m.value}</div>
+            </div>
+          ))}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function PlayIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M8 5v14l11-7L8 5z" fill="currentColor" />
+    </svg>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  SECTION 3 — MANUFACTURING WORKFLOW                         */
+/* ────────────────────────────────────────────────────────── */
+const WORKFLOW_STAGES = [
+  { id: "order", label: "Customer Order", icon: ShoppingCart, desc: "Order received and verified" },
+  { id: "inventory", label: "Inventory", icon: Boxes, desc: "Stock levels confirmed" },
+  { id: "warehouse", label: "Warehouse", icon: Warehouse, desc: "Materials allocated" },
+  { id: "production", label: "Production", icon: Cog, desc: "Batch in progress" },
+  { id: "quality", label: "Quality", icon: ShieldCheck, desc: "QC inspection passed" },
+  { id: "dispatch", label: "Dispatch", icon: Truck, desc: "Shipping scheduled" },
+  { id: "finance", label: "Finance", icon: Landmark, desc: "Invoice generated" },
+  { id: "analytics", label: "Analytics", icon: Activity, desc: "Performance logged" },
+  { id: "ai", label: "AI", icon: Sparkles, desc: "Optimization complete" },
+];
+
+function Workflow() {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [expanded, setExpanded] = useState<number | null>(null);
+
+  useEffect(() => {
+    const t = setInterval(() => setActiveIdx(i => (i + 1) % WORKFLOW_STAGES.length), 2200);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <section id="flow" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+      <SectionHeader
+        eyebrow="Manufacturing Workflow"
+        title="From order to delivery"
+        desc="Every stage of your manufacturing pipeline, live and connected."
+      />
+      <div className="mt-10 relative">
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2.5">
+          {WORKFLOW_STAGES.map((stage, i) => {
+            const isActive = i === activeIdx;
+            const isPast = i < activeIdx;
+            const Icon = stage.icon;
+            return (
+              <motion.button
+                key={stage.id}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.04 }}
+                onMouseEnter={() => setExpanded(i)}
+                onMouseLeave={() => setExpanded(null)}
+                onClick={() => setExpanded(expanded === i ? null : i)}
+                className="relative text-left"
+              >
+                <motion.div
+                  animate={{
+                    borderColor: isActive ? "oklch(0.58 0.22 259 / 0.4)" : isPast ? "oklch(0.72 0.19 145 / 0.25)" : "oklch(1 0 0 / 0.06)",
+                    backgroundColor: isActive ? "oklch(0.58 0.22 259 / 0.08)" : "rgba(255,255,255,0.02)",
+                  }}
+                  transition={{ duration: 0.3 }}
+                  className="rounded-xl border p-3"
+                >
+                  <div className={`h-7 w-7 rounded-lg grid place-items-center ${
+                    isActive ? "bg-primary" : isPast ? "bg-success/20" : "bg-white/5"
+                  }`}>
+                    <Icon className={`h-3.5 w-3.5 ${
+                      isActive ? "text-white" : isPast ? "text-success" : "text-white/40"
+                    }`} />
+                  </div>
+                  <div className="mt-2 text-[11px] font-medium text-white/80 truncate">{stage.label}</div>
+                  <div className="h-0.5 mt-2 rounded-full bg-white/5 overflow-hidden">
+                    <motion.div
+                      className="h-full bg-primary"
+                      initial={{ width: "0%" }}
+                      animate={{ width: isActive ? "100%" : isPast ? "100%" : "0%" }}
+                      transition={{ duration: 0.6 }}
+                    />
+                  </div>
+                </motion.div>
+
+                {/* Expanded detail */}
+                <AnimatePresence>
+                  {expanded === i && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute top-full left-0 mt-2 z-20 w-48 rounded-lg border border-white/[0.08] bg-card p-3 shadow-xl backdrop-blur-xl"
+                    >
+                      <div className="text-xs font-medium text-white">{stage.label}</div>
+                      <div className="text-[11px] text-white/40 mt-0.5">{stage.desc}</div>
+                      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-white/30">
+                        <Clock className="h-3 w-3" /> {(i + 1) * 12}m avg.
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.button>
+            );
+          })}
+        </div>
+
+        {/* Live status bar */}
+        <div className="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 flex items-center gap-3 text-xs">
+          <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+          <span className="text-white/40">Current:</span>
+          <span className="text-white font-medium">{WORKFLOW_STAGES[activeIdx].label}</span>
+          <span className="text-white/20 mx-1">·</span>
+          <span className="text-white/40">{WORKFLOW_STAGES[activeIdx].desc}</span>
+          <span className="ml-auto text-white/20 tabular-nums">Order #ORD-{4821 + activeIdx}</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  SECTION 4 — ENTERPRISE MODULES                             */
+/* ────────────────────────────────────────────────────────── */
+const ENTERPRISE_MODULES = [
+  { label: "Inventory", icon: Boxes, hint: "42k SKUs tracked", color: "from-blue-500/20 to-blue-600/10" },
+  { label: "Production", icon: Cog, hint: "12 lines · 87% OEE", color: "from-teal-500/20 to-teal-600/10" },
+  { label: "Warehouse", icon: Warehouse, hint: "18 zones · 94% util", color: "from-emerald-500/20 to-emerald-600/10" },
+  { label: "Maintenance", icon: Wrench, hint: "94% uptime", color: "from-amber-500/20 to-amber-600/10" },
+  { label: "Quality", icon: ShieldCheck, hint: "NCR 0.4% · Cpk 1.6", color: "from-violet-500/20 to-violet-600/10" },
+  { label: "Finance", icon: Landmark, hint: "GL · AP · AR", color: "from-green-500/20 to-green-600/10" },
+  { label: "HR", icon: Users, hint: "412 employees", color: "from-pink-500/20 to-pink-600/10" },
+  { label: "CRM", icon: Network, hint: "312 accounts", color: "from-indigo-500/20 to-indigo-600/10" },
+  { label: "AI Center", icon: Sparkles, hint: "Copilot · Predictions", color: "from-primary/30 to-primary/10" },
+  { label: "Analytics", icon: BarChart3, hint: "Real-time dashboards", color: "from-cyan-500/20 to-cyan-600/10" },
+  { label: "Procurement", icon: ShoppingCart, hint: "128 POs active", color: "from-orange-500/20 to-orange-600/10" },
+  { label: "Documents", icon: FileCheck2, hint: "ISO compliant", color: "from-slate-500/20 to-slate-600/10" },
+];
+
+function EnterpriseModules() {
+  const [clicked, setClicked] = useState<string | null>(null);
+
+  return (
+    <section id="modules" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+      <SectionHeader
+        eyebrow="Platform"
+        title="Every function, one platform"
+        desc="Consistent primitives across every module — with role-scoped access."
+      />
+      <div className="mt-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {ENTERPRISE_MODULES.map((m, i) => (
+          <ModuleTile
+            key={m.label}
+            module={m}
+            index={i}
+            isClicked={clicked === m.label}
+            onClick={() => setClicked(clicked === m.label ? null : m.label)}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ModuleTile({ module: m, index, isClicked, onClick }: {
+  module: typeof ENTERPRISE_MODULES[number];
+  index: number;
+  isClicked: boolean;
+  onClick: () => void;
+}) {
+  const Icon = m.icon;
+  const [count, setCount] = useState(0);
+  const countRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const target = parseInt(m.hint.replace(/[^0-9]/g, "").slice(0, 3)) || 100;
+    const duration = 1500;
+    const start = performance.now();
+    const raf = () => {
+      const elapsed = performance.now() - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(eased * target));
+      if (progress < 1) requestAnimationFrame(raf);
+    };
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { requestAnimationFrame(raf); observer.disconnect(); }
+    }, { threshold: 0.3 });
+    if (countRef.current) observer.observe(countRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay: index * 0.03 }}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className="group relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-left hover:border-white/[0.12] transition-all duration-200 overflow-hidden"
+    >
+      {/* Background gradient on hover */}
+      <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-br ${m.color} transition-opacity duration-300`} />
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-between">
+          <div className="h-9 w-9 rounded-lg bg-white/[0.04] group-hover:bg-primary/20 grid place-items-center transition-colors duration-200">
+            <Icon className="h-4 w-4 text-white/60 group-hover:text-primary transition-colors duration-200" />
+          </div>
+          <ChevronRight className={`h-3.5 w-3.5 text-white/20 transition-all duration-200 ${
+            isClicked ? "rotate-90 text-primary" : "group-hover:translate-x-0.5"
+          }`} />
+        </div>
+        <div className="mt-3 text-sm font-medium text-white/90">{m.label}</div>
+        <div ref={countRef} className="text-[11px] text-white/40 mt-0.5">{m.hint}</div>
+
+        {/* Animated number */}
+        <AnimatePresence>
+          {isClicked && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="mt-3 pt-3 border-t border-white/[0.06] overflow-hidden"
+            >
+              <div className="text-[10px] text-white/30 uppercase tracking-wider">Live metrics</div>
+              <div className="mt-1.5 flex items-baseline gap-1">
+                <span className="text-lg font-semibold text-white tabular-nums">{count}</span>
+                <span className="text-[10px] text-success">▲ {Math.floor(count * 0.04)}%</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.button>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  SECTION 5 — AI INTELLIGENCE                                */
+/* ────────────────────────────────────────────────────────── */
+const AI_MESSAGES = [
+  { text: "Inventory: Raw Material A projected to run out in 3 days.", type: "warn" as const },
+  { text: "Supplier ACME Corp selected — estimated savings $12,400.", type: "success" as const },
+  { text: "Production delay detected on Line B-04. Adjusting schedule.", type: "info" as const },
+  { text: "Machine M-07: Predictive maintenance due in 48 hours.", type: "warn" as const },
+  { text: "Quality trend: Defect rate improving 0.3% week-over-week.", type: "success" as const },
+  { text: "Executive summary generated for Q3 board review.", type: "info" as const },
+];
+
+function AIIntelligence() {
+  const [visible, setVisible] = useState<typeof AI_MESSAGES>([]);
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (idx >= AI_MESSAGES.length) return;
+    const t = setTimeout(() => {
+      setVisible(prev => [...prev, AI_MESSAGES[idx]]);
+      setIdx(i => i + 1);
+    }, 800);
+    return () => clearTimeout(t);
+  }, [idx]);
+
+  const typeColors = {
+    warn: "border-amber-500/20 bg-amber-500/5",
+    success: "border-emerald-500/20 bg-emerald-500/5",
+    info: "border-blue-500/20 bg-blue-500/5",
+  };
+
+  const typeDot = {
+    warn: "bg-amber-500",
+    success: "bg-emerald-500",
+    info: "bg-blue-500",
+  };
+
+  return (
+    <section id="ai" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+      <SectionHeader
+        eyebrow="AI Intelligence"
+        title="AI Copilot, live"
+        desc="Real-time decisions from production, inventory, quality and maintenance streams."
+      />
+      <div className="mt-10 max-w-2xl mx-auto">
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 min-h-[320px] relative overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center gap-2 pb-4 border-b border-white/[0.06]">
+            <div className="h-6 w-6 rounded-md bg-primary/20 grid place-items-center">
+              <Sparkles className="h-3 w-3 text-primary" />
+            </div>
+            <div className="text-sm font-medium text-white">AI Copilot</div>
+            <div className="ml-auto flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              <span className="text-[10px] text-white/30">Live</span>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="mt-4 space-y-2 min-h-[220px]">
+            <AnimatePresence>
+              {visible.map((msg, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 8, x: -4 }}
+                  animate={{ opacity: 1, y: 0, x: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className={`flex items-start gap-2.5 rounded-lg border p-2.5 ${typeColors[msg.type]}`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${typeDot[msg.type]}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] text-white/80 leading-relaxed">{msg.text}</div>
+                    <div className="text-[10px] text-white/20 mt-1">Just now</div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {/* Typing indicator */}
+            {idx < AI_MESSAGES.length && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-center gap-2 px-2.5 py-2"
+              >
+                <div className="flex gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+                <span className="text-[11px] text-white/30">AI is analyzing streams...</span>
+              </motion.div>
+            )}
+
+            {/* Empty state */}
+            {visible.length === 0 && (
+              <div className="flex items-center justify-center h-[200px] text-sm text-white/20">
+                AI insights will appear here
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  SECTION 6 — ROLE HIERARCHY                                 */
+/* ────────────────────────────────────────────────────────── */
+function RoleHierarchy() {
+  const [expandedRole, setExpandedRole] = useState<string | null>(null);
+
+  const tiers = [
+    { label: "Root Super Admin", roles: ["root_super_admin"], color: "text-amber-400", line: "bg-amber-400/30" },
+    { label: "Company Admin", roles: ["company_admin"], color: "text-blue-400", line: "bg-blue-400/30" },
+    { label: "Plant Admin", roles: ["plant_admin"], color: "text-cyan-400", line: "bg-cyan-400/30" },
+    { label: "Managers", roles: ["plant_manager", "production_manager", "warehouse_manager", "procurement_manager", "quality_inspector", "maintenance_engineer", "finance_manager", "hr_manager"], color: "text-teal-400", line: "bg-teal-400/30" },
+    { label: "Operators", roles: ["production_operator"], color: "text-slate-400", line: "bg-slate-400/30" },
+    { label: "External", roles: ["customer_portal", "supplier_portal", "auditor"], color: "text-violet-400", line: "bg-violet-400/30" },
+  ];
+
+  const rolePerms: Record<string, string[]> = {
+    root_super_admin: ["Platform access", "All companies", "System config", "Audit logs"],
+    company_admin: ["Company settings", "Plant management", "User roles", "Whitelist"],
+    plant_admin: ["Plant config", "Departments", "Employee mgmt", "Operations"],
+    plant_manager: ["Plant dashboard", "Production view", "Quality view", "Reports"],
+    production_manager: ["Work orders", "Scheduling", "BOM", "Capacity"],
+    warehouse_manager: ["Inventory", "Stock movement", "Transfers", "Dispatch"],
+    procurement_manager: ["POs", "Suppliers", "RFQs", "Goods receipt"],
+    quality_inspector: ["Inspections", "Defects", "CAPA", "Reports"],
+    maintenance_engineer: ["Machines", "Schedules", "Breakdowns", "Parts"],
+    finance_manager: ["Invoices", "Expenses", "Budgets", "P&L"],
+    hr_manager: ["Employees", "Attendance", "Payroll", "Training"],
+    production_operator: ["Work orders", "Machines", "Logs", "Issues"],
+    customer_portal: ["Orders", "Invoices", "Shipments", "Support"],
+    supplier_portal: ["POs", "Deliveries", "Invoices", "Performance"],
+    auditor: ["Audit logs", "Reports", "Compliance", "Documents"],
+  };
+
+  return (
+    <section className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+      <SectionHeader
+        eyebrow="Access Model"
+        title="Role hierarchy"
+        desc="Every user is scoped by role, plant and company — enforced in the database."
+      />
+      <div className="mt-10 grid lg:grid-cols-[1fr_300px] gap-8 items-start">
+        <div className="space-y-0">
+          {tiers.map((tier, ti) => (
+            <div key={tier.label}>
+              {/* Tier header */}
+              <motion.div
+                initial={{ opacity: 0, x: -8 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: ti * 0.05 }}
+                className="flex items-center gap-3 py-3"
+              >
+                <div className={`h-2 w-2 rounded-full ${tier.line.replace("bg-", "bg-")} bg-opacity-100`} />
+                <div className={`text-xs font-medium uppercase tracking-wider ${tier.color}`}>{tier.label}</div>
+                <div className="flex-1 h-px bg-white/[0.04]" />
+              </motion.div>
+
+              {/* Role pills */}
+              <div className="flex flex-wrap gap-1.5 ml-5 mb-1">
+                {tier.roles.map(roleId => {
+                  const meta = ROLES.find(r => r.id === roleId);
+                  if (!meta) return null;
+                  const isExpanded = expandedRole === roleId;
+                  return (
+                    <motion.button
+                      key={roleId}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      whileInView={{ opacity: 1, scale: 1 }}
+                      viewport={{ once: true }}
+                      whileHover={{ scale: 1.02 }}
+                      onClick={() => setExpandedRole(isExpanded ? null : roleId)}
+                      className={`relative rounded-lg border px-2.5 py-1.5 text-xs transition-all duration-150 ${
+                        isExpanded
+                          ? "border-primary/40 bg-primary/10 text-white"
+                          : "border-white/[0.06] bg-white/[0.02] text-white/60 hover:border-white/[0.12] hover:text-white/80"
+                      }`}
+                    >
+                      {meta.label}
+                    </motion.button>
+                  );
+                })}
+              </div>
+
+              {/* Permissions panel */}
+              <AnimatePresence>
+                {tier.roles.map(roleId => {
+                  if (expandedRole !== roleId) return null;
+                  const perms = rolePerms[roleId] || [];
+                  return (
+                    <motion.div
+                      key={roleId}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden ml-5 mb-2"
+                    >
+                      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+                        <div className="text-[10px] uppercase tracking-wider text-white/30 mb-2">Permissions</div>
+                        <div className="grid grid-cols-2 gap-1">
+                          {perms.map(p => (
+                            <div key={p} className="flex items-center gap-1.5 text-[11px] text-white/50">
+                              <CheckCircle2 className="h-3 w-3 text-primary/60" />
+                              {p}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          ))}
+        </div>
+
+        {/* Sidebar info */}
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+          <div className="text-[10px] uppercase tracking-wider text-white/30">Security model</div>
+          <div className="mt-4 space-y-3">
+            {[
+              { icon: KeyRound, label: "JWT Authentication" },
+              { icon: Lock, label: "Row-Level Security" },
+              { icon: ScrollText, label: "Audit Logging" },
+              { icon: Globe, label: "Multi-tenant Isolation" },
+            ].map(s => (
+              <div key={s.label} className="flex items-center gap-2.5">
+                <div className="h-6 w-6 rounded bg-white/[0.04] grid place-items-center">
+                  <s.icon className="h-3 w-3 text-primary/60" />
+                </div>
+                <span className="text-xs text-white/60">{s.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  SECTION 7 — SECURITY ARCHITECTURE                          */
+/* ────────────────────────────────────────────────────────── */
+function SecurityArchitecture() {
+  const layers = [
+    { icon: UserCheck, label: "Authentication", desc: "Supabase Auth + JWT" },
+    { icon: FileCheck2, label: "Whitelist", desc: "Email domain verification" },
+    { icon: ShieldCheck, label: "Role Permissions", desc: "15 predefined roles" },
+    { icon: Lock, label: "Row-Level Security", desc: "PostgreSQL RLS policies" },
+    { icon: HardDrive, label: "Encryption at Rest", desc: "AES-256" },
+    { icon: ScrollText, label: "Audit Logs", desc: "All writes recorded" },
+    { icon: Building2, label: "Multi-company", desc: "Tenant isolation" },
+  ];
+
+  return (
+    <section id="security" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+      <SectionHeader
+        eyebrow="Enterprise Security"
+        title="Built for regulated plants"
+        desc="Security is enforced in the database, not the UI."
+      />
+      <div className="mt-10 grid md:grid-cols-[240px_1fr] gap-6 items-center">
+        {/* Shield illustration */}
+        <div className="relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-8 grid place-items-center">
+          <motion.div
+            animate={{ scale: [1, 1.03, 1] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            className="h-24 w-24 rounded-full grid place-items-center bg-primary/10"
+          >
+            <ShieldCheck className="h-10 w-10 text-primary/60" />
+          </motion.div>
+        </div>
+
+        {/* Security layers */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          {layers.map((layer, i) => (
+            <motion.div
+              key={layer.label}
+              initial={{ opacity: 0, y: 8 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.04 }}
+              className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5 hover:border-white/[0.1] transition-colors duration-200"
+            >
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-lg bg-white/[0.04] grid place-items-center">
+                  <layer.icon className="h-3.5 w-3.5 text-primary/60" />
+                </div>
+                <span className="text-xs font-medium text-white/80">{layer.label}</span>
+              </div>
+              <div className="mt-1.5 text-[10px] text-white/30 ml-9">{layer.desc}</div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  SECTION 8 — ANALYTICS SHOWCASE                             */
+/* ────────────────────────────────────────────────────────── */
+const KPI_METRICS = [
+  { label: "Revenue", value: "$2.41M", delta: "+12.4%", chart: "area", color: "oklch(0.58 0.22 259)" },
+  { label: "Production", value: "1,248/hr", delta: "+8.2%", chart: "line", color: "oklch(0.72 0.14 210)" },
+  { label: "OEE", value: "87.4%", delta: "+3.2%", chart: "area", color: "oklch(0.62 0.19 300)" },
+  { label: "Efficiency", value: "94.1%", delta: "+1.8%", chart: "line", color: "oklch(0.72 0.19 145)" },
+];
+
+function AnalyticsShowcase() {
+  const chartData = useMemo(() =>
+    Array.from({ length: 14 }, (_, i) => ({
+      d: `D${i + 1}`,
+      v1: 60 + Math.sin(i / 2) * 15 + Math.random() * 8,
+      v2: 40 + Math.cos(i / 2.5) * 10 + Math.random() * 6,
+      v3: 70 + Math.sin(i / 1.8) * 12 + Math.random() * 7,
+      v4: 80 + Math.cos(i / 2) * 8 + Math.random() * 5,
+    })), []);
+
+  return (
+    <section id="analytics" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+      <SectionHeader
+        eyebrow="Analytics"
+        title="Live operations dashboard"
+        desc="Real-time KPIs that update as your factory runs."
+      />
+      <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {KPI_METRICS.map((metric, i) => (
+          <motion.div
+            key={metric.label}
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.06 }}
+            className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
+          >
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] uppercase tracking-wider text-white/30">{metric.label}</div>
+              <span className="text-[10px] text-success flex items-center gap-0.5">
+                <TrendingUp className="h-3 w-3" /> {metric.delta}
+              </span>
+            </div>
+            <div className="mt-1.5 text-xl font-semibold text-white tabular-nums">{metric.value}</div>
+            <div className="mt-3 h-12">
+              <ResponsiveContainer>
+                {metric.chart === "area" ? (
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id={`ag-${i}`} x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stopColor={metric.color} stopOpacity={0.3} />
+                        <stop offset="100%" stopColor={metric.color} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Area type="monotone" dataKey={`v${i + 1}`} stroke={metric.color} strokeWidth={1.5} fill={`url(#ag-${i})`} isAnimationActive />
+                  </AreaChart>
+                ) : (
+                  <RechartLine data={chartData}>
+                    <Line type="monotone" dataKey={`v${i + 1}`} stroke={metric.color} strokeWidth={1.5} dot={false} isAnimationActive />
+                  </RechartLine>
+                )}
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Extended metrics row */}
+      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Inventory Turns", value: "8.2", delta: "+0.6" },
+          { label: "Machine Health", value: "94%", delta: "+2%" },
+          { label: "Quality Rate", value: "99.6%", delta: "+0.1%" },
+          { label: "Customer Sat.", value: "4.8/5", delta: "+0.2" },
+        ].map((m, i) => (
+          <motion.div
+            key={m.label}
+            initial={{ opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 + i * 0.04 }}
+            className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-3"
+          >
+            <div className="text-[10px] text-white/30">{m.label}</div>
+            <div className="flex items-baseline gap-1.5 mt-0.5">
+              <span className="text-sm font-medium text-white tabular-nums">{m.value}</span>
+              <span className="text-[10px] text-success">▲ {m.delta}</span>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  SECTION 9 — TRUSTED PLATFORM                               */
+/* ────────────────────────────────────────────────────────── */
+function TrustedPlatform() {
+  const capabilities = [
+    { icon: Activity, label: "99.9% Uptime", desc: "Enterprise SLA with 24/7 monitoring" },
+    { icon: Radio, label: "Real-time Sync", desc: "Sub-second data propagation across modules" },
+    { icon: ShieldCheck, label: "Enterprise Security", desc: "RLS, JWT, encryption, audit" },
+    { icon: Sparkles, label: "AI-first Automation", desc: "Predictive models power every decision" },
+    { icon: Globe, label: "Multi-tenant SaaS", desc: "Isolated tenants, shared infrastructure" },
+    { icon: Server, label: "Cloud-native", desc: "Deployed on Supabase + Vercel edge" },
+  ];
+
+  return (
+    <section className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+      <SectionHeader
+        eyebrow="Platform"
+        title="Built for production"
+        desc="Enterprise-grade infrastructure that scales with your operations."
+      />
+      <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {capabilities.map((cap, i) => (
+          <motion.div
+            key={cap.label}
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.04 }}
+            className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 flex items-start gap-3"
+          >
+            <div className="h-8 w-8 rounded-lg bg-white/[0.04] grid place-items-center shrink-0">
+              <cap.icon className="h-4 w-4 text-primary/60" />
+            </div>
+            <div>
+              <div className="text-sm font-medium text-white/90">{cap.label}</div>
+              <div className="text-xs text-white/40 mt-0.5">{cap.desc}</div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  SECTION 10 — FOOTER                                        */
+/* ────────────────────────────────────────────────────────── */
+function Footer() {
+  return (
+    <footer className="border-t border-white/[0.04]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-8 text-sm">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-md bg-primary grid place-items-center">
+              <Factory className="h-3 w-3 text-white" />
+            </div>
+            <span className="text-sm font-semibold text-white">FactoryOS AI</span>
+          </div>
+          <p className="mt-3 text-xs text-white/40 max-w-xs leading-relaxed">
+            The intelligent manufacturing operating system for modern enterprises.
+          </p>
+          <div className="mt-4 text-[11px] text-white/20">v4.2.1 · © {new Date().getFullYear()}</div>
+        </div>
+
+        {[
+          { h: "Product", l: ["Modules", "AI Platform", "Security", "Roadmap"] },
+          { h: "Resources", l: ["Documentation", "API Reference", "Status", "Support"] },
+          { h: "Company", l: ["About", "Careers", "Privacy", "Terms"] },
+        ].map(group => (
+          <div key={group.h}>
+            <div className="text-xs font-medium text-white/60 mb-3">{group.h}</div>
+            <ul className="space-y-2">
+              {group.l.map(x => (
+                <li key={x}>
+                  <a href="#" className="text-xs text-white/30 hover:text-white/60 transition-colors duration-150">{x}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-white/[0.04]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2 text-[11px] text-white/20">
+          <span>© {new Date().getFullYear()} FactoryOS AI. All rights reserved.</span>
+          <div className="flex items-center gap-4">
+            <a href="https://github.com" className="hover:text-white/40 transition-colors">GitHub</a>
+            <a href="#" className="hover:text-white/40 transition-colors">Privacy</a>
+            <a href="#" className="hover:text-white/40 transition-colors">Terms</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  SHARED COMPONENTS                                          */
+/* ────────────────────────────────────────────────────────── */
+function SectionHeader({ eyebrow, title, desc }: { eyebrow: string; title: string; desc?: string }) {
+  return (
+    <div className="max-w-2xl">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-white/30">{eyebrow}</div>
+      <h2 className="mt-3 text-[22px] sm:text-[28px] font-semibold tracking-tight text-white">{title}</h2>
+      {desc && <p className="mt-2 text-sm text-white/40 leading-relaxed">{desc}</p>}
     </div>
   );
 }
 
 /* ────────────────────────────────────────────────────────── */
-/*  NAV                                                       */
+/*  TOP NAV                                                     */
 /* ────────────────────────────────────────────────────────── */
 const NAV_LINKS = [
-  { label: "Solutions", href: "#modules" },
-  { label: "Manufacturing", href: "#flow" },
-  { label: "AI Platform", href: "#ai" },
+  { label: "Workflow", href: "#flow" },
+  { label: "Modules", href: "#modules" },
+  { label: "AI", href: "#ai" },
   { label: "Security", href: "#security" },
-  { label: "Documentation", href: "#tech" },
-  { label: "Contact", href: "#contact" },
+  { label: "Analytics", href: "#analytics" },
 ];
 
 function TopNav() {
@@ -119,42 +1097,41 @@ function TopNav() {
 
   return (
     <motion.header
-      initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
       className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-        scrolled ? "backdrop-blur-xl bg-background/70 border-b border-white/5" : "bg-transparent"
+        scrolled ? "bg-[oklch(0.14_0.02_260)]/80 backdrop-blur-xl border-b border-white/[0.04]" : "bg-transparent"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-6">
         <Link to="/" className="flex items-center gap-2 shrink-0">
-          <div className="h-7 w-7 rounded-md bg-[image:var(--gradient-primary)] grid place-items-center shadow-glow">
+          <div className="h-7 w-7 rounded-md bg-primary grid place-items-center">
             <Factory className="h-3.5 w-3.5 text-white" />
           </div>
-          <div className="text-[13px] font-semibold tracking-tight">FactoryOS <span className="text-primary">AI</span></div>
+          <span className="text-[13px] font-semibold tracking-tight text-white">FactoryOS <span className="text-white/40">AI</span></span>
         </Link>
 
-        <nav className="hidden lg:flex items-center gap-1 ml-4">
+        <nav className="hidden lg:flex items-center gap-0.5 ml-2">
           {NAV_LINKS.map(l => (
             <a key={l.href} href={l.href}
-              className="text-[12.5px] text-muted-foreground hover:text-foreground transition px-3 py-1.5 rounded-md hover:bg-white/5">
+              className="text-[12px] text-white/40 hover:text-white/80 transition-colors px-2.5 py-1.5 rounded-md hover:bg-white/[0.04]"
+            >
               {l.label}
             </a>
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1.5">
-          <button className="hidden sm:grid place-items-center h-8 w-8 rounded-md hover:bg-white/5 text-muted-foreground" aria-label="Search">
-            <Search className="h-4 w-4" />
-          </button>
-          <button onClick={() => setDark(d => !d)} className="grid place-items-center h-8 w-8 rounded-md hover:bg-white/5 text-muted-foreground" aria-label="Theme">
+        <div className="ml-auto flex items-center gap-1">
+          <button onClick={() => setDark(d => !d)} className="grid place-items-center h-8 w-8 rounded-md hover:bg-white/[0.04] text-white/40" aria-label="Theme">
             {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
-          <Link to="/auth" className="hidden sm:inline-flex items-center h-8 px-3 rounded-md text-[12.5px] text-foreground/90 hover:bg-white/5">
-            Login
+          <Link to="/auth" className="hidden sm:inline-flex items-center h-8 px-3 rounded-md text-[12px] text-white/60 hover:text-white/80 hover:bg-white/[0.04] transition-all">
+            Sign in
           </Link>
-          <Link to="/auth" className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[12.5px] font-medium text-white bg-[image:var(--gradient-primary)] shadow-glow hover:opacity-95">
-            Register <ArrowRight className="h-3 w-3" />
+          <Link to="/auth" className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[12px] font-medium text-white bg-primary hover:bg-primary/90 transition-all active:scale-[0.97]">
+            Get started <ArrowRight className="h-3 w-3" />
           </Link>
-          <button onClick={() => setMobile(true)} className="lg:hidden grid place-items-center h-8 w-8 rounded-md hover:bg-white/5" aria-label="Menu">
+          <button onClick={() => setMobile(true)} className="lg:hidden grid place-items-center h-8 w-8 rounded-md hover:bg-white/[0.04] text-white/40" aria-label="Menu">
             <Menu className="h-4 w-4" />
           </button>
         </div>
@@ -162,17 +1139,24 @@ function TopNav() {
 
       <AnimatePresence>
         {mobile && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="lg:hidden fixed inset-0 z-50 bg-background/95 backdrop-blur-xl">
-            <div className="flex items-center justify-between h-14 px-4 border-b border-white/5">
-              <span className="text-sm font-semibold">Menu</span>
-              <button onClick={() => setMobile(false)} className="grid place-items-center h-8 w-8"><X className="h-4 w-4" /></button>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="lg:hidden fixed inset-0 z-50 bg-[oklch(0.14_0.02_260)]/98 backdrop-blur-xl"
+          >
+            <div className="flex items-center justify-between h-14 px-4 border-b border-white/[0.04]">
+              <span className="text-sm font-medium text-white">Menu</span>
+              <button onClick={() => setMobile(false)} className="grid place-items-center h-8 w-8 text-white/40"><X className="h-4 w-4" /></button>
             </div>
-            <div className="p-4 flex flex-col gap-1">
+            <div className="p-4 flex flex-col gap-0.5">
               {NAV_LINKS.map(l => (
                 <a key={l.href} href={l.href} onClick={() => setMobile(false)}
-                  className="px-3 py-3 rounded-lg hover:bg-white/5 text-sm">{l.label}</a>
+                  className="px-3 py-3 rounded-lg hover:bg-white/[0.04] text-sm text-white/60 hover:text-white">{l.label}</a>
               ))}
+              <hr className="my-3 border-white/[0.04]" />
+              <Link to="/auth" onClick={() => setMobile(false)}
+                className="px-3 py-3 rounded-lg text-sm font-medium text-white bg-primary/20 text-center">Get started</Link>
             </div>
           </motion.div>
         )}
@@ -182,796 +1166,31 @@ function TopNav() {
 }
 
 /* ────────────────────────────────────────────────────────── */
-/*  ANIMATED COUNTER                                          */
-/* ────────────────────────────────────────────────────────── */
-function useTicker(base: number, jitter = 0.02, interval = 2400) {
-  const [v, setV] = useState(base);
-  useEffect(() => {
-    const t = setInterval(() => {
-      setV(base * (1 + (Math.random() - 0.5) * jitter * 2));
-    }, interval);
-    return () => clearInterval(t);
-  }, [base, jitter, interval]);
-  return v;
-}
-
-/* ────────────────────────────────────────────────────────── */
-/*  DASHBOARD PREVIEW (right column)                          */
-/* ────────────────────────────────────────────────────────── */
-function seriesFromSeed(seed: number, n = 24, base = 60) {
-  const out: { i: number; v: number }[] = [];
-  let v = base;
-  for (let i = 0; i < n; i++) {
-    v += Math.sin(i * 0.6 + seed) * 4 + (Math.random() - 0.5) * 3;
-    out.push({ i, v: Math.max(20, Math.round(v)) });
-  }
-  return out;
-}
-
-function TiltCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const rx = useSpring(useMotionValue(0), { stiffness: 200, damping: 20 });
-  const ry = useSpring(useMotionValue(0), { stiffness: 200, damping: 20 });
-  const tx = useTransform(rx, v => `${v}deg`);
-  const ty = useTransform(ry, v => `${v}deg`);
-
-  function onMove(e: React.MouseEvent) {
-    const el = ref.current; if (!el) return;
-    const r = el.getBoundingClientRect();
-    const px = (e.clientX - r.left) / r.width - 0.5;
-    const py = (e.clientY - r.top) / r.height - 0.5;
-    ry.set(px * 8); rx.set(-py * 8);
-  }
-  function onLeave() { rx.set(0); ry.set(0); }
-
-  return (
-    <motion.div
-      ref={ref} onMouseMove={onMove} onMouseLeave={onLeave}
-      style={{ rotateX: tx, rotateY: ty, transformStyle: "preserve-3d" }}
-      className={className}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-function DashboardPreview() {
-  const oee = useTicker(87.4, 0.01);
-  const throughput = useTicker(1248, 0.015);
-  const revenue = useTicker(2.41, 0.008);
-  const health = useTicker(94, 0.005);
-
-  const line = useMemo(() => seriesFromSeed(1, 30, 70), []);
-  const area = useMemo(() => seriesFromSeed(2, 30, 40), []);
-  const bars = useMemo(() => seriesFromSeed(3, 12, 55), []);
-
-  const [notif, setNotif] = useState<{ id: number; text: string; kind: "ok" | "warn" | "info" } | null>(null);
-  useEffect(() => {
-    const msgs: { text: string; kind: "ok" | "warn" | "info" }[] = [
-      { text: "Line B-04 reached target OEE 92%", kind: "ok" },
-      { text: "Bearing wear detected on Machine 07", kind: "warn" },
-      { text: "PO #4821 approved by Finance", kind: "info" },
-      { text: "Batch QC passed — Motor Housing", kind: "ok" },
-    ];
-    let i = 0;
-    const t = setInterval(() => {
-      setNotif({ id: Date.now(), ...msgs[i % msgs.length] });
-      i++;
-    }, 3200);
-    return () => clearInterval(t);
-  }, []);
-
-  return (
-    <TiltCard className="relative">
-      <div className="absolute -inset-4 rounded-3xl bg-[image:var(--gradient-primary)] opacity-20 blur-3xl" />
-      <div className="relative glass-strong rounded-2xl shadow-elegant overflow-hidden border border-white/10">
-        {/* Fake window chrome */}
-        <div className="flex items-center gap-2 px-3 h-9 border-b border-white/5 bg-white/[0.02]">
-          <div className="flex gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-destructive/70" />
-            <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
-            <span className="h-2.5 w-2.5 rounded-full bg-success/70" />
-          </div>
-          <div className="mx-auto text-[10.5px] text-muted-foreground flex items-center gap-1.5">
-            <Radio className="h-3 w-3 text-success animate-pulse" />
-            factoryos.ai / plants / abc-detroit-01 · live
-          </div>
-        </div>
-
-        <div className="p-3 sm:p-4 grid grid-cols-6 gap-2.5 text-[11.5px]">
-          {/* KPI row */}
-          <KPI icon={Gauge} label="OEE" value={`${oee.toFixed(1)}%`} trend="+2.4" />
-          <KPI icon={Activity} label="Throughput" value={`${Math.round(throughput)}/hr`} trend="+120" />
-          <KPI icon={Landmark} label="Revenue" value={`$${revenue.toFixed(2)}M`} trend="+3.1%" />
-          <KPI icon={ShieldCheck} label="Health" value={`${Math.round(health)}`} trend="stable" ok />
-          <KPI icon={AlertTriangle} label="Alerts" value="3" trend="-1" warn />
-          <KPI icon={Boxes} label="SKUs" value="1,284" trend="+12" />
-
-          {/* Big chart */}
-          <div className="col-span-4 rounded-xl bg-white/[0.02] border border-white/5 p-3">
-            <div className="flex items-center justify-between mb-1.5">
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Production Output — 24h</div>
-                <div className="text-sm font-semibold">Line A · Assembly</div>
-              </div>
-              <div className="text-[10px] text-success flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" /> +8.2% vs shift avg
-              </div>
-            </div>
-            <div className="h-28">
-              <ResponsiveContainer>
-                <AreaChart data={line}>
-                  <defs>
-                    <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="oklch(0.58 0.22 259)" stopOpacity={0.5} />
-                      <stop offset="100%" stopColor="oklch(0.58 0.22 259)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Area type="monotone" dataKey="v" stroke="oklch(0.58 0.22 259)" strokeWidth={1.6} fill="url(#g1)" isAnimationActive />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Machine health */}
-          <div className="col-span-2 rounded-xl bg-white/[0.02] border border-white/5 p-3">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Machine Health</div>
-            <div className="mt-2 space-y-2">
-              {[
-                { n: "CNC-01", v: 96, c: "success" },
-                { n: "PRESS-04", v: 78, c: "warning" },
-                { n: "ROBOT-07", v: 42, c: "destructive" },
-                { n: "PACK-02", v: 88, c: "success" },
-              ].map(m => (
-                <div key={m.n}>
-                  <div className="flex justify-between text-[10.5px]">
-                    <span className="text-muted-foreground">{m.n}</span>
-                    <span className="font-medium">{m.v}%</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }} animate={{ width: `${m.v}%` }}
-                      transition={{ duration: 1.2, ease: "easeOut" }}
-                      className={`h-full bg-${m.c}`}
-                      style={{
-                        background:
-                          m.c === "success" ? "oklch(0.72 0.19 145)" :
-                          m.c === "warning" ? "oklch(0.79 0.17 75)" :
-                          "oklch(0.62 0.23 25)",
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Inventory */}
-          <div className="col-span-3 rounded-xl bg-white/[0.02] border border-white/5 p-3">
-            <div className="flex items-center justify-between mb-1">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Inventory · 12 weeks</div>
-              <div className="text-[10px] text-muted-foreground">Raw · WIP · Finished</div>
-            </div>
-            <div className="h-24">
-              <ResponsiveContainer>
-                <BarChart data={bars}>
-                  <Bar dataKey="v" radius={[3, 3, 0, 0]}>
-                    {bars.map((_, i) => (
-                      <motion.rect key={i} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* AI reco */}
-          <div className="col-span-3 rounded-xl border border-primary/20 bg-primary/5 p-3 relative overflow-hidden">
-            <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-primary/20 blur-2xl" />
-            <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-primary">
-              <Sparkles className="h-3 w-3" /> AI Copilot
-            </div>
-            <div className="mt-1.5 text-[12px] font-medium leading-snug">
-              Reorder <span className="text-primary">250 units</span> of Raw Material A within 5 days to prevent Line B stoppage.
-            </div>
-            <div className="mt-2 flex items-center gap-1.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/15 text-success">96% confidence</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">2.3s ago</span>
-            </div>
-          </div>
-
-          {/* Alerts */}
-          <div className="col-span-3 rounded-xl bg-white/[0.02] border border-white/5 p-3">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Quality & Maintenance</div>
-            <div className="space-y-1.5">
-              <AlertRow icon={AlertTriangle} color="warning" text="NCR-2831 · Deviation on Motor Housing (3.1%)" />
-              <AlertRow icon={Wrench} color="destructive" text="ROBOT-07 · Bearing wear · ETA 4h" />
-              <AlertRow icon={CheckCircle2} color="success" text="QC batch #1284 passed" />
-            </div>
-          </div>
-
-          <div className="col-span-3 rounded-xl bg-white/[0.02] border border-white/5 p-3">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Purchase Orders</div>
-            <div className="h-20">
-              <ResponsiveContainer>
-                <LineChart data={area}>
-                  <Line dataKey="v" type="monotone" stroke="oklch(0.62 0.19 300)" strokeWidth={1.4} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex justify-between text-[10.5px] mt-1">
-              <span className="text-muted-foreground">Open</span><span>42</span>
-              <span className="text-muted-foreground">Pending</span><span>7</span>
-              <span className="text-muted-foreground">Approved</span><span className="text-success">128</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Floating notif */}
-        <div className="absolute bottom-3 right-3 w-64 pointer-events-none">
-          <AnimatePresence>
-            {notif && (
-              <motion.div
-                key={notif.id}
-                initial={{ opacity: 0, x: 20, y: 10 }}
-                animate={{ opacity: 1, x: 0, y: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="glass-strong rounded-lg border border-white/10 px-3 py-2 text-[11px] shadow-elegant flex items-center gap-2"
-              >
-                <span className={`h-1.5 w-1.5 rounded-full ${
-                  notif.kind === "ok" ? "bg-success" : notif.kind === "warn" ? "bg-warning" : "bg-primary"
-                } animate-pulse`} />
-                {notif.text}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-    </TiltCard>
-  );
-}
-
-function KPI({ icon: Icon, label, value, trend, ok, warn }: {
-  icon: any; label: string; value: string; trend: string; ok?: boolean; warn?: boolean;
-}) {
-  return (
-    <div className="rounded-xl bg-white/[0.02] border border-white/5 p-2.5">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-        <Icon className="h-3 w-3" /> {label}
-      </div>
-      <div className="mt-1 text-sm font-semibold tabular-nums">{value}</div>
-      <div className={`text-[10px] ${warn ? "text-warning" : ok ? "text-muted-foreground" : "text-success"}`}>{trend}</div>
-    </div>
-  );
-}
-
-function AlertRow({ icon: Icon, color, text }: { icon: any; color: "warning" | "destructive" | "success"; text: string }) {
-  const c = color === "warning" ? "text-warning" : color === "destructive" ? "text-destructive" : "text-success";
-  return (
-    <div className="flex items-start gap-2 text-[11px]">
-      <Icon className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${c}`} />
-      <span className="text-foreground/90 leading-snug">{text}</span>
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────── */
-/*  COMMAND CENTER (hero replacement)                         */
-/* ────────────────────────────────────────────────────────── */
-function CommandCenter() {
-  return (
-    <section className="pt-28 pb-16 max-w-7xl mx-auto px-4 sm:px-6">
-      <div className="grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-10 items-center">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          <div className="inline-flex items-center gap-2 text-[11px] px-2.5 py-1 rounded-full border border-white/10 bg-white/[0.03] text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-            Live system · v4.2.1
-          </div>
-          <h1 className="mt-5 text-[28px] sm:text-[34px] leading-[1.15] font-semibold tracking-tight">
-            FactoryOS <span className="gradient-text">AI</span>
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground max-w-md">
-            Enterprise Smart Manufacturing Operating System.
-          </p>
-          <p className="mt-4 text-[13.5px] leading-relaxed text-foreground/80 max-w-lg">
-            Manage production, inventory, warehouses, procurement, quality, maintenance, finance,
-            HR and AI from one enterprise platform. Multi-tenant, RLS-enforced, audit-logged.
-          </p>
-
-          <div className="mt-6 flex items-center gap-2.5">
-            <Link to="/auth" className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md text-[12.5px] font-medium text-white bg-[image:var(--gradient-primary)] shadow-glow hover:opacity-95">
-              Launch Platform <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-            <a href="#tech" className="inline-flex items-center gap-1.5 h-9 px-4 rounded-md text-[12.5px] font-medium border border-white/10 hover:bg-white/5">
-              Documentation
-            </a>
-          </div>
-
-          <div className="mt-8 grid grid-cols-3 gap-2 max-w-md">
-            {[
-              { k: "Plants", v: "128" },
-              { k: "Machines", v: "9.4k" },
-              { k: "SKUs", v: "42k" },
-            ].map(x => (
-              <div key={x.k} className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{x.k}</div>
-                <div className="text-sm font-semibold">{x.v}</div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
-          <DashboardPreview />
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-/* ────────────────────────────────────────────────────────── */
-/*  INTERACTIVE FACTORY MAP                                   */
-/* ────────────────────────────────────────────────────────── */
-const FACTORY_STAGES = [
-  { id: "warehouse", label: "Warehouse", icon: Warehouse, stat: "18 zones · 94% util" },
-  { id: "inventory", label: "Inventory", icon: Boxes, stat: "42k SKUs · 3 low" },
-  { id: "production", label: "Production", icon: Cog, stat: "12 lines · OEE 87%" },
-  { id: "quality", label: "Quality", icon: ShieldCheck, stat: "NCR 0.4% · Cpk 1.6" },
-  { id: "packaging", label: "Packaging", icon: Package, stat: "8.2k/hr" },
-  { id: "dispatch", label: "Dispatch", icon: Truck, stat: "42 shipments today" },
-] as const;
-
-function FactoryMap() {
-  const [active, setActive] = useState<string | null>(null);
-  const [modal, setModal] = useState<typeof FACTORY_STAGES[number] | null>(null);
-
-  return (
-    <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6">
-      <SectionHeader eyebrow="Plant Layout" title="Interactive factory map" desc="Hover a station for live stats. Click to inspect." />
-
-      <div className="mt-8 relative rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-8">
-        {/* Connection lines (SVG) */}
-        <svg className="absolute inset-0 h-full w-full pointer-events-none" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="flow" x1="0" x2="1">
-              <stop offset="0%" stopColor="oklch(0.58 0.22 259)" stopOpacity="0" />
-              <stop offset="50%" stopColor="oklch(0.58 0.22 259)" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="oklch(0.62 0.19 300)" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-        </svg>
-
-        <div className="relative grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 overflow-x-auto">
-          {FACTORY_STAGES.map((s, i) => (
-            <motion.button
-              key={s.id}
-              onMouseEnter={() => setActive(s.id)}
-              onMouseLeave={() => setActive(null)}
-              onClick={() => setModal(s)}
-              initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }} transition={{ delay: i * 0.05 }}
-              className="group relative rounded-xl border border-white/10 bg-card/50 p-4 text-left hover:border-primary/40 hover:bg-primary/5 transition"
-            >
-              <div className="flex items-center justify-between">
-                <div className="h-9 w-9 rounded-lg bg-[image:var(--gradient-primary)] grid place-items-center shadow-glow">
-                  <s.icon className="h-4 w-4 text-white" />
-                </div>
-                <span className="text-[10px] text-muted-foreground">0{i + 1}</span>
-              </div>
-              <div className="mt-3 text-sm font-medium">{s.label}</div>
-              <div className="mt-1 text-[11px] text-muted-foreground">{s.stat}</div>
-              <AnimatePresence>
-                {active === s.id && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="absolute inset-x-0 -bottom-2 mx-3 h-0.5 bg-[image:var(--gradient-primary)] rounded-full" />
-                )}
-              </AnimatePresence>
-            </motion.button>
-          ))}
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {modal && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={() => setModal(null)}
-            className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur-md p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95 }}
-              onClick={e => e.stopPropagation()}
-              className="glass-strong rounded-2xl border border-white/10 p-6 max-w-md w-full shadow-elegant"
-            >
-              <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-xl bg-[image:var(--gradient-primary)] grid place-items-center shadow-glow">
-                  <modal.icon className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold">{modal.label}</div>
-                  <div className="text-xs text-muted-foreground">{modal.stat}</div>
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                {["Throughput", "Utilization", "Alerts"].map((k, i) => (
-                  <div key={k} className="rounded-lg bg-white/[0.03] p-2">
-                    <div className="text-[10px] uppercase text-muted-foreground">{k}</div>
-                    <div className="text-sm font-semibold">{["98%", "87%", "2"][i]}</div>
-                  </div>
-                ))}
-              </div>
-              <button onClick={() => setModal(null)} className="mt-5 w-full h-9 rounded-md text-[12.5px] bg-white/5 hover:bg-white/10">
-                Close preview
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </section>
-  );
-}
-
-/* ────────────────────────────────────────────────────────── */
-/*  LIVE PRODUCTION FLOW                                       */
-/* ────────────────────────────────────────────────────────── */
-const FLOW = [
-  { id: "supplier", label: "Supplier", icon: Truck },
-  { id: "raw", label: "Raw Material", icon: Layers },
-  { id: "warehouse", label: "Warehouse", icon: Warehouse },
-  { id: "production", label: "Production", icon: Cog },
-  { id: "assembly", label: "Assembly", icon: Wrench },
-  { id: "quality", label: "Quality", icon: ShieldCheck },
-  { id: "packaging", label: "Packaging", icon: Package },
-  { id: "finished", label: "Finished Goods", icon: PackageCheck },
-  { id: "customer", label: "Customer", icon: Users },
-] as const;
-
-function ProductionFlow() {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  const activeIdx = useTransform(scrollYProgress, [0.1, 0.9], [0, FLOW.length - 1]);
-  const [current, setCurrent] = useState(0);
-
-  useEffect(() => activeIdx.on("change", v => setCurrent(Math.min(FLOW.length - 1, Math.max(0, Math.round(v))))), [activeIdx]);
-
-  return (
-    <section ref={ref} className="py-20 max-w-7xl mx-auto px-4 sm:px-6">
-      <SectionHeader eyebrow="End-to-end pipeline" title="Live production flow" desc="Material moves as you scroll — every stage updates in real time." />
-
-      <div className="mt-10 relative">
-        {/* Horizontal scrollable on mobile, grid on desktop */}
-        <div className="grid grid-cols-3 md:grid-cols-9 gap-2 relative">
-          {FLOW.map((s, i) => {
-            const active = i <= current;
-            return (
-              <motion.div key={s.id}
-                initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-                className="relative">
-                <div className={`rounded-xl border p-3 text-center transition-all ${
-                  active ? "border-primary/50 bg-primary/10 shadow-glow" : "border-white/5 bg-white/[0.02]"
-                }`}>
-                  <s.icon className={`h-4 w-4 mx-auto ${active ? "text-primary" : "text-muted-foreground"}`} />
-                  <div className="mt-1.5 text-[10.5px] font-medium">{s.label}</div>
-                  <div className="mt-1 h-1 rounded-full bg-white/5 overflow-hidden">
-                    <motion.div className="h-full bg-[image:var(--gradient-primary)]"
-                      initial={{ width: 0 }}
-                      animate={{ width: active ? "100%" : "0%" }}
-                      transition={{ duration: 0.6 }} />
-                  </div>
-                </div>
-                {i < FLOW.length - 1 && (
-                  <div className="hidden md:block absolute top-1/2 -right-1 h-px w-2 bg-white/10" />
-                )}
-              </motion.div>
-            );
-          })}
-        </div>
-
-        <div className="mt-6 rounded-xl border border-white/5 bg-white/[0.02] p-4 flex items-center gap-4 text-[12.5px]">
-          <Radio className="h-4 w-4 text-success animate-pulse" />
-          <span className="text-muted-foreground">Current stage:</span>
-          <span className="font-medium">{FLOW[current].label}</span>
-          <span className="ml-auto text-muted-foreground tabular-nums">Batch #{1284 + current} · {(94 - current * 0.6).toFixed(1)}%</span>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ────────────────────────────────────────────────────────── */
-/*  CORE MODULES                                              */
-/* ────────────────────────────────────────────────────────── */
-const MODULES = [
-  { label: "Inventory", icon: Boxes, hint: "42k SKUs" },
-  { label: "Warehouse", icon: Warehouse, hint: "18 zones" },
-  { label: "Production", icon: Cog, hint: "12 lines" },
-  { label: "Quality", icon: ShieldCheck, hint: "NCR 0.4%" },
-  { label: "Maintenance", icon: Wrench, hint: "94% uptime" },
-  { label: "Finance", icon: Landmark, hint: "GL · AP · AR" },
-  { label: "HR", icon: Users, hint: "412 people" },
-  { label: "Procurement", icon: ShoppingCart, hint: "128 POs" },
-  { label: "CRM", icon: Network, hint: "312 accounts" },
-  { label: "Analytics", icon: Activity, hint: "real-time" },
-  { label: "AI Center", icon: Sparkles, hint: "copilot" },
-  { label: "Documents", icon: FileCheck2, hint: "ISO ready" },
-];
-
-function CoreModules() {
-  return (
-    <section id="modules" className="py-20 max-w-7xl mx-auto px-4 sm:px-6">
-      <SectionHeader eyebrow="Modules" title="One platform, every function" desc="Consistent primitives across every module — with role-scoped access." />
-      <div className="mt-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {MODULES.map((m, i) => (
-          <motion.div
-            key={m.label}
-            initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-            transition={{ delay: i * 0.03 }}
-            whileHover={{ y: -3 }}
-            className="group rounded-xl border border-white/10 bg-white/[0.02] p-4 hover:border-primary/40 hover:shadow-glow transition"
-          >
-            <div className="flex items-center justify-between">
-              <div className="h-9 w-9 rounded-lg bg-white/5 grid place-items-center group-hover:bg-[image:var(--gradient-primary)] transition">
-                <m.icon className="h-4 w-4" />
-              </div>
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition" />
-            </div>
-            <div className="mt-3 text-sm font-medium">{m.label}</div>
-            <div className="text-[11px] text-muted-foreground">{m.hint}</div>
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ────────────────────────────────────────────────────────── */
-/*  AI CENTER — realistic outputs                             */
-/* ────────────────────────────────────────────────────────── */
-function AICenter() {
-  const p1 = useTicker(82, 0.03);
-  const p2 = useTicker(250, 0.02);
-  const p3 = useTicker(3.1, 0.05);
-
-  return (
-    <section id="ai" className="py-20 max-w-7xl mx-auto px-4 sm:px-6">
-      <SectionHeader eyebrow="AI Center" title="Decisions, not demos" desc="Live model outputs from production, maintenance and inventory streams." />
-      <div className="mt-10 grid md:grid-cols-3 gap-4">
-        <AICard title="Predictive Maintenance" chip="Machine 07">
-          <Row k="Failure probability" v={`${p1.toFixed(0)}%`} vColor="text-warning" />
-          <Row k="Recommended action" v="Replace bearing" />
-          <Row k="Confidence" v="96%" vColor="text-success" />
-          <Row k="Est. downtime saved" v="14 hrs" />
-        </AICard>
-        <AICard title="Inventory Forecast" chip="Raw Material A">
-          <Row k="Estimated shortage" v="5 days" vColor="text-destructive" />
-          <Row k="Suggested purchase" v={`${Math.round(p2)} units`} />
-          <Row k="Confidence" v="93%" vColor="text-success" />
-          <Row k="Lead time buffer" v="+2 days" />
-        </AICard>
-        <AICard title="Quality Alert" chip="Motor Housing">
-          <Row k="Expected defect rate" v={`${p3.toFixed(1)}%`} vColor="text-warning" />
-          <Row k="Root cause" v="Torque drift on Station 3" />
-          <Row k="Confidence" v="88%" vColor="text-success" />
-          <Row k="Action" v="Recalibrate spindle" />
-        </AICard>
-      </div>
-    </section>
-  );
-}
-
-function AICard({ title, chip, children }: { title: string; chip: string; children: React.ReactNode }) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-      className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 relative overflow-hidden">
-      <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-primary/15 blur-3xl" />
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-primary">
-        <Sparkles className="h-3 w-3" /> Model output
-      </div>
-      <div className="mt-1.5 flex items-center justify-between">
-        <div className="text-sm font-semibold">{title}</div>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">{chip}</span>
-      </div>
-      <div className="mt-4 space-y-2">{children}</div>
-    </motion.div>
-  );
-}
-
-function Row({ k, v, vColor = "text-foreground" }: { k: string; v: string; vColor?: string }) {
-  return (
-    <div className="flex items-center justify-between text-[12.5px] border-t border-white/5 pt-2">
-      <span className="text-muted-foreground">{k}</span>
-      <span className={`font-medium tabular-nums ${vColor}`}>{v}</span>
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────── */
-/*  ROLE HIERARCHY                                            */
-/* ────────────────────────────────────────────────────────── */
-function RoleHierarchy() {
-  const [hovered, setHovered] = useState<string | null>(null);
-  const meta = hovered ? ROLES.find(r => r.id === hovered) : null;
-  return (
-    <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6">
-      <SectionHeader eyebrow="Access model" title="Role hierarchy" desc="Every user is scoped by role, plant and company — enforced in the database." />
-      <div className="mt-10 grid lg:grid-cols-[minmax(0,1fr)_320px] gap-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-          {ROLES.map((r, i) => (
-            <motion.button
-              key={r.id}
-              onMouseEnter={() => setHovered(r.id)}
-              initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-              transition={{ delay: i * 0.02 }}
-              className={`group relative rounded-xl border p-3 text-left transition ${
-                hovered === r.id ? "border-primary/50 bg-primary/5" : "border-white/10 bg-white/[0.02]"
-              }`}
-            >
-              <div className={`h-8 w-8 rounded-lg bg-gradient-to-br ${r.accent} grid place-items-center`}>
-                <r.icon className="h-4 w-4 text-white" />
-              </div>
-              <div className="mt-2 text-[12px] font-medium truncate">{r.label}</div>
-              <div className="text-[10.5px] text-muted-foreground truncate">{r.tagline}</div>
-            </motion.button>
-          ))}
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 min-h-[220px]">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Selected role</div>
-          {meta ? (
-            <>
-              <div className="mt-1 flex items-center gap-2">
-                <div className={`h-9 w-9 rounded-lg bg-gradient-to-br ${meta.accent} grid place-items-center`}>
-                  <meta.icon className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold">{meta.label}</div>
-                  <div className="text-[11px] text-muted-foreground">{meta.tagline}</div>
-                </div>
-              </div>
-              <div className="mt-4 space-y-2 text-[12px]">
-                <Row k="Scope" v={meta.group === "platform" ? "Global" : meta.group === "company" ? "Company" : meta.group === "operations" ? "Plant" : "External"} />
-                <Row k="Access model" v="RLS + JWT" />
-                <Row k="Audit" v="All writes logged" />
-              </div>
-            </>
-          ) : (
-            <div className="mt-4 text-[12.5px] text-muted-foreground">Hover a role to inspect responsibilities, permissions and modules.</div>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ────────────────────────────────────────────────────────── */
-/*  SECURITY                                                  */
-/* ────────────────────────────────────────────────────────── */
-function Security() {
-  const items = [
-    { icon: Layers, label: "Multi-tenant" },
-    { icon: KeyRound, label: "JWT" },
-    { icon: Lock, label: "Row-Level Security" },
-    { icon: ScrollText, label: "Audit logs" },
-    { icon: Database, label: "Encryption at rest" },
-    { icon: Network, label: "Permission matrix" },
-  ];
-  return (
-    <section id="security" className="py-20 max-w-7xl mx-auto px-4 sm:px-6">
-      <SectionHeader eyebrow="Enterprise security" title="Built for regulated plants" desc="Security is enforced in the database, not the UI." />
-      <div className="mt-10 grid md:grid-cols-[280px_minmax(0,1fr)] gap-6 items-center">
-        <div className="relative rounded-2xl border border-white/10 bg-white/[0.02] p-8 grid place-items-center">
-          <div className="absolute inset-0 rounded-2xl bg-[image:var(--gradient-primary)] opacity-10 blur-2xl" />
-          <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 3, repeat: Infinity }}
-            className="relative h-28 w-28 rounded-full grid place-items-center bg-[image:var(--gradient-primary)] shadow-glow">
-            <ShieldCheck className="h-12 w-12 text-white" />
-          </motion.div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {items.map((it, i) => (
-            <motion.div key={it.label}
-              initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-              transition={{ delay: i * 0.05 }}
-              className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5 flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-white/5 grid place-items-center">
-                <it.icon className="h-4 w-4 text-primary" />
-              </div>
-              <span className="text-[12.5px] font-medium">{it.label}</span>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ────────────────────────────────────────────────────────── */
-/*  TECH STACK                                                */
-/* ────────────────────────────────────────────────────────── */
-function Tech() {
-  const stack = ["React", "TypeScript", "Supabase", "PostgreSQL", "TailwindCSS", "Framer Motion", "React Three Fiber", "Shadcn UI", "Recharts"];
-  return (
-    <section id="tech" className="py-20 max-w-7xl mx-auto px-4 sm:px-6">
-      <SectionHeader eyebrow="Engineering" title="Built on a modern stack" />
-      <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-        {stack.map((t, i) => (
-          <motion.div key={t}
-            initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-            transition={{ delay: i * 0.04 }}
-            className="rounded-xl border border-white/10 bg-white/[0.02] p-3 flex items-center gap-2">
-            <Zap className="h-3.5 w-3.5 text-primary" />
-            <span className="text-[12.5px] font-medium">{t}</span>
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ────────────────────────────────────────────────────────── */
-/*  SECTION HEADER + FOOTER                                   */
-/* ────────────────────────────────────────────────────────── */
-function SectionHeader({ eyebrow, title, desc }: { eyebrow: string; title: string; desc?: string }) {
-  return (
-    <div className="max-w-2xl">
-      <div className="text-[10.5px] uppercase tracking-[0.15em] text-primary">{eyebrow}</div>
-      <h2 className="mt-2 text-[22px] sm:text-[26px] font-semibold tracking-tight">{title}</h2>
-      {desc && <p className="mt-2 text-[13.5px] text-muted-foreground">{desc}</p>}
-    </div>
-  );
-}
-
-function Footer() {
-  return (
-    <footer id="contact" className="mt-16 border-t border-white/5">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 grid md:grid-cols-4 gap-6 text-[12.5px]">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-md bg-[image:var(--gradient-primary)] grid place-items-center">
-              <Factory className="h-3 w-3 text-white" />
-            </div>
-            <span className="font-semibold">FactoryOS AI</span>
-          </div>
-          <p className="mt-3 text-muted-foreground max-w-xs">The enterprise operating system for modern factories.</p>
-        </div>
-        {[
-          { h: "Product", l: ["Modules", "AI Platform", "Security", "Roadmap"] },
-          { h: "Company", l: ["About", "Careers", "Press", "Legal"] },
-          { h: "Resources", l: ["Documentation", "API", "Status", "Contact"] },
-        ].map(g => (
-          <div key={g.h}>
-            <div className="text-foreground font-medium mb-2">{g.h}</div>
-            <ul className="space-y-1.5 text-muted-foreground">
-              {g.l.map(x => <li key={x}><a href="#" className="hover:text-foreground">{x}</a></li>)}
-            </ul>
-          </div>
-        ))}
-      </div>
-      <div className="border-t border-white/5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>© {new Date().getFullYear()} FactoryOS AI. All rights reserved.</span>
-          <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" /> All systems operational</span>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
-/* ────────────────────────────────────────────────────────── */
 /*  PAGE                                                      */
 /* ────────────────────────────────────────────────────────── */
 function LandingPage() {
   return (
-    <div className="min-h-screen text-foreground">
-      <BlueprintBackground />
+    <div className="min-h-screen bg-[oklch(0.14_0.02_260)] text-white selection:bg-primary/30">
+      {/* Subtle background */}
+      <div className="fixed inset-0 -z-10 pointer-events-none">
+        <div className="absolute inset-0 bg-[oklch(0.12_0.015_260)]" />
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] rounded-full bg-primary/[0.02] blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] rounded-full bg-blue-500/[0.02] blur-[100px]" />
+      </div>
+
       <TopNav />
-      <CommandCenter />
-      <FactoryMap />
-      <ProductionFlow />
-      <CoreModules />
-      <AICenter />
-      <RoleHierarchy />
-      <Security />
-      <Tech />
-      <Footer />
+      <div className="pt-20">
+        <NetworkCanvas />
+        <Hero />
+        <Workflow />
+        <EnterpriseModules />
+        <AIIntelligence />
+        <RoleHierarchy />
+        <SecurityArchitecture />
+        <AnalyticsShowcase />
+        <TrustedPlatform />
+        <Footer />
+      </div>
     </div>
   );
 }

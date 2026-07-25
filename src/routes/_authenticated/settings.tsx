@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, Panel } from "@/components/ui-parts";
+import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +18,9 @@ function SettingsPage() {
   const { profile } = useAuth();
   return (
     <div className="max-w-[1200px] mx-auto space-y-4">
-      <PageHeader eyebrow="Configuration" title="Settings" sub="Company, branding, integrations and platform preferences." />
+      <ModuleStatusBar moduleName="settings" />
+      <PageHeader eyebrow="Configuration" title="Settings" sub="Company, branding, integrations and platform preferences."
+        actions={<ModuleCopilot moduleName="settings" />} />
       <Panel title="Company">
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Legal name" defaultValue="ABC Manufacturing Inc." />

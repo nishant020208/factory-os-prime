@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { FileCheck2, Plus, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Panel, StatusBadge, Kpi } from "@/components/ui-parts";
+import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,11 +55,12 @@ function WhitelistPage() {
 
   return (
     <div className="max-w-[1600px] mx-auto">
+      <ModuleStatusBar moduleName="whitelist" />
       <PageHeader
         eyebrow="Access Control"
         title="Whitelist"
         sub="Only whitelisted emails may register. Assign a role, company and plant per invitation."
-        actions={canInvite && (
+        actions={<>{canInvite && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="bg-[image:var(--gradient-primary)] shadow-glow"><Plus className="h-4 w-4 mr-1.5" />Invite</Button>
@@ -90,6 +92,8 @@ function WhitelistPage() {
             </DialogContent>
           </Dialog>
         )}
+        <ModuleCopilot moduleName="whitelist" />
+      </>}
       />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Kpi label="Total invites" value={String(data?.length ?? 0)} icon={FileCheck2} tone="primary" />

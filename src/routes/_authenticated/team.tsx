@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, Panel } from "@/components/ui-parts";
+import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { useAuth } from "@/hooks/use-auth";
 import { ROLE_MAP } from "@/lib/roles";
 import { Users } from "lucide-react";
@@ -16,7 +17,9 @@ function TeamPage() {
   const { profile, roles } = useAuth();
   return (
     <div className="max-w-[1600px] mx-auto">
-      <PageHeader eyebrow="People" title="Team" sub="Everyone with access to your FactoryOS tenant." />
+      <ModuleStatusBar moduleName="team" />
+      <PageHeader eyebrow="People" title="Team" sub="Everyone with access to your FactoryOS tenant."
+        actions={<ModuleCopilot moduleName="team" />} />
       <Panel title="Your account">
         <div className="flex items-center gap-4">
           <div className="h-14 w-14 rounded-2xl bg-[image:var(--gradient-primary)] grid place-items-center shadow-glow">

@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useState, useMemo } from "react";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
-  Bell, Search, Settings, LogOut, Command, ChevronDown, Sun, Moon, Factory,
+  Bell, Search, Settings, LogOut, Command, ChevronDown, Sun, Moon, Factory, BrainCircuit,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -217,13 +217,91 @@ function TopBar() {
     </header>
 
     <CommandDialog open={cmdOpen} onOpenChange={setCmdOpen}>
-      <CommandInput placeholder="Jump to…" />
+      <CommandInput placeholder={'Ask Copilot — "show production", "create supplier", "export inventory"…'} />
       <CommandList>
-        <CommandEmpty>Nothing matched. Try a different keyword.</CommandEmpty>
+        <CommandEmpty>No results. Try "show production", "create supplier", or "export inventory".</CommandEmpty>
+        <CommandGroup heading="🏭 ERP Workflow Commands">
+          <CommandItem value="show production today orders manufacturing" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/production" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Show today's production orders</span>
+          </CommandItem>
+          <CommandItem value="which machines need maintenance downtime repair" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/maintenance" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Which machines need maintenance?</span>
+          </CommandItem>
+          <CommandItem value="show low inventory stock reorder shortage" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/inventory" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Show low inventory items</span>
+          </CommandItem>
+          <CommandItem value="create purchase order buy procurement supplier" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/procurement" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Create a purchase order</span>
+          </CommandItem>
+          <CommandItem value="check quality inspection defect yield pass fail" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/quality" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Run quality inspection</span>
+          </CommandItem>
+          <CommandItem value="dispatch shipment delivery customer shipping" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/dispatch" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Dispatch customer shipment</span>
+          </CommandItem>
+          <CommandItem value="finance invoice payment revenue accounting" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/finance" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>View invoices and payments</span>
+          </CommandItem>
+          <CommandItem value="customer order sales tracking" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/customers" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>View customer orders</span>
+          </CommandItem>
+          <CommandItem value="employee hr people payroll attendance" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/employees" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Manage employees</span>
+          </CommandItem>
+          <CommandItem value="create new supplier vendor" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/suppliers" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Add a new supplier</span>
+          </CommandItem>
+          <CommandItem value="summarize today activities overview status" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/dashboard" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Summarize today's activities</span>
+          </CommandItem>
+          <CommandItem value="analytics kpi reports intelligence data" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/analytics" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>View analytics & KPIs</span>
+          </CommandItem>
+          <CommandItem value="ai center copilot insights predictions" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/ai-center" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Open AI Center</span>
+          </CommandItem>
+          <CommandItem value="export inventory data csv download" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/inventory" }); toast.success("Navigate to Inventory → click Export CSV"); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Export inventory data</span>
+          </CommandItem>
+          <CommandItem value="create warehouse new storage" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/warehouse" }); toast.success("Click \"New\" to add a warehouse"); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Create a new warehouse</span>
+          </CommandItem>
+          <CommandItem value="work order production schedule plan" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/work-orders" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Manage work orders</span>
+          </CommandItem>
+          <CommandItem value="bom bill of materials product assembly" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/bom" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>View Bill of Materials</span>
+          </CommandItem>
+          <CommandItem value="products catalog sku manage" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/products" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Manage product catalog</span>
+          </CommandItem>
+          <CommandItem value="reports production quality finance maintenance" onSelect={() => { setCmdOpen(false); router.navigate({ to: "/reports" }); }}>
+            <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+            <span>Generate reports</span>
+          </CommandItem>
+        </CommandGroup>
         {sections.map(s => (
           <CommandGroup key={s.label} heading={s.label}>
             {s.items.map(it => (
-              <CommandItem key={it.to} value={`${s.label} ${it.label}`} onSelect={() => { setCmdOpen(false); router.navigate({ to: it.to }); }}>
+              <CommandItem key={it.to} value={`${s.label} ${it.label} ${it.to}`} onSelect={() => { setCmdOpen(false); router.navigate({ to: it.to }); }}>
                 <it.icon className="h-4 w-4 mr-2 text-muted-foreground" />
                 {it.label}
               </CommandItem>

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ClipboardList, Download } from "lucide-react";
 import { PageHeader, Panel } from "@/components/ui-parts";
+import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/reports")({
@@ -22,7 +23,9 @@ const reports = [
 function ReportsPage() {
   return (
     <div className="max-w-[1600px] mx-auto">
-      <PageHeader eyebrow="Reporting" title="Reports Library" sub="Every operational and financial report in PDF, Excel and CSV." />
+      <ModuleStatusBar moduleName="reports" />
+      <PageHeader eyebrow="Reporting" title="Reports Library" sub="Every operational and financial report in PDF, Excel and CSV."
+        actions={<ModuleCopilot moduleName="reports" />} />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {reports.map(g => (
           <Panel key={g.g} title={g.g}>

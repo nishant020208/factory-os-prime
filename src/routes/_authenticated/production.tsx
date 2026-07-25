@@ -27,6 +27,7 @@ function ProductionPage() {
       eyebrow="Manufacturing"
       title="Production Orders"
       sub="Work orders released, in progress and completed across your plants."
+      moduleName="production"
       rows={data}
       searchKeys={["order_number", "status", "priority"]}
       kpis={

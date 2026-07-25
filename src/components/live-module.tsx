@@ -9,7 +9,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { PageHeader, Panel, Kpi, StatusBadge, EmptyState } from "@/components/ui-parts";
+import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import type { ColumnDef, ModuleConfig } from "@/lib/module-registry";
 
 type Row = Record<string, unknown> & { id: string; company_id?: string };
@@ -49,6 +52,8 @@ export function LiveModule({ config }: { config: ModuleConfig }) {
   const { companyId } = useAuth();
   const qc = useQueryClient();
   const [q, setQ] = useState("");
+  const [showNew, setShowNew] = useState(false);
+  const [formData, setFormData] = useState<Record<string, string>>({});
 
   const queryKey = useMemo(
     () => [table, companyId, filter ?? null, orderBy ?? null] as const,
@@ -106,23 +111,57 @@ export function LiveModule({ config }: { config: ModuleConfig }) {
     return { total, top };
   }, [rows]);
 
+  // Auto-generate form fields from columns
+  const formFields = useMemo(() => {
+    const fields: { key: string; label: string; type: string; placeholder: string }[] = [];
+    // Use titleField as primary field
+    if (titleField) {
+      fields.push({ key: titleField, label: titleField.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), type: "text", placeholder: `Enter ${titleField.replace(/_/g, " ")}` });
+    }
+    // Add status if it exists in columns
+    if (columns.some(c => c.key === "status")) {
+      fields.push({ key: "status", label: "Status", type: "select", placeholder: "Select status" });
+    }
+    // Add priority if it exists
+    if (columns.some(c => c.key === "priority")) {
+      fields.push({ key: "priority", label: "Priority", type: "select", placeholder: "Select priority" });
+    }
+    return fields;
+  }, [columns, titleField]);
+
+  function openNew() {
+    const defaults: Record<string, string> = {};
+    if (titleField) defaults[titleField] = "";
+    if (columns.some(c => c.key === "status")) defaults.status = "pending";
+    if (columns.some(c => c.key === "priority")) defaults.priority = "medium";
+    setFormData(defaults);
+    setShowNew(true);
+  }
+
   async function handleCreate() {
     if (!companyId) return;
-    const label = window.prompt(`New ${singular} — enter a name/reference`);
-    if (!label) return;
     const nowNum = Date.now().toString().slice(-6);
     const row: Record<string, unknown> = { company_id: companyId, ...(createDefaults ?? {}) };
-    if (titleField) row[titleField] = label;
-    // Common number fields we auto-fill so uniqueness holds:
-    for (const k of ["so_number","po_number","wo_number","invoice_number","payment_number","shipment_number","ticket_number","order_number","inspection_number","employee_code"]) {
+
+    // Apply form data
+    for (const [k, v] of Object.entries(formData)) {
+      if (v !== "") row[k] = v;
+    }
+
+    // Auto-fill title/subject if needed
+    const label = titleField ? String(row[titleField] ?? "") : "";
+    if (columns.some(c => c.key === "title") && !row["title"]) row["title"] = label || `${singular} ${nowNum}`;
+    if (columns.some(c => c.key === "subject") && !row["subject"]) row["subject"] = label || `${singular} ${nowNum}`;
+
+    // Auto-fill common number fields for uniqueness
+    for (const k of ["so_number","po_number","wo_number","invoice_number","payment_number","shipment_number","ticket_number","order_number","inspection_number","employee_code","count_number"]) {
       if (columns.some(c => c.key === k) && !(k in row)) row[k] = `${k.split("_")[0].toUpperCase()}-${nowNum}`;
     }
-    if (columns.some(c => c.key === "title") && !row["title"]) row["title"] = label;
-    if (columns.some(c => c.key === "subject") && !row["subject"]) row["subject"] = label;
 
     const { error } = await supabase.from(table as never).insert(row as never);
     if (error) { toast.error(error.message); return; }
     toast.success(`${singular} created`);
+    setShowNew(false);
     void refetch();
   }
 
@@ -141,6 +180,7 @@ export function LiveModule({ config }: { config: ModuleConfig }) {
     const a = document.createElement("a");
     a.href = url; a.download = `${table}.csv`; a.click();
     URL.revokeObjectURL(url);
+    toast.success("Exported to CSV");
   }
 
   function handleAiSummary() {
@@ -154,28 +194,98 @@ export function LiveModule({ config }: { config: ModuleConfig }) {
 
   return (
     <div className="max-w-[1600px] mx-auto">
+      <ModuleStatusBar moduleName={title.toLowerCase().replace(/\s+/g, "-")} />
       <PageHeader
         eyebrow={eyebrow}
         title={title}
         sub={sub}
         actions={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleAiSummary}>
+          <div className="flex flex-wrap items-center gap-2">
+            <ModuleCopilot moduleName={title.toLowerCase().replace(/\s+/g, "-")} />
+            <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={handleAiSummary}>
               <Sparkles className="h-4 w-4 mr-1" /> AI summary
             </Button>
             <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="h-4 w-4 mr-1" /> Export
+              <Download className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Export</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+            <Button variant="outline" size="sm" className="hidden md:inline-flex" onClick={() => refetch()} disabled={isFetching}>
               {isFetching ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
-              Refresh
+              <span className="hidden lg:inline">Refresh</span>
             </Button>
-            <Button size="sm" className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={handleCreate}>
-              <Plus className="h-4 w-4 mr-1" /> New
+            <Button size="sm" className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={openNew}>
+              <Plus className="h-4 w-4 mr-1" />New
             </Button>
           </div>
         }
       />
+
+      {/* New Record Dialog */}
+      <Dialog open={showNew} onOpenChange={setShowNew}>
+        <DialogContent className="sm:max-w-[480px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>New {singular}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {formFields.map(field => (
+              <div key={field.key} className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">{field.label}</Label>
+                {field.type === "select" ? (
+                  <select
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={formData[field.key] ?? ""}
+                    onChange={e => setFormData(d => ({ ...d, [field.key]: e.target.value }))}
+                  >
+                    {field.key === "status" && (
+                      <>
+                        <option value="pending">Pending</option>
+                        <option value="draft">Draft</option>
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                      </>
+                    )}
+                    {field.key === "priority" && (
+                      <>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                      </>
+                    )}
+                  </select>
+                ) : (
+                  <Input
+                    type={field.type}
+                    value={formData[field.key] ?? ""}
+                    onChange={e => setFormData(d => ({ ...d, [field.key]: e.target.value }))}
+                    placeholder={field.placeholder}
+                    className="h-9"
+                  />
+                )}
+              </div>
+            ))}
+            {formFields.length === 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Name / Reference</Label>
+                <Input
+                  value={formData._name ?? ""}
+                  onChange={e => setFormData(d => ({ ...d, _name: e.target.value }))}
+                  placeholder={`Enter ${singular.toLowerCase()} name`}
+                  className="h-9"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
+            <Button className="bg-[image:var(--gradient-primary)]" onClick={handleCreate}>
+              <Plus className="h-4 w-4 mr-1.5" />Create {singular}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
         <Kpi label={`Total ${title.toLowerCase()}`} value={kpis.total.toLocaleString()} />

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Boxes, AlertTriangle, ArrowLeftRight, TrendingDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge } from "@/components/ui-parts";
+import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -35,8 +36,9 @@ function InventoryPage() {
 
   return (
     <div className="max-w-[1600px] mx-auto">
+      <ModuleStatusBar moduleName="inventory" />
       <PageHeader eyebrow="Warehouse" title="Inventory" sub="Real-time on-hand, reserved and in-transit across every warehouse."
-        actions={<Button className="bg-[image:var(--gradient-primary)] shadow-glow"><ArrowLeftRight className="h-4 w-4 mr-1.5" />Adjust stock</Button>} />
+        actions={<><ModuleCopilot moduleName="inventory" /><Button className="bg-[image:var(--gradient-primary)] shadow-glow"><ArrowLeftRight className="h-4 w-4 mr-1.5" />Adjust stock</Button></>} />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Kpi label="Total on-hand" value={totalOnHand.toLocaleString()} delta="+2.3%" icon={Boxes} tone="primary" />
         <Kpi label="Inventory value" value={`$${Math.round(value).toLocaleString()}`} delta="+1.1%" icon={Boxes} tone="success" />
