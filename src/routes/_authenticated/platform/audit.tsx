@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Panel } from "@/components/ui-parts";
+import { ModuleCopilot } from "@/components/module-status";
 import { ScrollText } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/platform/audit")({
@@ -16,7 +17,8 @@ function PlatformAudit() {
   });
   return (
     <div className="max-w-[1600px] mx-auto">
-      <PageHeader eyebrow="Platform" title="Platform Audit Logs" sub="Every action across every tenant, immutable and exportable." />
+      <PageHeader eyebrow="Platform" title="Platform Audit Logs" sub="Every action across every tenant, immutable and exportable."
+        actions={<ModuleCopilot moduleName="platform-audit" />} />
       <Panel title={`${data?.length ?? 0} events`}>
         <div className="divide-y divide-white/5 text-sm">
           {(data ?? []).map(l => (

@@ -1,95 +1,330 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
-import { useQuery } from "@tanstack/react-query";
-import { FileText, FolderOpen, Upload, Download, Search } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { FileText, Upload, Download, Trash2, File, Image, FileSpreadsheet, Loader2, Plus, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { PageHeader, Kpi, Panel, StatusBadge } from "@/components/ui-parts";
+import { ResourceView, type FormField } from "@/components/resource-view";
+import { Kpi, StatusBadge, Panel, PageHeader } from "@/components/ui-parts";
+import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { useState, useRef } from "react";
 
 export const Route = createFileRoute("/_authenticated/documents")({
   head: () => ({ meta: [
     { title: "Documents — FactoryOS AI" },
-    { name: "description", content: "Document management, sharing and version control." },
+    { name: "description", content: "SOPs, manuals, policies, delivery notes and shared documents with customer upload support." },
   ]}),
   component: DocumentsPage,
 });
 
-// Demo documents derived from ERP context
-const DEMO_DOCS = [
-  { id: "1", name: "Production Report Q1 2026", category: "Reports", type: "PDF", size: "2.4 MB", updated: "2 hours ago", status: "active", author: "Admin" },
-  { id: "2", name: "ISO 9001 Quality Manual", category: "Compliance", type: "PDF", size: "8.1 MB", updated: "1 week ago", status: "active", author: "Quality Manager" },
-  { id: "3", name: "Machine Maintenance Schedule", category: "Maintenance", type: "XLSX", size: "156 KB", updated: "3 days ago", status: "active", author: "Maintenance Eng." },
-  { id: "4", name: "Supplier Agreement - Nordic Steel", category: "Contracts", type: "PDF", size: "1.2 MB", updated: "2 weeks ago", status: "active", author: "Procurement" },
-  { id: "5", name: "Safety Data Sheet - Ti Alloy", category: "Safety", type: "PDF", size: "3.8 MB", updated: "1 month ago", status: "active", author: "HSE" },
-  { id: "6", name: "Customer Invoice Template", category: "Finance", type: "DOCX", size: "89 KB", updated: "5 days ago", status: "active", author: "Finance" },
-  { id: "7", name: "Employee Handbook 2026", category: "HR", type: "PDF", size: "4.2 MB", updated: "3 weeks ago", status: "active", author: "HR Manager" },
-  { id: "8", name: "Plant Layout Blueprint", category: "Engineering", type: "DWG", size: "12.5 MB", updated: "1 month ago", status: "active", author: "Engineering" },
+const DOC_FORM_FIELDS: FormField[] = [
+  { key: "title", label: "Title", type: "text", placeholder: "Document title", required: true },
+  { key: "category", label: "Category", type: "select", defaultValue: "general", options: [
+    { value: "general", label: "General" },
+    { value: "sop", label: "SOP" },
+    { value: "iso", label: "ISO/Compliance" },
+    { value: "shipping", label: "Shipping" },
+    { value: "contract", label: "Contract" },
+    { value: "customer", label: "Customer Upload" },
+    { value: "hr", label: "HR" },
+    { value: "finance", label: "Finance" },
+    { value: "engineering", label: "Engineering" },
+  ]},
+  { key: "description", label: "Description", type: "textarea" },
+  { key: "visibility", label: "Visibility", type: "select", defaultValue: "company", options: [
+    { value: "company", label: "Company" },
+    { value: "public", label: "Public (Read-only)" },
+    { value: "customer", label: "Customer Only" },
+  ]},
 ];
 
 function DocumentsPage() {
-  const [search, setSearch] = useState("");
-  const docs = DEMO_DOCS.filter(d =>
-    d.name.toLowerCase().includes(search.toLowerCase()) ||
-    d.category.toLowerCase().includes(search.toLowerCase())
-  );
-  const categories = [...new Set(DEMO_DOCS.map(d => d.category))];
-  const categoryCount = categories.length;
+  const queryClient = useQueryClient();
+  const { companyId, user, roles } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploadForm, setUploadForm] = useState({
+    title: "",
+    category: "customer",
+    description: "",
+    visibility: "customer",
+  });
+  const [uploading, setUploading] = useState(false);
+
+  const isCustomer = roles.includes("customer_portal");
+
+  const { data } = useQuery({
+    queryKey: ["documents", companyId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("documents")
+        .select("*")
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+  });
+
+  // Customer documents table
+  const { data: customerDocs } = useQuery({
+    queryKey: ["customer-documents", companyId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("customer_documents")
+        .select("*, customers!inner(name)")
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !isCustomer,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("documents").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      toast.success("Document deleted");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const handleFileUpload = async () => {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file) {
+      toast.error("Please select a file");
+      return;
+    }
+    if (!uploadForm.title.trim()) {
+      toast.error("Please enter a title");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // For demo: create a document record with a placeholder URL
+      // In production, upload to Supabase Storage
+      const { error } = await supabase.from("documents").insert({
+        company_id: companyId!,
+        title: uploadForm.title,
+        description: uploadForm.description || null,
+        category: uploadForm.category,
+        file_type: file.name.split(".").pop() || "unknown",
+        file_url: URL.createObjectURL(file), // In production, use uploaded URL
+        uploaded_by: user?.id,
+        visibility: uploadForm.visibility,
+        version: "v1",
+        status: "published",
+      });
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      toast.success("Document uploaded");
+      setShowUpload(false);
+      setUploadForm({ title: "", category: "customer", description: "", visibility: "customer" });
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const totalDocs = data?.length ?? 0;
+  const customerUploaded = data?.filter((d: any) => d.category === "customer").length ?? 0;
+  const published = data?.filter((d: any) => d.status === "published").length ?? 0;
 
   return (
     <div className="max-w-[1600px] mx-auto">
+      <ModuleStatusBar moduleName="documents" />
       <PageHeader
         eyebrow="Knowledge"
-        title="Documents"
-        sub="Centralized document management with categories, versioning and sharing."
+        title={isCustomer ? "My Documents" : "Documents"}
+        sub={isCustomer
+          ? "Upload and manage your documents — certificates, contracts, drawings, and more."
+          : "SOPs, manuals, policies, delivery notes and customer-uploaded documents."}
         actions={
-          <Button className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={() => toast.info("Upload feature — coming soon")}>
-            <Upload className="h-4 w-4 mr-1.5" />Upload Document
-          </Button>
+          <div className="flex items-center gap-2">
+            <ModuleCopilot moduleName="documents" />
+            <Button className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={() => setShowUpload(true)}>
+              <Upload className="h-4 w-4 mr-1.5" />Upload
+            </Button>
+          </div>
         }
       />
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Total Documents" value={String(DEMO_DOCS.length)} icon={FileText} tone="primary" />
-        <Kpi label="Categories" value={String(categoryCount)} icon={FolderOpen} tone="info" />
-        <Kpi label="This Week" value="3" icon={FileText} tone="success" />
-        <Kpi label="Shared" value="6" icon={FolderOpen} tone="warning" />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <Kpi label="Total Documents" value={String(totalDocs)} icon={FileText} tone="primary" />
+        <Kpi label="Published" value={String(published)} icon={FileText} tone="success" />
+        <Kpi label="Customer Uploaded" value={String(customerUploaded)} icon={Upload} tone="info" />
+        <Kpi label="Categories" value={String(new Set(data?.map((d: any) => d.category).filter(Boolean)).size)} icon={FileSpreadsheet} tone="warning" />
       </div>
 
-      <div className="mt-4">
-        <Panel title={`${docs.length} Documents`} right={
-          <div className="relative">
-            <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search documents…" className="h-8 pl-8 w-48 bg-background/40" />
-          </div>
-        }>
-          <div className="space-y-2">
-            {docs.map(doc => (
-              <div key={doc.id} className="flex items-center justify-between gap-3 py-3 px-2 rounded-lg hover:bg-white/[0.02] transition-colors border-b border-white/5 last:border-0">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <FileText className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{doc.name}</div>
-                    <div className="text-[11px] text-muted-foreground">{doc.author} · {doc.updated}</div>
+      {/* Customer Documents section */}
+      {!isCustomer && customerDocs && customerDocs.length > 0 && (
+        <div className="mb-4">
+        <Panel title={`Customer Documents (${customerDocs.length})`}>
+          <div className="divide-y divide-white/5">
+            {customerDocs.map((doc: any) => (
+              <div key={doc.id} className="flex items-center justify-between py-2.5 text-sm">
+                <div className="flex items-center gap-3">
+                  <File className="h-4 w-4 text-primary/60" />
+                  <div>
+                    <div className="font-medium">{doc.title}</div>
+                    <div className="text-xs text-muted-foreground">{doc.customers?.name ?? "—"} · {doc.file_type ?? "—"}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Badge variant="outline" className="text-[10px] font-medium hidden sm:inline-flex">{doc.category}</Badge>
-                  <Badge variant="outline" className="text-[10px] font-medium bg-info/10 text-info border-info/20 hidden md:inline-flex">{doc.type}</Badge>
-                  <span className="text-[11px] text-muted-foreground hidden lg:inline">{doc.size}</span>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast.info(`Download ${doc.name}`)}>
-                    <Download className="h-3.5 w-3.5" />
-                  </Button>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{new Date(doc.created_at).toLocaleDateString()}</span>
+                  {doc.file_url && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.open(doc.file_url, "_blank")}>
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         </Panel>
-      </div>
+        </div>
+      )}
+
+      {/* Main documents table */}
+      <Panel title={`${data?.length ?? 0} documents`}>
+        {(!data || data.length === 0) ? (
+          <div className="text-center text-muted-foreground py-12 text-sm">
+            No documents yet. Upload your first document to get started.
+          </div>
+        ) : (
+          <div className="divide-y divide-white/5">
+            {data.map((doc: any) => (
+              <div key={doc.id} className="flex items-center justify-between py-2.5 text-sm">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`h-8 w-8 rounded-lg grid place-items-center ${
+                    doc.file_type === "pdf" ? "bg-destructive/10 text-destructive" :
+                    doc.file_type?.startsWith("image") ? "bg-info/10 text-info" :
+                    "bg-primary/10 text-primary"
+                  }`}>
+                    {doc.file_type === "pdf" ? <FileText className="h-4 w-4" /> :
+                     doc.file_type?.startsWith("image") ? <Image className="h-4 w-4" /> :
+                     <File className="h-4 w-4" />}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{doc.title}</div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <span>{doc.category ?? "general"}</span>
+                      {doc.version && <><span>·</span><span>v{doc.version}</span></>}
+                      {doc.file_type && <><span>·</span><span>{doc.file_type}</span></>}
+                      {doc.visibility && <><span>·</span><StatusBadge status={doc.visibility} /></>}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <StatusBadge status={doc.status ?? "published"} />
+                  <span className="text-xs text-muted-foreground hidden sm:inline">{new Date(doc.created_at).toLocaleDateString()}</span>
+                  {doc.file_url && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.open(doc.file_url, "_blank")}>
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteMutation.mutate(doc.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      {/* Upload Dialog */}
+      <Dialog open={showUpload} onOpenChange={setShowUpload}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Title *</Label>
+              <Input
+                value={uploadForm.title}
+                onChange={(e) => setUploadForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Document title"
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Category</Label>
+              <Select value={uploadForm.category} onValueChange={(v) => setUploadForm(f => ({ ...f, category: v }))}>
+                <SelectTrigger className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer">Customer Upload</SelectItem>
+                  <SelectItem value="shipping">Shipping</SelectItem>
+                  <SelectItem value="contract">Contract</SelectItem>
+                  <SelectItem value="sop">SOP</SelectItem>
+                  <SelectItem value="iso">ISO/Compliance</SelectItem>
+                  <SelectItem value="general">General</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Description</Label>
+              <Textarea
+                value={uploadForm.description}
+                onChange={(e) => setUploadForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Optional description"
+                rows={2}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Visibility</Label>
+              <Select value={uploadForm.visibility} onValueChange={(v) => setUploadForm(f => ({ ...f, visibility: v }))}>
+                <SelectTrigger className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer">Customer Only</SelectItem>
+                  <SelectItem value="company">Company</SelectItem>
+                  <SelectItem value="public">Public</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">File *</Label>
+              <div className="border-2 border-dashed border-white/10 rounded-lg p-6 text-center hover:border-primary/30 transition cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
+                <div className="text-sm text-muted-foreground">Click to select a file</div>
+                <div className="text-[10px] text-muted-foreground mt-1">PDF, Images, Documents accepted</div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.csv"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUpload(false)}>Cancel</Button>
+            <Button
+              className="bg-[image:var(--gradient-primary)]"
+              onClick={handleFileUpload}
+              disabled={uploading}
+            >
+              {uploading ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Upload className="h-4 w-4 mr-1.5" />}
+              Upload Document
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

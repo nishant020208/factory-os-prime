@@ -1,9 +1,11 @@
 import { type ReactNode, useEffect, useState, useMemo } from "react";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Bell, Search, Settings, LogOut, Command, ChevronDown, Sun, Moon, Factory, BrainCircuit,
+  Palette,
 } from "lucide-react";
+import { useTheme, type ThemeMode } from "@/hooks/use-theme";
 import { toast } from "sonner";
 import {
   SidebarProvider, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -131,14 +133,11 @@ function UserBadge({ collapsed }: { collapsed: boolean }) {
 function TopBar() {
   const router = useRouter();
   const { profile, roles, companyId } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [cmdOpen, setCmdOpen] = useState(false);
-  const [dark, setDark] = useState(true);
   const role = useMemo(() => primaryRole(roles), [roles]);
   const sections = useMemo(() => navForRole(role), [role]);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("light", !dark);
-  }, [dark]);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -180,9 +179,70 @@ function TopBar() {
           </kbd>
         </button>
 
-        <Button variant="ghost" size="icon" onClick={() => setDark(d => !d)} className="h-9 w-9" aria-label="Toggle theme">
-          {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
+        {/* 3-way theme switcher - visible as segmented control on wide screens */}
+        <div className="hidden lg:flex items-center bg-card/60 border border-white/5 rounded-lg p-0.5 gap-0">
+          {([
+            { id: "dark" as ThemeMode, icon: Moon, label: "Dark" },
+            { id: "light" as ThemeMode, icon: Sun, label: "Light" },
+            { id: "aesthetic" as ThemeMode, icon: Palette, label: "Aesthetic" },
+          ]).map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              onClick={() => setTheme(id)}
+              className={`relative flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium rounded-md transition-all duration-200 ${
+                theme === id
+                  ? "text-foreground bg-card shadow-sm border border-white/10"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {theme === id && (
+                <motion.div
+                  layoutId="activeTheme"
+                  className="absolute inset-0 rounded-md bg-card shadow-sm border border-white/10"
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              <span className="relative z-10 flex items-center gap-1.5">
+                <Icon className="h-3 w-3" />
+                <span>{label}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Compact theme dropdown for smaller screens */}
+        <div className="lg:hidden relative">
+          <Button variant="ghost" size="icon" onClick={() => setThemeMenuOpen(o => !o)} className="h-9 w-9" aria-label="Theme">
+            {theme === "dark" ? <Moon className="h-4 w-4" /> : theme === "light" ? <Sun className="h-4 w-4" /> : <Palette className="h-4 w-4" />}
+          </Button>
+          <AnimatePresence>
+            {themeMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 4, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                className="absolute right-0 top-full mt-1 z-50 w-40 rounded-lg border border-white/10 bg-card shadow-elevated p-1"
+              >
+                {([
+                  { id: "dark" as ThemeMode, icon: Moon, label: "Dark" },
+                  { id: "light" as ThemeMode, icon: Sun, label: "Light" },
+                  { id: "aesthetic" as ThemeMode, icon: Palette, label: "Aesthetic" },
+                ]).map(({ id, icon: Icon, label }) => (
+                  <button
+                    key={id}
+                    onClick={() => { setTheme(id); setThemeMenuOpen(false); }}
+                    className={`flex items-center gap-2 w-full px-3 py-2 text-xs rounded-md transition-colors ${
+                      theme === id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
         <Button variant="ghost" size="icon" className="h-9 w-9 relative" aria-label="Notifications">
           <Bell className="h-4 w-4" />
           <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-primary animate-pulse-glow" />

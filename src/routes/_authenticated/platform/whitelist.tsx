@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { FileCheck2, Plus, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Panel, StatusBadge, Kpi } from "@/components/ui-parts";
+import { ModuleCopilot } from "@/components/module-status";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,8 @@ function WhitelistPage() {
         title="Company Admin Whitelist"
         sub="Only whitelisted emails can register as Company Admins. Each invite provisions a brand new isolated tenant."
         actions={
+          <>
+          <ModuleCopilot moduleName="whitelist" />
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="bg-[image:var(--gradient-primary)] shadow-glow"><Plus className="h-4 w-4 mr-1.5" />Whitelist Company Admin</Button>
@@ -85,6 +88,7 @@ function WhitelistPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </>
         }
       />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

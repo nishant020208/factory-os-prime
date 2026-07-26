@@ -58,7 +58,7 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/whitelist":   ONLY("company_admin"),
   "/knowledge":   ALL_COMPANY,
   "/analytics":   ONLY("company_admin", "plant_admin", "plant_manager", "finance_manager"),
-  "/settings":    ONLY("company_admin", "plant_admin"),
+  "/settings":    ONLY("company_admin", "plant_admin", "customer_portal", "supplier_portal", "auditor"),
 
   // Dashboard: every authenticated non-root
   "/dashboard": ALL_COMPANY,

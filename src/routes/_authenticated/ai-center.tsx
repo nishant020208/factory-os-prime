@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { BrainCircuit, Sparkles, Loader2, Send, Radar, ScanLine, GaugeCircle, LineChart, Layers, MessageCircle } from "lucide-react";
 import { PageHeader, Panel } from "@/components/ui-parts";
-import { ModuleStatusBar } from "@/components/module-status";
+import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -51,7 +51,8 @@ function AICenter() {
   return (
     <div className="max-w-[1600px] mx-auto">
       <ModuleStatusBar moduleName="ai-center" />
-      <PageHeader eyebrow="AI-native" title="AI Center" sub="Every AI capability across FactoryOS in one control plane." />
+      <PageHeader eyebrow="AI-native" title="AI Center" sub="Every AI capability across FactoryOS in one control plane."
+        actions={<ModuleCopilot moduleName="ai-center" />} />
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {capabilities.map((c, i) => (

@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Factory, Boxes, ShieldCheck, Cog, TrendingUp, Activity, BrainCircuit, Zap,
+  Factory, Boxes, ShieldCheck, Cog, TrendingUp, Activity, Zap,
   Warehouse, ShoppingCart, Users, Landmark, Wrench, ClipboardList, Timer,
   Truck, UserRound, ScrollText, Package, ArrowRight, CheckCircle2, Clock, AlertTriangle, Link2,
+  Plus, X, MessageSquare,
 } from "lucide-react";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart,
@@ -11,11 +12,16 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { Kpi, PageHeader, Panel, StatusBadge } from "@/components/ui-parts";
+import { ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { primaryRole } from "@/lib/route-access";
 import type { AppRole } from "@/lib/roles";
 import { ROLE_MAP } from "@/lib/roles";
+import { getDashboardNotes, saveDashboardNote } from "@/lib/order-lifecycle";
+import { toast } from "sonner";
+import { useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [
@@ -60,8 +66,8 @@ function Shell({ title, sub, eyebrow, children }: { title: string; sub: string; 
     <div className="max-w-[1600px] mx-auto">
       <PageHeader eyebrow={eyebrow} title={title} sub={sub}
         actions={<>
+          <ModuleCopilot moduleName="dashboard" />
           <Button variant="outline" className="glass border-white/5"><Activity className="h-4 w-4 mr-1.5" />Live</Button>
-          <Button className="bg-[image:var(--gradient-primary)] shadow-glow"><BrainCircuit className="h-4 w-4 mr-1.5" />Ask Copilot</Button>
         </>}
       />
       {children}
@@ -89,17 +95,74 @@ function OutputChart({ data }: { data: ReturnType<typeof trend> }) {
   );
 }
 
-function AIInsights({ items }: { items: { t: string; c: number }[] }) {
+/* ─────────── AI INSIGHTS WITH PERSISTENT NOTES (Bug B Fix) ─────────── */
+function AIInsights({ items, dashboardType = "default" }: { items: { t: string; c: number }[]; dashboardType?: string }) {
+  const { companyId, user } = useAuth();
+  const queryClient = useQueryClient();
+  const [showAddNote, setShowAddNote] = useState(false);
+  const [newNote, setNewNote] = useState("");
+
+  const { data: savedNotes } = useQuery({
+    queryKey: ["dashboard-notes", dashboardType, companyId],
+    queryFn: () => getDashboardNotes(companyId!, dashboardType),
+    enabled: !!companyId,
+  });
+
+  const handleSaveNote = async () => {
+    if (!companyId || !user || !newNote.trim()) return;
+    try {
+      await saveDashboardNote(companyId, user.id, dashboardType, newNote.trim(), "manual");
+      queryClient.invalidateQueries({ queryKey: ["dashboard-notes", dashboardType] });
+      toast.success("Note saved");
+      setNewNote("");
+      setShowAddNote(false);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
   return (
-    <Panel title="AI Copilot" right={<span className="text-[10px] text-primary">{items.length} insights</span>}>
+    <Panel title="AI Copilot" right={
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-primary">{items.length + (savedNotes?.length ?? 0)} insights</span>
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowAddNote(!showAddNote)}>
+          {showAddNote ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+        </Button>
+      </div>
+    }>
+      {showAddNote && (
+        <div className="flex gap-2 mb-3">
+          <Input
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            placeholder="Add your own note or insight..."
+            className="h-8 text-xs"
+            onKeyDown={(e) => e.key === "Enter" && handleSaveNote()}
+          />
+          <Button size="sm" className="h-8 shrink-0" onClick={handleSaveNote}>
+            <MessageSquare className="h-3 w-3 mr-1" />Save
+          </Button>
+        </div>
+      )}
       <div className="space-y-3">
+        {/* AI-generated insights */}
         {items.map((r, i) => (
-          <div key={i} className="rounded-xl bg-card/60 border border-white/5 p-3">
+          <div key={`ai-${i}`} className="rounded-xl bg-card/60 border border-white/5 p-3">
             <div className="flex items-center justify-between text-[10px] text-primary">
               <span className="flex items-center gap-1"><Zap className="h-3 w-3" /> Copilot</span>
               <span>{r.c}% conf.</span>
             </div>
             <div className="mt-1 text-sm">{r.t}</div>
+          </div>
+        ))}
+        {/* Saved user notes */}
+        {(savedNotes ?? []).map((note: any) => (
+          <div key={note.id} className="rounded-xl bg-card/40 border border-primary/10 p-3">
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" /> Note</span>
+              <span>{new Date(note.created_at).toLocaleDateString()}</span>
+            </div>
+            <div className="mt-1 text-sm">{note.content}</div>
           </div>
         ))}
       </div>
@@ -119,7 +182,7 @@ function WorkflowConnectionPanel() {
   const { data: inspections } = useQuery({ queryKey: ["wf-qi", companyId], queryFn: async () => (await supabase.from("quality_inspections").select("inspection_number,result")).data ?? [], ...opts });
   const { data: tickets } = useQuery({ queryKey: ["wf-tkt", companyId], queryFn: async () => (await supabase.from("support_tickets").select("ticket_number,status")).data ?? [], ...opts });
 
-  const soDone = salesOrders?.filter(s => s.status === "completed").length ?? 0;
+  const soDone = salesOrders?.filter(s => s.status === "completed" || s.status === "delivered").length ?? 0;
   const soTotal = salesOrders?.length ?? 0;
   const poDone = prodOrders?.filter(p => p.status === "completed").length ?? 0;
   const poTotal = prodOrders?.length ?? 0;
@@ -165,6 +228,46 @@ function WorkflowConnectionPanel() {
   );
 }
 
+/* ─────────── PENDING APPROVALS PANEL ─────────── */
+function PendingApprovalsPanel() {
+  const { companyId } = useAuth();
+  const { data: pendingOrders } = useQuery({
+    queryKey: ["pending-approvals", companyId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("sales_orders")
+        .select("*, customers!inner(name)")
+        .eq("status", "pending_approval")
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!companyId,
+  });
+
+  if (!pendingOrders?.length) return null;
+
+  return (
+    <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 mb-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-amber-400 mb-3">
+        <AlertTriangle className="h-4 w-4" />
+        {pendingOrders.length} Order{pendingOrders.length > 1 ? "s" : ""} Pending Approval
+      </div>
+      <div className="space-y-2">
+        {pendingOrders.slice(0, 5).map((o: any) => (
+          <div key={o.id} className="flex items-center justify-between text-sm">
+            <div>
+              <span className="font-medium">{o.so_number}</span>
+              <span className="text-muted-foreground mx-1">·</span>
+              <span className="text-muted-foreground">{o.customers?.name ?? "—"}</span>
+            </div>
+            <span className="text-xs text-muted-foreground">${Number(o.total_amount ?? 0).toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ─────────── COMPANY ADMIN ─────────── */
 function CompanyAdminDashboard() {
   const production = useQuery({ queryKey: ["prod-orders-recent"],
@@ -177,6 +280,10 @@ function CompanyAdminDashboard() {
     queryFn: async () => (await supabase.from("customers").select("*", { count: "exact", head: true })).count ?? 0 });
   const employees = useQuery({ queryKey: ["emp-count"],
     queryFn: async () => (await supabase.from("employees").select("*", { count: "exact", head: true })).count ?? 0 });
+  const { data: changeRequests } = useQuery({
+    queryKey: ["change-requests"],
+    queryFn: async () => (await supabase.from("profile_change_requests").select("*").eq("status", "pending").order("created_at", { ascending: false })).data ?? [],
+  });
 
   const outputTrend = trend(14);
   const oeeSeries = Array.from({ length: 12 }, (_, i) => ({
@@ -193,8 +300,8 @@ function CompanyAdminDashboard() {
 
   return (
     <Shell eyebrow="Executive" title="Command Center" sub="Company-wide operations, plants, machines and AI recommendations.">
-      {/* Workflow Pipeline — live status across all 3 customer orders */}
       <WorkflowConnectionPanel />
+      <PendingApprovalsPanel />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-4">
         <Kpi label="Active Orders" value={String(activeOrders)} delta="+4" icon={Factory} tone="primary" />
@@ -207,7 +314,7 @@ function CompanyAdminDashboard() {
         <Kpi label="Customers" value={String(customers.data ?? 0)} icon={UserRound} tone="info" />
         <Kpi label="Products" value={String(products.data ?? 0)} icon={Boxes} tone="primary" />
         <Kpi label="Avg Utilization" value={`${avgUtil}%`} icon={TrendingUp} tone="success" />
-        <Kpi label="Down Machines" value={String(machineDown)} icon={Wrench} tone="warning" />
+        <Kpi label="Change Requests" value={String(changeRequests?.length ?? 0)} icon={Users} tone="warning" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
@@ -216,10 +323,10 @@ function CompanyAdminDashboard() {
             <OutputChart data={outputTrend} />
           </Panel>
         </div>
-        <AIInsights items={[
-          { t: `MediCore SO-005 at 45% — on track for delivery in 7 days`, c: 94 },
-          { t: `Reorder N-08-SKU-A1003 — consumption up 22% WoW`, c: 88 },
-          { t: `Supplier Kyoto Precision beat SLA by 6% this month`, c: 91 },
+        <AIInsights dashboardType="company_admin" items={[
+          { t: `Orders pipeline: ${production.data?.length ?? 0} active, ${completedOrders} completed this period`, c: 94 },
+          { t: `Machine utilization at ${avgUtil}% — ${machineDown} machine(s) need attention`, c: 88 },
+          { t: `Inventory health: ${products.data} SKUs tracked, ${customers.data} active customers`, c: 91 },
         ]} />
       </div>
 
@@ -323,7 +430,7 @@ function PlantAdminDashboard() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2"><Panel title="Plant output · last 14 days"><OutputChart data={trend(14)} /></Panel></div>
-        <AIInsights items={[
+        <AIInsights dashboardType="plant_admin" items={[
           { t: "Line B utilization down 8% vs last week", c: 82 },
           { t: "Shift 2 productivity best of the quarter", c: 91 },
         ]} />
@@ -342,7 +449,7 @@ function PlantManagerDashboard() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2"><Panel title="Throughput trend"><OutputChart data={trend(14, 1600)} /></Panel></div>
-        <AIInsights items={[
+        <AIInsights dashboardType="plant_manager" items={[
           { t: "CNC-A3 vibration anomaly — schedule inspection", c: 87 },
           { t: "Optimize batching on line C for +6% throughput", c: 79 },
         ]} />
@@ -355,6 +462,10 @@ function PlantManagerDashboard() {
 function ProductionManagerDashboard() {
   const orders = useQuery({ queryKey: ["prod-orders"],
     queryFn: async () => (await supabase.from("production_orders").select("*").order("due_date").limit(8)).data ?? [] });
+  const { data: approvedOrders } = useQuery({
+    queryKey: ["approved-sales-orders"],
+    queryFn: async () => (await supabase.from("sales_orders").select("*, customers!inner(name)").eq("status", "approved").order("created_at", { ascending: false })).data ?? [],
+  });
   return (
     <Shell eyebrow="Production" title="Production Planning" sub="Schedule, work orders and capacity for the next 14 days.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -363,6 +474,21 @@ function ProductionManagerDashboard() {
         <Kpi label="Capacity Used" value="78%" icon={TrendingUp} tone="warning" />
         <Kpi label="On-Time %" value="94.2%" delta="+1.1%" icon={Timer} tone="success" />
       </div>
+      {/* Approved orders needing production orders */}
+      {approvedOrders && approvedOrders.length > 0 && (
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 mb-4">
+          <div className="text-sm font-medium text-blue-400 mb-2">
+            {approvedOrders.length} Approved Customer Order{approvedOrders.length > 1 ? "s" : ""} — Create Production Orders
+          </div>
+          <div className="space-y-1">
+            {approvedOrders.map((o: any) => (
+              <div key={o.id} className="text-xs text-muted-foreground">
+                {o.so_number} — {o.customers?.name ?? "—"} — ${Number(o.total_amount ?? 0).toLocaleString()}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2">
           <Panel title="Upcoming production orders">
@@ -377,7 +503,7 @@ function ProductionManagerDashboard() {
             </div>
           </Panel>
         </div>
-        <AIInsights items={[
+        <AIInsights dashboardType="production_manager" items={[
           { t: "Reschedule PO-1042 → save 6 setup hours", c: 88 },
           { t: "Material shortage predicted for W-42", c: 76 },
         ]} />
@@ -389,8 +515,8 @@ function ProductionManagerDashboard() {
 /* ─────────── WAREHOUSE MANAGER ─────────── */
 function WarehouseDashboard() {
   const inv = useQuery({ queryKey: ["inv"],
-    queryFn: async () => (await supabase.from("inventory").select("*").limit(200)).data ?? [] });
-  const low = inv.data?.filter(i => Number(i.quantity ?? 0) <= 10).length ?? 0;
+    queryFn: async () => (await supabase.from("inventory").select("*, products!inner(name,reorder_level)").limit(200)).data ?? [] });
+  const low = inv.data?.filter((i: any) => Number(i.quantity ?? 0) <= Number(i.products?.reorder_level ?? 0)).length ?? 0;
   return (
     <Shell eyebrow="Logistics" title="Warehouse Control" sub="Stock movements, receiving, dispatch and cycle counts.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -401,7 +527,7 @@ function WarehouseDashboard() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2"><Panel title="Warehouse throughput"><OutputChart data={trend(14, 240, 20)} /></Panel></div>
-        <AIInsights items={[
+        <AIInsights dashboardType="warehouse_manager" items={[
           { t: `${low} SKUs are at or below reorder level`, c: 100 },
           { t: "Suggest bin re-slotting for A-class items", c: 84 },
         ]} />
@@ -436,7 +562,7 @@ function ProcurementDashboard() {
             </div>
           </Panel>
         </div>
-        <AIInsights items={[
+        <AIInsights dashboardType="procurement_manager" items={[
           { t: "Consolidate SKU-A1003 orders → save 8%", c: 89 },
           { t: "Alt supplier available for critical Ti stock", c: 76 },
         ]} />
@@ -457,7 +583,7 @@ function QualityDashboard() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2"><Panel title="Yield trend"><OutputChart data={trend(14, 940, 30)} /></Panel></div>
-        <AIInsights items={[
+        <AIInsights dashboardType="quality_inspector" items={[
           { t: "Predicted micro-crack on batch B-2287", c: 88 },
           { t: "Housing dimensional drift approaching limit", c: 76 },
         ]} />
@@ -492,7 +618,7 @@ function MaintenanceDashboard() {
             </div>
           </Panel>
         </div>
-        <AIInsights items={[
+        <AIInsights dashboardType="maintenance_engineer" items={[
           { t: "Bearing wear on CNC-A1 — 72h", c: 94 },
           { t: "Coolant pump inlet blockage risk on Line B", c: 81 },
         ]} />
@@ -514,7 +640,7 @@ function FinanceDashboard() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2"><Panel title="Cash flow"><OutputChart data={cash} /></Panel></div>
-        <AIInsights items={[
+        <AIInsights dashboardType="finance_manager" items={[
           { t: "Late-paying customer detected — 42 DSO", c: 84 },
           { t: "Reallocate $60k opex to CAPEX for +ROI", c: 71 },
         ]} />
@@ -535,7 +661,7 @@ function HRDashboard() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2"><Panel title="Headcount trend"><OutputChart data={trend(14, 240, 3)} /></Panel></div>
-        <AIInsights items={[
+        <AIInsights dashboardType="hr_manager" items={[
           { t: "Attrition risk: 3 employees in Line B", c: 74 },
           { t: "Overtime spike on Shift 2 — 14% above target", c: 82 },
         ]} />
@@ -597,7 +723,7 @@ function SupplierDashboard() {
 /* ─────────── AUDITOR ─────────── */
 function AuditorDashboard() {
   const logs = useQuery({ queryKey: ["audit-recent"],
-    queryFn: async () => (await supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(20)).data ?? [] });
+    queryFn: async () => (await supabase.from("audit_logs").select("*, profiles(full_name)").order("created_at", { ascending: false }).limit(20)).data ?? [] });
   return (
     <Shell eyebrow="Audit" title="Compliance Overview" sub="Read-only view of activity and compliance across the company.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

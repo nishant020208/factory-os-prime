@@ -37,9 +37,10 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
   company_admin: [
     { label: "Overview", items: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { to: "/company",   label: "Company",   icon: Building2 },
+      { to: "/company",   label: "My Company",   icon: Building2, badge: "New" },
       { to: "/plants",    label: "Plants",    icon: Factory },
       { to: "/departments", label: "Departments", icon: TreePine },
+      { to: "/orders",    label: "Order Approvals", icon: ShoppingCart, badge: "!" },
     ]},
     { label: "People", items: [
       { to: "/employees", label: "Employees", icon: Users },
@@ -234,6 +235,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
       { to: "/shipments",         label: "Shipments", icon: TruckIcon },
       { to: "/support",           label: "Support",   icon: MessageSquare },
       { to: "/documents",         label: "Documents", icon: Files },
+      { to: "/settings",          label: "Settings",  icon: Settings },
     ]},
   ],
 
@@ -245,6 +247,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
       { to: "/supplier-invoices",     label: "Invoices",     icon: Receipt },
       { to: "/payments",              label: "Payments",     icon: CreditCard },
       { to: "/supplier-performance",  label: "Performance",  icon: Star },
+      { to: "/settings",              label: "Settings",     icon: Settings },
     ]},
   ],
 
@@ -255,6 +258,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
       { to: "/reports",    label: "Reports",    icon: ClipboardList },
       { to: "/compliance", label: "Compliance", icon: Shield },
       { to: "/documents",  label: "Documents",  icon: Files },
+      { to: "/settings",   label: "Settings",   icon: Settings },
     ]},
   ],
 };

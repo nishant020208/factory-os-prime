@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { primaryRole } from "@/lib/route-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,13 +44,28 @@ function toCsv(rows: Row[], cols: ColumnDef[]) {
   return head + "\n" + body;
 }
 
-export function LiveModule({ config }: { config: ModuleConfig }) {
+// Roles that are allowed to create/delete records via LiveModule
+const CREATE_ALLOWED_ROLES = [
+  "company_admin", "plant_admin", "production_manager",
+  "warehouse_manager", "procurement_manager", "quality_inspector",
+  "maintenance_engineer", "finance_manager", "hr_manager",
+  "customer_portal", // limited scope
+];
+
+// Roles that are strictly READ-ONLY - cannot create or delete anything
+const READ_ONLY_ROLES = ["auditor", "supplier_portal"];
+
+export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCreate?: boolean }) {
   const {
     table, title, eyebrow, sub, columns, filter, orderBy,
     createDefaults, titleField, singular = "Record",
   } = config;
 
-  const { companyId } = useAuth();
+  const { companyId, roles } = useAuth();
+  const userRole = primaryRole(roles);
+  // canCreate can be overridden by the parent, otherwise derive from role
+  const userCanCreate = canCreate ?? (userRole ? CREATE_ALLOWED_ROLES.includes(userRole) : false);
+  const isReadOnly = userRole ? READ_ONLY_ROLES.includes(userRole) : false;
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [showNew, setShowNew] = useState(false);
@@ -212,9 +228,11 @@ export function LiveModule({ config }: { config: ModuleConfig }) {
               {isFetching ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
               <span className="hidden lg:inline">Refresh</span>
             </Button>
-            <Button size="sm" className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={openNew}>
-              <Plus className="h-4 w-4 mr-1" />New
-            </Button>
+            {userCanCreate && !isReadOnly && (
+              <Button size="sm" className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={openNew}>
+                <Plus className="h-4 w-4 mr-1" />New
+              </Button>
+            )}
           </div>
         }
       />
@@ -314,7 +332,7 @@ export function LiveModule({ config }: { config: ModuleConfig }) {
         ) : filtered.length === 0 ? (
           <EmptyState
             title={`No ${title.toLowerCase()} yet`}
-            sub={`Click "New" to create your first ${singular.toLowerCase()}. Records are scoped to your company via RLS.`}
+            sub={userCanCreate ? `Click "New" to create your first ${singular.toLowerCase()}. Records are scoped to your company via RLS.` : `Records will appear here as they are created by authorized roles.`}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -346,12 +364,14 @@ export function LiveModule({ config }: { config: ModuleConfig }) {
                       </td>
                     ))}
                     <td className="px-3 py-2.5 text-right">
-                      <button
-                        onClick={() => handleDelete(r.id)}
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {userCanCreate && !isReadOnly && (
+                        <button
+                          onClick={() => handleDelete(r.id)}
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </td>
                   </motion.tr>
                 ))}

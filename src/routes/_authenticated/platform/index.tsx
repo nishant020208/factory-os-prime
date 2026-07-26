@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Kpi, PageHeader, Panel, StatusBadge } from "@/components/ui-parts";
-import { Building2, FileCheck2, Timer, ClipboardX, ScrollText, Activity, BrainCircuit } from "lucide-react";
+import { ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
+import { Building2, FileCheck2, Timer, ClipboardX, ScrollText, Activity } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/platform/")({
   head: () => ({ meta: [
@@ -32,8 +33,8 @@ function PlatformHome() {
         title="Platform Console"
         sub="Manage tenants, whitelist Company Admins and monitor platform-wide activity."
         actions={<>
+          <ModuleCopilot moduleName="platform" />
           <Button variant="outline" className="glass border-white/5"><Activity className="h-4 w-4 mr-1.5" />Live</Button>
-          <Button className="bg-[image:var(--gradient-primary)] shadow-glow"><BrainCircuit className="h-4 w-4 mr-1.5" />Platform Copilot</Button>
         </>}
       />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

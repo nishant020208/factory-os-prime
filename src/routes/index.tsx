@@ -6,7 +6,7 @@ import {
   ShoppingCart, Sparkles, Boxes, Truck, PackageCheck,
   ArrowRight, Search, Sun, Moon, Menu, X, Lock, FileCheck2,
   ScrollText, Network, ChevronRight, TrendingUp, TrendingDown, AlertTriangle,
-  CheckCircle2, Radio, Database, Zap, Cog,
+  CheckCircle2, Radio, Database, Zap, Cog, Palette,
   BarChart3, Clock, Globe, HardDrive,
   UserCheck, Building2, Server, KeyRound,
 } from "lucide-react";
@@ -15,6 +15,7 @@ import {
   XAxis, YAxis, Tooltip,
 } from "recharts";
 import { ROLES } from "@/lib/roles";
+import { useTheme, type ThemeMode } from "@/hooks/use-theme";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -82,30 +83,55 @@ function NetworkCanvas() {
         </svg>
       </div>
 
-      {/* SVG Connections */}
+      {/* SVG Connections with bezier curves */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none">
         {CONNECTIONS.map(([from, to], i) => {
           const a = NETWORK_NODES[from], b = NETWORK_NODES[to];
-          const cx = `${(a.x + b.x) / 2}%`, cy = `${(a.y + b.y) / 2}%`;
+          const ax = a.x, ay = a.y, bx = b.x, by = b.y;
+          const cpx1 = `${ax + (bx - ax) * 0.3}%`, cpy1 = `${ay + (by - ay) * 0.1 - 3}%`;
+          const cpx2 = `${ax + (bx - ax) * 0.7}%`, cpy2 = `${by + (ay - by) * 0.1 + 3}%`;
+          const cx = `${(ax + bx) / 2}%`, cy = `${(ay + by) / 2}%`;
           const isPulsing = activePulse === i;
           return (
             <g key={i}>
-              <line
-                x1={`${a.x}%`} y1={`${a.y}%`} x2={`${b.x}%`} y2={`${b.y}%`}
-                className="stroke-white/[0.08]" strokeWidth="1"
+              {/* Bezier curve instead of straight line */}
+              <path
+                d={`M${ax}% ${ay}% C${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${bx}% ${by}%`}
+                className="stroke-foreground/[0.06]"
+                fill="none"
+                strokeWidth="1"
               />
-              {/* Animated pulse dot */}
               {isPulsing && (
-                <motion.circle
-                  r="2.5" fill="oklch(0.58 0.22 259)"
-                  initial={{ cx: `${a.x}%`, cy: `${a.y}%`, opacity: 0 }}
-                  animate={{
-                    cx: [`${a.x}%`, `${b.x}%`], cy: [`${a.y}%`, `${b.y}%`],
-                    opacity: [0, 1, 0],
-                  }}
-                  transition={{ duration: 1.2, ease: "easeInOut" }}
+                <path
+                  d={`M${ax}% ${ay}% C${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${bx}% ${by}%`}
+                  className="stroke-primary/15"
+                  fill="none"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 6"
                 />
               )}
+              {/* Flowing data dots along bezier — all cycle 0%→100% with stagger */}
+              {Array.from({ length: 3 }).map((_, di) => (
+                <motion.circle
+                  key={`dot-${di}`}
+                  r="1.5"
+                  className={`fill-primary/40`}
+                  initial={{ offsetDistance: "0%" }}
+                  animate={{
+                    offsetDistance: ["0%", "100%"],
+                    opacity: [0, 0.8, 0],
+                  }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    delay: -di * 1.0,
+                    ease: "linear",
+                  }}
+                  style={{
+                    offsetPath: `path("M${ax}% ${ay}% C${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${bx}% ${by}%")`,
+                  }}
+                />
+              ))}
               {/* Mouse-reactive glow on connection */}
               <ClosestLine cx={cx} cy={cy} mouseX={mouseX} mouseY={mouseY} />
             </g>
@@ -135,10 +161,10 @@ function NetworkCanvas() {
       <motion.div
         animate={{ y: [0, 4, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
-        className="absolute bottom-6 left-1/2 -translate-x-1/2 text-[11px] text-white/20 flex flex-col items-center gap-1"
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 text-[11px] text-foreground/30 flex flex-col items-center gap-1"
       >
         <span>Explore the platform</span>
-        <div className="w-4 h-[1px] bg-white/20" />
+        <div className="w-4 h-[1px] bg-foreground/20" />
       </motion.div>
     </section>
   );
@@ -147,14 +173,22 @@ function NetworkCanvas() {
 function ClosestLine({ cx, cy, mouseX, mouseY }: { cx: string; cy: string; mouseX: any; mouseY: any }) {
   const dist = useTransform(
     useVelocity(useTransform(mouseX, (v: number) => Math.abs(parseFloat(cx) / 100 - v))),
-    [0, 0.3], [1, 0]
+    [0, 0.25], [1, 0]
   );
+  const scale = useTransform(dist, [0, 1], [5, 1]);
   return (
-    <motion.circle
-      cx={cx} cy={cy} r="0"
-      className="fill-primary/20"
-      style={{ opacity: dist }}
-    />
+    <>
+      <motion.circle
+        cx={cx} cy={cy} r="0"
+        className="fill-primary/30"
+        style={{ opacity: dist, scale }}
+      />
+      <motion.circle
+        cx={cx} cy={cy} r="0"
+        className="fill-primary/10"
+        style={{ opacity: useTransform(dist, [0, 1], [0, 0.5]), scale: useTransform(scale, [1, 5], [3, 10]) }}
+      />
+    </>
   );
 }
 
@@ -197,15 +231,13 @@ function NodeItem({ node, index, hovered, onHover, mouseX, mouseY, containerRef 
       <motion.div
         animate={{
           scale: isHovered ? 1.15 : 1,
-          borderColor: isHovered ? "oklch(0.58 0.22 259 / 0.5)" : "oklch(1 0 0 / 0.08)",
-        }}
-        transition={{ duration: 0.2 }}
-        className="flex items-center gap-2.5 px-3 py-2 rounded-lg border bg-card/80 backdrop-blur-sm cursor-pointer whitespace-nowrap"
-      >
-        <div className={`h-6 w-6 rounded grid place-items-center transition-colors ${isHovered ? "bg-primary" : "bg-white/5"}`}>
-          <Icon className={`h-3 w-3 ${isHovered ? "text-white" : "text-white/60"}`} />
+          borderColor: isHovered ? "oklch(0.58 0.22 259 / 0.5)" : "color-mix(in oklab, var(--color-border) 80%, transparent)",
+        }}            transition={{ duration: 0.2 }}
+        className="flex items-center gap-2.5 px-3 py-2 rounded-lg border bg-card/70 backdrop-blur-sm cursor-pointer whitespace-nowrap"
+      >          <div className={`h-6 w-6 rounded grid place-items-center transition-colors ${isHovered ? "bg-primary" : "bg-foreground/10"}`}>
+          <Icon className={`h-3 w-3 ${isHovered ? "text-foreground" : "text-muted-foreground"}`} />
         </div>
-        <span className={`text-xs font-medium transition-colors ${isHovered ? "text-white" : "text-white/50"}`}>
+        <span className={`text-xs font-medium transition-colors ${isHovered ? "text-foreground" : "text-muted-foreground"}`}>
           {node.label}
         </span>
       </motion.div>
@@ -214,108 +246,412 @@ function NodeItem({ node, index, hovered, onHover, mouseX, mouseY, containerRef 
 }
 
 /* ────────────────────────────────────────────────────────── */
-/*  SECTION 2 — HERO                                           */
+/*  FLOATING PARTICLES (canvas, ~80, cursor-reactive)         */
+/* ────────────────────────────────────────────────────────── */
+function FloatingParticles() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mouse = useRef({ x: -999, y: -999 });
+  const raf = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (isMobile || prefersReduced) { canvas.style.display = "none"; return; }
+
+    let w = 0, h = 0;
+    const count = 70;
+    const particles: Array<{
+      x: number; y: number; vx: number; vy: number;
+      size: number; alpha: number; phase: number;
+      baseX: number; baseY: number;
+    }> = [];
+
+    function resize() {
+      w = window.innerWidth;
+      h = Math.min(window.innerHeight * 1.1, 700);
+      canvas!.width = w * devicePixelRatio;
+      canvas!.height = h * devicePixelRatio;
+      canvas!.style.width = w + "px";
+      canvas!.style.height = h + "px";
+      ctx!.scale(devicePixelRatio, devicePixelRatio);
+    }
+
+    function init() {
+      particles.length = 0;
+      for (let i = 0; i < count; i++) {
+        const x = Math.random() * w;
+        const y = Math.random() * h;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.15 + Math.random() * 0.25;
+        particles.push({
+          x, y,
+          baseX: x, baseY: y,
+          vx: Math.cos(angle) * speed,
+          vy: -(0.1 + Math.random() * 0.2),
+          size: 1.5 + Math.random() * 2.5,
+          alpha: 0.15 + Math.random() * 0.35,
+          phase: Math.random() * Math.PI * 2,
+        });
+      }
+    }
+
+    resize();
+    init();
+    window.addEventListener("resize", () => { resize(); init(); });
+
+    const onMouse = (e: MouseEvent) => {
+      const rect = canvas!.getBoundingClientRect();
+      mouse.current.x = e.clientX - rect.left;
+      mouse.current.y = e.clientY - rect.top;
+    };
+    window.addEventListener("mousemove", onMouse, { passive: true });
+
+    function draw() {
+      ctx!.clearRect(0, 0, w, h);
+
+      const mx = mouse.current.x;
+      const my = mouse.current.y;
+      const repelRadius = 120;
+      const repelStrength = 1.2;
+
+      for (const p of particles) {
+        // Drift: slow upward float with gentle sine oscillation
+        p.x += p.vx + Math.sin(Date.now() * 0.001 + p.phase) * 0.08;
+        p.y += p.vy;
+
+        // Wrap around vertically
+        if (p.y < -10) { p.y = h + 10; p.baseY = p.y; p.baseX = Math.random() * w; p.x = p.baseX; }
+        if (p.y > h + 10) { p.y = -10; p.baseY = p.y; }
+        if (p.x < -10 || p.x > w + 10) { p.baseX = Math.random() * w; p.x = p.baseX; }
+
+        // Cursor repulsion
+        const dx = p.x - mx;
+        const dy = p.y - my;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < repelRadius && dist > 0) {
+          const force = (repelRadius - dist) / repelRadius * repelStrength;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          p.x += nx * force * 3;
+          p.y += ny * force * 3;
+        }
+
+        // Gentle return to base position
+        p.x += (p.baseX - p.x) * 0.001;
+        p.y += (p.baseY - p.y) * 0.001;
+
+        const isAesthetic = document.documentElement.getAttribute("data-theme") === "aesthetic";
+        const color = isAesthetic ? `oklch(0.79 0.17 75 / ${p.alpha})` : `oklch(0.58 0.22 259 / ${p.alpha})`;
+
+        ctx!.beginPath();
+        ctx!.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx!.fillStyle = color;
+        ctx!.fill();
+
+        // Subtle glow ring
+        ctx!.beginPath();
+        ctx!.arc(p.x, p.y, p.size * 2.5, 0, Math.PI * 2);
+        ctx!.fillStyle = isAesthetic
+          ? `oklch(0.79 0.17 75 / ${p.alpha * 0.15})`
+          : `oklch(0.58 0.22 259 / ${p.alpha * 0.15})`;
+        ctx!.fill();
+      }
+
+      raf.current = requestAnimationFrame(draw);
+    }
+    raf.current = requestAnimationFrame(draw);
+
+    function onVisibility() {
+      if (document.hidden) cancelAnimationFrame(raf.current);
+      else raf.current = requestAnimationFrame(draw);
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      cancelAnimationFrame(raf.current);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("mousemove", onMouse);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 pointer-events-none z-0"
+      style={{ maskImage: "linear-gradient(to bottom, black 0%, black 70%, transparent 100%)" }}
+    />
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  DRIFTING GRADIENT ORBS                                    */
+/* ────────────────────────────────────────────────────────── */
+function GradientOrbs() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+      {[
+        { size: 500, x: "15%", y: "20%", color: "oklch(0.58 0.22 259 / 0.12)", dur: 8, delay: 0 },
+        { size: 400, x: "60%", y: "10%", color: "oklch(0.62 0.19 300 / 0.08)", dur: 10, delay: 2 },
+        { size: 350, x: "40%", y: "60%", color: "oklch(0.72 0.14 210 / 0.06)", dur: 12, delay: 4 },
+      ].map((orb, i) => (
+        <motion.div
+          key={i}
+          className="absolute rounded-full"
+          style={{
+            width: orb.size,
+            height: orb.size,
+            background: `radial-gradient(circle, ${orb.color} 0%, transparent 70%)`,
+          }}
+          animate={{
+            x: [0, 30, -20, 0],
+            y: [0, -25, 15, 0],
+            scale: [1, 1.08, 0.95, 1],
+          }}
+          transition={{
+            duration: orb.dur,
+            delay: orb.delay,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  SECTION 2 — HERO (3D DEPTH PARALLAX)                      */
 /* ────────────────────────────────────────────────────────── */
 function Hero() {
-  const btnRef = useRef<HTMLAnchorElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
+  const mouseX = useMotionValue(0.5);
+  const mouseY = useMotionValue(0.5);
+  const springX = useSpring(mouseX, { stiffness: 120, damping: 18 });
+  const springY = useSpring(mouseY, { stiffness: 120, damping: 18 });
+
+  // Scroll-based parallax out
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+  const heroScale = useTransform(scrollYProgress, [0, 0.6], [1, 0.92]);
+  const heroY = useTransform(scrollYProgress, [0, 1], [0, -80]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    const el = btnRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width - 0.5;
-    const y = (e.clientY - r.top) / r.height - 0.5;
-    el.style.transform = `translate(${x * 8}px, ${y * 6}px)`;
+    const rect = heroRef.current?.getBoundingClientRect();
+    if (rect) {
+      mouseX.set((e.clientX - rect.left) / rect.width);
+      mouseY.set((e.clientY - rect.top) / rect.height);
+    }
   };
 
   const handleMouseLeave = () => {
-    if (btnRef.current) btnRef.current.style.transform = "translate(0, 0)";
+    mouseX.set(0.5);
+    mouseY.set(0.5);
   };
 
+  // Layer transforms: each layer moves at different depth
+  const layer1X = useTransform(springX, [0, 1], [18, -18]);
+  const layer1Y = useTransform(springY, [0, 1], [18, -18]);
+  const layer2X = useTransform(springX, [0, 1], [10, -10]);
+  const layer2Y = useTransform(springY, [0, 1], [10, -10]);
+  const layer3X = useTransform(springX, [0, 1], [6, -6]);
+  const layer3Y = useTransform(springY, [0, 1], [6, -6]);
+  const layer4X = useTransform(springX, [0, 1], [3, -3]);
+  const layer4Y = useTransform(springY, [0, 1], [3, -3]);
+
+  const btnRef = useRef<HTMLAnchorElement>(null);
+
   return (
-    <section className="pb-16 sm:pb-24 max-w-7xl mx-auto px-4 sm:px-6">
-      <div className="max-w-3xl">
+    <motion.section
+      ref={heroRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        opacity: heroOpacity,
+        scale: heroScale,
+        y: heroY,
+        perspective: 800,
+      }}
+      className="relative pb-16 sm:pb-24 max-w-7xl mx-auto px-4 sm:px-6"
+    >
+      {/* Drifting gradient orbs */}
+      <GradientOrbs />
+
+      {/* Floating particles */}
+      <FloatingParticles />
+
+      <div className="relative z-10" style={{ transformStyle: "preserve-3d" }}>
+        {/* Layer 1 — Version badge (moves 18px, deepest) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
+          style={{ x: layer1X, y: layer1Y }}
         >
-          <div className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-white/[0.06] bg-white/[0.03] text-white/40">
+          <div className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-border bg-muted/40 text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-primary" />
             v4.2.1 · Production ready
           </div>
         </motion.div>
 
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.15 }}
-          className="mt-6 text-[32px] sm:text-[44px] lg:text-[52px] font-semibold tracking-tight leading-[1.08] text-white"
-        >
-          Every Operation.<br />
-          <span className="text-white/40">One Intelligent Platform.</span>
-        </motion.h1>
+        {/* Layer 2 — Main title (moves 10px, mid-depth) */}
+        <motion.div style={{ x: layer2X, y: layer2Y }}>
+          <motion.h1 className="mt-6 text-[32px] sm:text-[44px] lg:text-[52px] font-semibold tracking-tight leading-[1.08] text-foreground">
+            <span className="inline-flex flex-wrap gap-x-[0.3em]">
+              {["Every", "Operation.", "One", "Intelligent", "Platform."].map((word, i) => (
+                <motion.span
+                  key={word}
+                  className="inline-block"
+                  initial={{ opacity: 0, rotateX: 85, y: 30, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, rotateX: 0, y: 0, filter: "blur(0px)" }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 180,
+                    damping: 16,
+                    delay: 0.15 + i * 0.09,
+                  }}
+                  style={{ perspective: 400 }}
+                >
+                  {i >= 2 ? (
+                    <span className="text-muted-foreground">{word}</span>
+                  ) : (
+                    word
+                  )}
+                </motion.span>
+              ))}
+            </span>
+          </motion.h1>
 
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="mt-4 text-[15px] text-white/50 max-w-xl leading-relaxed"
-        >
-          AI-powered Smart Manufacturing ERP built for modern enterprise operations.
-          Production, inventory, quality, maintenance, finance, HR and AI — unified.
-        </motion.p>
+          <motion.p
+            initial={{ opacity: 0, y: 16, filter: "blur(3px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ type: "spring", stiffness: 150, damping: 18, delay: 0.55 }}
+            className="mt-4 text-[15px] text-muted-foreground max-w-xl leading-relaxed"
+          >
+            AI-powered Smart Manufacturing ERP built for modern enterprise operations.
+            Production, inventory, quality, maintenance, finance, HR and AI — unified.
+          </motion.p>
+        </motion.div>
 
+        {/* Layer 3 — Buttons & CTA (moves 6px, closer) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.25 }}
+          style={{ x: layer3X, y: layer3Y }}
           className="mt-8 flex items-center gap-3 flex-wrap"
         >
           <Link
             ref={btnRef}
             to="/auth"
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
+            onMouseMove={(e) => {
+              const el = btnRef.current;
+              if (!el) return;
+              const r = el.getBoundingClientRect();
+              const x = (e.clientX - r.left) / r.width - 0.5;
+              const y = (e.clientY - r.top) / r.height - 0.5;
+              el.style.transform = `translate(${x * 8}px, ${y * 6}px)`;
+            }}
+            onMouseLeave={() => {
+              if (btnRef.current) btnRef.current.style.transform = "translate(0, 0)";
+            }}
             className="relative inline-flex items-center gap-1.5 h-10 px-5 rounded-lg text-[13px] font-medium text-white bg-primary hover:bg-primary/90 transition-all duration-150 active:scale-[0.97]"
           >
             Explore Platform <ArrowRight className="h-3.5 w-3.5" />
           </Link>
           <Link
             to="/auth"
-            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-[13px] font-medium border border-white/[0.08] text-white/60 hover:text-white hover:border-white/[0.15] transition-all duration-150 active:scale-[0.97]"
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-[13px] font-medium border border-border text-muted-foreground hover:text-foreground hover:border-border transition-all duration-150 active:scale-[0.97]"
           >
             Sign in
           </Link>
-          <button className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-[13px] text-white/40 hover:text-white/60 transition-all duration-150">
-            <span className="h-5 w-5 rounded border border-white/[0.1] grid place-items-center">
-              <PlayIcon className="h-3 w-3" />
+          <button
+            onClick={() => {
+              const el = document.getElementById("flow");
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth" });
+                setTimeout(() => {
+                  const playEvent = new CustomEvent("workflow:play");
+                  window.dispatchEvent(playEvent);
+                }, 800);
+              }
+            }}
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-[13px] text-muted-foreground hover:text-muted-foreground transition-all duration-150 group"
+          >
+            <span className="h-5 w-5 rounded border border-border grid place-items-center group-hover:border-primary/40 group-hover:bg-primary/10 transition-all duration-200">
+              <PlayIcon className="h-3 w-3 group-hover:text-primary transition-colors duration-200" />
             </span>
             Watch workflow
           </button>
         </motion.div>
 
-        {/* Metrics row */}
+        {/* Layer 4 — Metrics row with spring count-up (moves 3px, closest) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.35 }}
+          style={{ x: layer4X, y: layer4Y }}
           className="mt-10 flex items-center gap-6 sm:gap-10 text-[12px]"
         >
           {[
-            { label: "Plants", value: "128" },
-            { label: "Machines", value: "9.4k" },
-            { label: "Users", value: "2.1k" },
-            { label: "Uptime", value: "99.9%" },
+            { label: "Plants", target: 128, suffix: "" },
+            { label: "Machines", target: 9.4, suffix: "k" },
+            { label: "Users", target: 2.1, suffix: "k" },
+            { label: "Uptime", target: 99.9, suffix: "%" },
           ].map(m => (
-            <div key={m.label}>
-              <div className="text-white/30">{m.label}</div>
-              <div className="text-white font-semibold text-sm mt-0.5">{m.value}</div>
-            </div>
+            <MetricCounter key={m.label} label={m.label} target={m.target} suffix={m.suffix} />
           ))}
         </motion.div>
       </div>
-    </section>
+    </motion.section>
+  );
+}
+
+/* — spring count-up metric counter — */
+function MetricCounter({ label, target, suffix }: { label: string; target: number; suffix: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const count = useMotionValue(0);
+  const rounded = useTransform(count, (v) => {
+    if (suffix === "%") return v.toFixed(1);
+    return Math.round(v).toString();
+  });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    count.set(0);
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      const duration = 1500;
+      const start = performance.now();
+      function raf(now: number) {
+        const pct = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - pct, 3);
+        count.set(eased * target);
+        if (pct < 1) requestAnimationFrame(raf);
+      }
+      requestAnimationFrame(raf);
+      observer.disconnect();
+    }, { threshold: 0.3 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [target]);
+
+  return (
+    <div ref={ref}>
+      <div className="text-muted-foreground">{label}</div>
+      <motion.div className="text-foreground font-semibold text-sm mt-0.5 tabular-nums">
+        <motion.span>{rounded}</motion.span>{suffix}
+      </motion.div>
+    </div>
   );
 }
 
@@ -345,14 +681,51 @@ const WORKFLOW_STAGES = [
 function Workflow() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const playTimerRef = useRef<number | null>(null);
 
+  // Ambient auto-advance
   useEffect(() => {
+    if (playing) return; // don't run ambient when playing
     const t = setInterval(() => setActiveIdx(i => (i + 1) % WORKFLOW_STAGES.length), 2200);
     return () => clearInterval(t);
-  }, []);
+  }, [playing]);
+
+  // Watch workflow auto-play
+  useEffect(() => {
+    const onPlay = () => {
+      if (playing) return;
+      setPlaying(true);
+      setActiveIdx(0);
+      setExpanded(0);
+
+      let step = 0;
+      playTimerRef.current = window.setInterval(() => {
+        step++;
+        if (step >= WORKFLOW_STAGES.length) {
+          // Finished — reset
+          setPlaying(false);
+          setExpanded(null);
+          if (playTimerRef.current) {
+            clearInterval(playTimerRef.current);
+            playTimerRef.current = null;
+          }
+          return;
+        }
+        setActiveIdx(step);
+        setExpanded(step);
+      }, 1200);
+    };
+
+    window.addEventListener("workflow:play", onPlay);
+    return () => {
+      window.removeEventListener("workflow:play", onPlay);
+      if (playTimerRef.current) clearInterval(playTimerRef.current);
+    };
+  }, [playing]);
 
   return (
-    <section id="flow" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+    <section id="flow" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-border">
       <SectionHeader
         eyebrow="Manufacturing Workflow"
         title="From order to delivery"
@@ -378,27 +751,46 @@ function Workflow() {
               >
                 <motion.div
                   animate={{
-                    borderColor: isActive ? "oklch(0.58 0.22 259 / 0.4)" : isPast ? "oklch(0.72 0.19 145 / 0.25)" : "oklch(1 0 0 / 0.06)",
-                    backgroundColor: isActive ? "oklch(0.58 0.22 259 / 0.08)" : "rgba(255,255,255,0.02)",
+                    borderColor: isActive ? "oklch(0.58 0.22 259 / 0.4)" : isPast ? "oklch(0.72 0.19 145 / 0.25)" : "color-mix(in oklab, var(--color-foreground) 8%, transparent)",
+                    backgroundColor: isActive ? "oklch(0.58 0.22 259 / 0.08)" : "color-mix(in oklab, var(--color-foreground) 3%, transparent)",
                   }}
                   transition={{ duration: 0.3 }}
-                  className="rounded-xl border p-3"
+                  className="relative rounded-xl border p-3 overflow-hidden"
                 >
-                  <div className={`h-7 w-7 rounded-lg grid place-items-center ${
-                    isActive ? "bg-primary" : isPast ? "bg-success/20" : "bg-white/5"
-                  }`}>
-                    <Icon className={`h-3.5 w-3.5 ${
-                      isActive ? "text-white" : isPast ? "text-success" : "text-white/40"
-                    }`} />
-                  </div>
-                  <div className="mt-2 text-[11px] font-medium text-white/80 truncate">{stage.label}</div>
-                  <div className="h-0.5 mt-2 rounded-full bg-white/5 overflow-hidden">
-                    <motion.div
-                      className="h-full bg-primary"
-                      initial={{ width: "0%" }}
-                      animate={{ width: isActive ? "100%" : isPast ? "100%" : "0%" }}
-                      transition={{ duration: 0.6 }}
-                    />
+                  {/* Ripple pulse on becoming active */}
+                  <AnimatePresence>
+                    {isActive && (
+                      <motion.div
+                        key="ripple"
+                        className="absolute inset-0 rounded-xl pointer-events-none"
+                        initial={{ opacity: 0.35, scale: 0.95 }}
+                        animate={{ opacity: 0, scale: 1.08 }}
+                        exit={{ opacity: 0, scale: 1.08 }}
+                        transition={{ duration: 0.6, ease: "easeOut" }}
+                        style={{
+                          background: "oklch(0.58 0.22 259 / 0.15)",
+                          borderRadius: "inherit",
+                        }}
+                      />
+                    )}
+                  </AnimatePresence>
+                  <div className="relative z-10">
+                    <div className={`h-7 w-7 rounded-lg grid place-items-center ${
+                      isActive ? "bg-primary" : isPast ? "bg-success/20" : "bg-foreground/10"
+                    }`}>
+                      <Icon className={`h-3.5 w-3.5 ${
+                        isActive ? "text-white" : isPast ? "text-success" : "text-muted-foreground"
+                      }`} />
+                    </div>
+                    <div className="mt-2 text-[11px] font-medium text-foreground truncate">{stage.label}</div>
+                    <div className="h-0.5 mt-2 rounded-full bg-foreground/10 overflow-hidden">
+                      <motion.div
+                        className="h-full bg-primary"
+                        initial={{ width: "0%" }}
+                        animate={{ width: isActive ? "100%" : isPast ? "100%" : "0%" }}
+                        transition={{ duration: 0.6 }}
+                      />
+                    </div>
                   </div>
                 </motion.div>
 
@@ -410,11 +802,11 @@ function Workflow() {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 4, scale: 0.96 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute top-full left-0 mt-2 z-20 w-48 rounded-lg border border-white/[0.08] bg-card p-3 shadow-xl backdrop-blur-xl"
+                      className="absolute top-full left-0 mt-2 z-20 w-48 rounded-lg border border-border bg-card p-3 shadow-xl backdrop-blur-xl"
                     >
-                      <div className="text-xs font-medium text-white">{stage.label}</div>
-                      <div className="text-[11px] text-white/40 mt-0.5">{stage.desc}</div>
-                      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-white/30">
+                      <div className="text-xs font-medium text-foreground">{stage.label}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">{stage.desc}</div>
+                      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
                         <Clock className="h-3 w-3" /> {(i + 1) * 12}m avg.
                       </div>
                     </motion.div>
@@ -426,13 +818,13 @@ function Workflow() {
         </div>
 
         {/* Live status bar */}
-        <div className="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 flex items-center gap-3 text-xs">
+        <div className="mt-6 rounded-xl border border-border bg-muted/30 px-4 py-3 flex items-center gap-3 text-xs">
           <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-          <span className="text-white/40">Current:</span>
-          <span className="text-white font-medium">{WORKFLOW_STAGES[activeIdx].label}</span>
-          <span className="text-white/20 mx-1">·</span>
-          <span className="text-white/40">{WORKFLOW_STAGES[activeIdx].desc}</span>
-          <span className="ml-auto text-white/20 tabular-nums">Order #ORD-{4821 + activeIdx}</span>
+          <span className="text-muted-foreground">Current:</span>
+          <span className="text-foreground font-medium">{WORKFLOW_STAGES[activeIdx].label}</span>
+          <span className="text-foreground/30 mx-1">·</span>
+          <span className="text-muted-foreground">{WORKFLOW_STAGES[activeIdx].desc}</span>
+          <span className="ml-auto text-foreground/30 tabular-nums">Order #ORD-{4821 + activeIdx}</span>
         </div>
       </div>
     </section>
@@ -440,122 +832,649 @@ function Workflow() {
 }
 
 /* ────────────────────────────────────────────────────────── */
-/*  SECTION 4 — ENTERPRISE MODULES                             */
+/*  SECTION 4 — ENTERPRISE MODULES — BENTO GRID                */
 /* ────────────────────────────────────────────────────────── */
-const ENTERPRISE_MODULES = [
-  { label: "Inventory", icon: Boxes, hint: "42k SKUs tracked", color: "from-blue-500/20 to-blue-600/10" },
-  { label: "Production", icon: Cog, hint: "12 lines · 87% OEE", color: "from-teal-500/20 to-teal-600/10" },
-  { label: "Warehouse", icon: Warehouse, hint: "18 zones · 94% util", color: "from-emerald-500/20 to-emerald-600/10" },
-  { label: "Maintenance", icon: Wrench, hint: "94% uptime", color: "from-amber-500/20 to-amber-600/10" },
-  { label: "Quality", icon: ShieldCheck, hint: "NCR 0.4% · Cpk 1.6", color: "from-violet-500/20 to-violet-600/10" },
-  { label: "Finance", icon: Landmark, hint: "GL · AP · AR", color: "from-green-500/20 to-green-600/10" },
-  { label: "HR", icon: Users, hint: "412 employees", color: "from-pink-500/20 to-pink-600/10" },
-  { label: "CRM", icon: Network, hint: "312 accounts", color: "from-indigo-500/20 to-indigo-600/10" },
-  { label: "AI Center", icon: Sparkles, hint: "Copilot · Predictions", color: "from-primary/30 to-primary/10" },
-  { label: "Analytics", icon: BarChart3, hint: "Real-time dashboards", color: "from-cyan-500/20 to-cyan-600/10" },
-  { label: "Procurement", icon: ShoppingCart, hint: "128 POs active", color: "from-orange-500/20 to-orange-600/10" },
-  { label: "Documents", icon: FileCheck2, hint: "ISO compliant", color: "from-slate-500/20 to-slate-600/10" },
+
+/* — bento data — */
+type BentoSize = "1x1" | "2x1";
+interface BentoModule {
+  id: string;
+  label: string;
+  icon: any;
+  hint: string;
+  sub: string;
+  color: string;      // tailwind gradient class for bg overlay
+  colorHex: string;    // oklch string for charts/icons
+  size: BentoSize;
+  chart?: "sparkline" | "radial";
+}
+
+const COLOR_MAP: Record<string, string> = {
+  teal: "oklch(0.72 0.19 145)",
+  blue: "oklch(0.58 0.22 259)",
+  emerald: "oklch(0.72 0.19 145)",
+  violet: "oklch(0.62 0.19 300)",
+  amber: "oklch(0.79 0.17 75)",
+  green: "oklch(0.72 0.19 145)",
+  pink: "oklch(0.62 0.23 340)",
+  indigo: "oklch(0.62 0.19 300)",
+  orange: "oklch(0.79 0.17 75)",
+  cyan: "oklch(0.72 0.14 210)",
+};
+function hexFromColor(c: string): string {
+  return COLOR_MAP[Object.keys(COLOR_MAP).find(k => c.includes(k)) ?? "blue"];
+}
+
+const BENTO_MODULES: BentoModule[] = [
+  { id: "production", label: "Production", icon: Cog, hint: "87.4%", sub: "OEE · 12 lines active", color: "from-teal-500/20 to-teal-600/10", colorHex: hexFromColor("teal"), size: "2x1", chart: "sparkline" },
+  { id: "inventory", label: "Inventory", icon: Boxes, hint: "42,380", sub: "SKUs tracked", color: "from-blue-500/20 to-blue-600/10", colorHex: hexFromColor("blue"), size: "1x1" },
+  { id: "warehouse", label: "Warehouse", icon: Warehouse, hint: "94%", sub: "Utilization · 18 zones", color: "from-emerald-500/20 to-emerald-600/10", colorHex: hexFromColor("emerald"), size: "1x1" },
+  { id: "quality", label: "Quality", icon: ShieldCheck, hint: "99.6%", sub: "Pass rate · Cpk 1.6", color: "from-violet-500/20 to-violet-600/10", colorHex: hexFromColor("violet"), size: "1x1", chart: "sparkline" },
+  { id: "maintenance", label: "Maintenance", icon: Wrench, hint: "96.2%", sub: "Uptime · 3 open tickets", color: "from-amber-500/20 to-amber-600/10", colorHex: hexFromColor("amber"), size: "1x1", chart: "radial" },
+  { id: "finance", label: "Finance", icon: Landmark, hint: "$2.41M", sub: "Revenue · GL · AP · AR", color: "from-green-500/20 to-green-600/10", colorHex: hexFromColor("green"), size: "1x1" },
+  { id: "hr", label: "HR", icon: Users, hint: "412", sub: "Employees · 12 departments", color: "from-pink-500/20 to-pink-600/10", colorHex: hexFromColor("pink"), size: "1x1" },
+  { id: "crm-ai", label: "CRM + AI Center", icon: Sparkles, hint: "312 accounts", sub: "AI Copilot · Predictions · Insights", color: "from-indigo-500/20 to-indigo-600/10", colorHex: hexFromColor("indigo"), size: "2x1" },
+  { id: "procurement", label: "Procurement", icon: ShoppingCart, hint: "128", sub: "Active POs · 36 suppliers", color: "from-orange-500/20 to-orange-600/10", colorHex: hexFromColor("orange"), size: "1x1" },
+  { id: "analytics", label: "Analytics", icon: BarChart3, hint: "14", sub: "Live dashboards · 48 reports", color: "from-cyan-500/20 to-cyan-600/10", colorHex: hexFromColor("cyan"), size: "1x1" },
 ];
 
-function EnterpriseModules() {
-  const [clicked, setClicked] = useState<string | null>(null);
+/* — utility: bento placement map (lg: grid-cols-4) — */
+const BENTO_LAYOUT: Record<string, string> = {
+  production:   "sm:col-span-2 lg:col-span-2",
+  inventory:    "sm:col-span-1 lg:col-span-1",
+  warehouse:    "sm:col-span-1 lg:col-span-1",
+  quality:      "sm:col-span-1 lg:col-span-1",
+  maintenance:  "sm:col-span-1 lg:col-span-1",
+  finance:      "sm:col-span-1 lg:col-span-1",
+  hr:           "sm:col-span-1 lg:col-span-1",
+  "crm-ai":     "sm:col-span-2 lg:col-span-2",
+  procurement:  "sm:col-span-1 lg:col-span-1",
+  analytics:    "sm:col-span-1 lg:col-span-1",
+};
+
+/* — mini sparkline chart — */
+let sparkIdCounter = 0;
+function MiniSparkline({ color, moduleId }: { color: string; moduleId: string }) {
+  const [id] = useState(() => `spark-${moduleId}-${++sparkIdCounter}`);
+  const data = useMemo(() =>
+    Array.from({ length: 20 }, (_, i) => ({ v: 60 + Math.sin(i * 0.6) * 15 + Math.sin(i * 1.3) * 6 + Math.random() * 5 })),
+  []);
+  return (
+    <div className="h-10 w-full mt-2">
+      <ResponsiveContainer>
+        <AreaChart data={data}>
+          <defs>
+            <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill={`url(#${id})`} isAnimationActive={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/* — mini radial gauge — */
+function MiniRadial({ value, color }: { value: number; color: string }) {
+  const r = 24;
+  const circ = 2 * Math.PI * r;
+  const [animated, setAnimated] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      let start: number | null = null;
+      const duration = 1200;
+      function raf(t: number) {
+        if (!start) start = t;
+        const pct = Math.min((t - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - pct, 3);
+        setAnimated(eased * value);
+        if (pct < 1) requestAnimationFrame(raf);
+      }
+      requestAnimationFrame(raf);
+      observer.disconnect();
+    }, { threshold: 0.3 });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [value]);
 
   return (
-    <section id="modules" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+    <div ref={ref} className="relative flex items-center justify-center mt-1">
+      <svg width="64" height="64" viewBox="0 0 64 64" className="-rotate-90">
+        <circle cx="32" cy="32" r={r} fill="none" stroke="color-mix(in oklab, var(--color-foreground) 8%, transparent)" strokeWidth="4" />
+        <motion.circle
+          cx="32" cy="32" r={r} fill="none" stroke={color} strokeWidth="4"
+          strokeDasharray={circ}
+          strokeDashoffset={circ * (1 - animated / 100)}
+          strokeLinecap="round"
+          style={{ transition: "stroke-dashoffset 0.3s ease-out" }}
+        />
+      </svg>
+      <div className="absolute text-xs font-semibold text-foreground tabular-nums">{Math.round(animated)}%</div>
+    </div>
+  );
+}
+
+/* — bento tile (with 3D tilt + spring entry + holographic glow) — */
+function BentoModuleTile({ m, index, onHover }: { m: BentoModule; index: number; onHover?: (id: string | null) => void }) {
+  const Icon = m.icon;
+  const [expanded, setExpanded] = useState(false);
+  const [count, setCount] = useState(0);
+  const countRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Spring-driven 3D tilt
+  const tiltX = useMotionValue(0);
+  const tiltY = useMotionValue(0);
+  const springTiltX = useSpring(tiltX, { stiffness: 200, damping: 18 });
+  const springTiltY = useSpring(tiltY, { stiffness: 200, damping: 18 });
+
+
+
+  // count-up
+  useEffect(() => {
+    const target = parseInt(m.hint.replace(/[^0-9.]/g, "")) || 100;
+    const isPct = m.hint.includes("%");
+    const duration = 1500;
+    const startPerf = performance.now();
+    const rafCb = () => {
+      const elapsed = performance.now() - startPerf;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const val = isPct ? Math.round(eased * target * 10) / 10 : Math.round(eased * target);
+      setCount(val);
+      if (progress < 1) requestAnimationFrame(rafCb);
+    };              const observer = new IntersectionObserver(([entry]) => {
+                      if (entry.isIntersecting) { requestAnimationFrame(rafCb); observer.disconnect(); }
+                    }, { threshold: 0.3 });
+                    if (countRef.current) observer.observe(countRef.current);
+                    return () => observer.disconnect();
+                  }, []);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const el = buttonRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5;
+    const y = (e.clientY - r.top) / r.height - 0.5;
+    tiltX.set(x * 8);
+    tiltY.set(-y * 8);
+  };
+
+  const handleMouseEnter = () => {
+    onHover?.(m.id);
+  };
+
+  const handleMouseLeave = () => {
+    tiltX.set(0);
+    tiltY.set(0);
+    onHover?.(null);
+  };
+
+  const isTwoCol = m.size === "2x1";
+
+  // Glow background position — tracks cursor tilt for holographic sweep (extracted for hook rules)
+  const tiltBgPos = useTransform(springTiltX, [-4, 4], ["100% 50%", "0% 50%"]);
+  const glowColor = m.colorHex.replace(")", " / 0.13)");
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24, scale: 0.96 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ once: true }}
+      transition={{ type: "spring", stiffness: 260, damping: 20, delay: index * 0.04 }}
+      className={`${BENTO_LAYOUT[m.id]} group`}
+    >
+      <motion.button
+        ref={buttonRef}
+        onMouseEnter={handleMouseEnter}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        whileTap={{ scale: 0.98 }}
+        onClick={() => setExpanded(e => !e)}
+        className={`relative w-full text-left rounded-xl border border-border hover:border-border transition-shadow duration-200 overflow-hidden ${
+          isTwoCol ? "p-5" : "p-4"
+        } h-full bg-muted/30 group`}
+        style={{
+          rotateX: springTiltY,
+          rotateY: springTiltX,
+          perspective: 600,
+          transformStyle: "preserve-3d",
+        }}
+      >
+        {/* Holographic glow overlay that sweeps with tilt direction */}
+        <motion.div
+          className="absolute inset-0 pointer-events-none z-0"
+          style={{
+            background: `radial-gradient(circle at 50% 50%, ${glowColor}, transparent 60%)`,
+            backgroundPosition: tiltBgPos,
+            backgroundSize: "150% 150%",
+          }}
+        />
+
+        {/* Background gradient on hover (behind content layer) */}
+        <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-br ${m.color} transition-opacity duration-300 z-[1]`} />
+
+        <div className="relative z-10 h-full flex flex-col">
+          {/* Header row */}
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`${isTwoCol ? "h-11 w-11" : "h-9 w-9"} rounded-lg bg-muted/50 group-hover:bg-primary/20 grid place-items-center transition-colors duration-200`}>
+                <Icon className={`${isTwoCol ? "h-5 w-5" : "h-4 w-4"} text-muted-foreground group-hover:text-primary transition-colors duration-200`} />
+              </div>
+              <div>
+                <div className={`${isTwoCol ? "text-base" : "text-sm"} font-medium text-foreground`}>{m.label}</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">{m.sub}</div>
+              </div>
+            </div>
+            <ChevronRight className={`h-4 w-4 text-foreground/30 transition-all duration-200 ${
+              expanded ? "rotate-90 text-primary" : "group-hover:translate-x-0.5"
+            }`} />
+          </div>
+
+          {/* Sparkline chart for Production and Quality */}
+          {m.chart === "sparkline" && (
+            <div className="mt-auto pt-2">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-semibold text-foreground tabular-nums" ref={countRef}>{count}{m.hint.includes("%") ? "%" : ""}</span>
+                <span className="text-[10px] text-success">▲ {isTwoCol ? "3.2" : "0.8"}%</span>
+              </div>
+              <MiniSparkline color={m.colorHex} moduleId={m.id} />
+            </div>
+          )}
+
+          {/* Radial gauge for Maintenance */}
+          {m.chart === "radial" && (
+            <div className="mt-auto pt-1 flex items-center gap-3">
+              <div className="relative flex items-center justify-center">
+                <MiniRadial value={96.2} color={m.colorHex} />
+              </div>
+              <div>
+                <div className="text-lg font-semibold text-foreground tabular-nums" ref={countRef}>{count}%</div>
+                <div className="text-[10px] text-muted-foreground">3 open tickets</div>
+              </div>
+            </div>
+          )}
+
+          {/* Plain counter for 1x1 tiles without chart */}
+          {!m.chart && (
+            <div className="mt-auto pt-3">
+              <div className="flex items-baseline gap-1.5">
+                <span className={`${isTwoCol ? "text-sm" : "text-[11px]"} text-muted-foreground`}>{m.hint.includes("%") ? "" : ""}</span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className={`${isTwoCol ? "text-2xl" : "text-xl"} font-semibold text-foreground tabular-nums`} ref={countRef}>
+                  {count}{m.hint.includes("%") ? "%" : m.hint.startsWith("$") ? "" : ""}
+                </span>
+                {!m.hint.includes("%") && !m.hint.startsWith("$") && (
+                  <span className="text-[10px] text-success">▲ 4.2%</span>
+                )}
+              </div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{m.sub}</div>
+            </div>
+          )}
+
+          {/* Expanded detail */}
+          <AnimatePresence>
+            {expanded && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="mt-3 pt-3 border-t border-border overflow-hidden"
+              >
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{m.id === "production" ? "Output" : m.id === "inventory" ? "Low stock" : m.id === "warehouse" ? "Zones" : m.id === "quality" ? "Inspected" : m.id === "maintenance" ? "Scheduled" : m.id === "finance" ? "Expenses" : m.id === "hr" ? "New hires" : m.id === "crm-ai" ? "AI insights" : m.id === "procurement" ? "Pending" : "Reports"}</div>
+                    <div className="text-sm font-semibold text-foreground tabular-nums mt-0.5">{Math.round(count * (0.3 + Math.random() * 0.5))}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{m.id === "production" ? "Efficiency" : m.id === "inventory" ? "Value" : m.id === "warehouse" ? "Capacity" : m.id === "quality" ? "Passed" : m.id === "maintenance" ? "Overdue" : m.id === "finance" ? "Profit" : m.id === "hr" ? "Requests" : m.id === "crm-ai" ? "Predictions" : m.id === "procurement" ? "Suppliers" : "Charts"}</div>
+                    <div className="text-sm font-semibold text-foreground tabular-nums mt-0.5">{Math.round(count * (0.1 + Math.random() * 0.4))}</div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.button>
+    </motion.div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  3D PRODUCT CUBE (replaces TrustBanner)                    */
+/* ────────────────────────────────────────────────────────── */
+const CUBE_FACES = [
+  { id: "production", label: "Production", color: "oklch(0.72 0.19 145)", icon: Cog },
+  { id: "inventory", label: "Inventory", color: "oklch(0.58 0.22 259)", icon: Boxes },
+  { id: "warehouse", label: "Warehouse", color: "oklch(0.62 0.19 300)", icon: Warehouse },
+  { id: "quality", label: "Quality", color: "oklch(0.67 0.18 220)", icon: ShieldCheck },
+  { id: "maintenance", label: "Maintenance", color: "oklch(0.79 0.17 75)", icon: Wrench },
+  { id: "procurement", label: "Procurement", color: "oklch(0.55 0.18 25)", icon: ShoppingCart },
+  { id: "finance", label: "Finance", color: "oklch(0.72 0.19 145)", icon: Landmark },
+  { id: "hr", label: "HR", color: "oklch(0.62 0.23 340)", icon: Users },
+  { id: "analytics", label: "Analytics", color: "oklch(0.72 0.14 210)", icon: BarChart3 },
+];
+
+function ProductCube({ hoveredModule }: { hoveredModule: string | null }) {
+  const cubeRef = useRef<HTMLDivElement>(null);
+  const rotateX = useMotionValue(-15);
+  const rotateY = useMotionValue(0);
+  const springRotateX = useSpring(rotateX, { stiffness: 60, damping: 16 });
+  const springRotateY = useSpring(rotateY, { stiffness: 60, damping: 16 });
+  const autoSpin = useRef(0);
+  const faceAngle = useRef(0);
+
+  // Dynamic shadow derived from rotation
+  const shadowX = useTransform(springRotateY, (angle) => Math.sin(angle * Math.PI / 180) * 14);
+  const shadowScaleX = useTransform(springRotateY, (angle) => 0.6 + 0.5 * (0.5 + 0.5 * Math.cos(angle * Math.PI / 90)));
+  const shadowScaleY = useTransform(springRotateX, (tilt) => 0.7 + (tilt + 23) / 38 * 0.8);
+  const shadowOpacity = useTransform(springRotateX, (tilt) => 0.2 + (23 + tilt) / 38 * 0.55);
+  const shadowBlur = useTransform(springRotateX, (tilt) => 8 + (tilt + 23) / 38 * 14);
+
+  // Derived glow layer transforms (extracted for hook rules compliance)
+  const glowX = useTransform(shadowX, (x) => x * 1.6);
+  const glowScaleX = useTransform(shadowScaleX, (s) => s * 1.3);
+  const glowScaleY = useTransform(shadowScaleY, (s) => s * 0.6);
+  const glowOpacity = useTransform(shadowOpacity, (o) => o * 0.4);
+  const highlightX = useTransform(shadowX, (x) => x * 0.5);
+  const highlightScaleX = useTransform(shadowScaleX, (s) => s * 0.8);
+  const highlightOpacity = useTransform(shadowOpacity, (o) => o * 0.6);
+  const shadowFilter = useTransform(shadowBlur, (b: number) => `blur(${b}px)`);
+
+  // Glow trail: active face color that follows rotation
+  const [trailColor, setTrailColor] = useState(CUBE_FACES[0].color);
+  const lastFaceRef = useRef(-1);
+
+  // Update trail color when active face changes
+  useEffect(() => {
+    if (hoveredModule) {
+      const face = CUBE_FACES.find(f => f.id === hoveredModule);
+      if (face) {
+        setTrailColor(face.color);
+        lastFaceRef.current = CUBE_FACES.indexOf(face);
+      }
+      return;
+    }
+    const unsub = springRotateY.on("change", (angle) => {
+      const norm = ((angle % 360) + 360) % 360;
+      const idx = Math.round(norm / 40) % 9;
+      if (idx !== lastFaceRef.current) {
+        lastFaceRef.current = idx;
+        setTrailColor(CUBE_FACES[idx].color);
+      }
+    });
+    return unsub;
+  }, [hoveredModule, springRotateY]);
+
+  // Trace glow MotionValue: updates on rotation OR trailColor change
+  const traceGlowMV = useMotionValue("");
+
+  const updateTrailGradient = useCallback(() => {
+    const angle = springRotateY.get();
+    // Front-facing position in the gradient: the active face is at ~90° in CSS conic-gradient
+    // (0° = top 12 o'clock, face front = right 3 o'clock = 90°)
+    const baseAngle = 90;
+    const startBright = baseAngle - 8;
+    const endBright = baseAngle + 18;
+    const endFade = ((baseAngle + 55) % 360 + 360) % 360;
+    traceGlowMV.set(`conic-gradient(from 0deg at 50% 50%, 
+      transparent 0deg, 
+      ${trailColor} ${startBright}deg ${endBright}deg, 
+      transparent ${endFade}deg
+    )`);
+  }, [trailColor, springRotateY, traceGlowMV]);
+
+  useEffect(() => {
+    updateTrailGradient();
+    const unsub = springRotateY.on("change", updateTrailGradient);
+    return unsub;
+  }, [updateTrailGradient, springRotateY]);
+
+  // Hovered face color for holographic tint — proper oklch with alpha
+  const hoverColor = useMemo(() => {
+    if (!hoveredModule) return "oklch(0.58 0.22 259 / 0.08)";
+    const face = CUBE_FACES.find(f => f.id === hoveredModule);
+    if (!face) return "oklch(0.58 0.22 259 / 0.08)";
+    return face.color.replace(")", " / 0.12)");
+  }, [hoveredModule]);
+
+  // Auto-rotation and hover-snap
+  useEffect(() => {
+    let running = true;
+    function tick() {
+      if (!running) return;
+      if (!hoveredModule) {
+        // Auto-rotate slowly
+        faceAngle.current += 0.15;
+        rotateY.set(faceAngle.current);
+      }
+      autoSpin.current = requestAnimationFrame(tick);
+    }
+    autoSpin.current = requestAnimationFrame(tick);
+    return () => { running = false; cancelAnimationFrame(autoSpin.current); };
+  }, [hoveredModule, rotateY]);
+
+  // Snap to face on hover
+  useEffect(() => {
+    if (!hoveredModule) return;
+    const idx = CUBE_FACES.findIndex(f => f.id === hoveredModule);
+    if (idx < 0) return;
+    const targetAngle = idx * 40; // 40° per face (360/9)
+    faceAngle.current = targetAngle;
+    rotateY.set(targetAngle);
+  }, [hoveredModule, rotateY]);
+
+  // Cursor proximity tracking
+  useEffect(() => {
+    const el = cubeRef.current;
+    if (!el) return;
+    const onMove = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const dx = (e.clientX - cx) / r.width;
+      const dy = (e.clientY - cy) / r.height;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 1.5) {
+        const influence = (1 - dist / 1.5) * 8;
+        rotateX.set(-15 + dy * influence);
+        if (!hoveredModule) rotateY.set(faceAngle.current + dx * influence);
+      }
+    };
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => window.removeEventListener("mousemove", onMove);
+  }, [hoveredModule, rotateX, rotateY]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ type: "spring", stiffness: 200, damping: 22, delay: 0.35 }}
+      className="lg:col-span-4"
+    >
+      <div className="relative rounded-xl border border-border bg-transparent p-5 sm:p-8 overflow-hidden group">
+        <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
+          {/* Cube */}
+          <div className="relative shrink-0" style={{ perspective: 900 }}>
+            {/* Glow trail arc — sweeps with rotation, colored by active face */}
+            <motion.div
+              className="absolute -inset-6 sm:-inset-8 rounded-full pointer-events-none opacity-25 blur-sm"
+              style={{
+                rotate: springRotateY,
+                background: traceGlowMV,
+                mask: "radial-gradient(circle at center, transparent 71%, black 72%, black 86%, transparent 87%)",
+                WebkitMask: "radial-gradient(circle at center, transparent 71%, black 72%, black 86%, transparent 87%)",
+              }}
+            />
+
+            {/* Dynamic 3D Shadow — responds to cube rotation & tilt */}
+            {/* Layer 1: Holographic glow ring */}
+            <motion.div
+              className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-36 h-6 rounded-full blur-2xl pointer-events-none"
+              style={{
+                x: glowX,
+                scaleX: glowScaleX,
+                scaleY: glowScaleY,
+                opacity: glowOpacity,
+                background: `radial-gradient(ellipse at center, ${hoverColor}, transparent 70%)`,
+              }}
+            />
+
+            {/* Layer 2: Core shadow */}
+            <motion.div
+              className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-28 h-4 rounded-full pointer-events-none"
+              style={{
+                x: shadowX,
+                scaleX: shadowScaleX,
+                scaleY: shadowScaleY,
+                opacity: shadowOpacity,
+                backgroundColor: "color-mix(in oklab, var(--color-foreground) 10%, transparent)",
+                filter: shadowFilter,
+              }}
+            />
+
+            {/* Layer 3: Hover-colored highlight ring (closest to shadow edge) */}
+            <motion.div
+              className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-20 h-2 rounded-full pointer-events-none"
+              style={{
+                x: highlightX,
+                scaleX: highlightScaleX,
+                opacity: highlightOpacity,
+                background: `radial-gradient(ellipse at center, color-mix(in oklab, ${hoverColor} 60%, transparent), transparent 70%)`,
+                filter: "blur(4px)",
+              }}
+            />
+
+            <motion.div
+              ref={cubeRef}
+              style={{
+                rotateX: springRotateX,
+                rotateY: springRotateY,
+                transformStyle: "preserve-3d",
+              }}
+              className="w-36 h-36 sm:w-44 sm:h-44"
+            >
+              {CUBE_FACES.map((face, i) => {
+                const angle = i * 40;
+                const Icon = face.icon;
+                const isVisible = hoveredModule === face.id;
+                return (
+                  <div
+                    key={face.id}
+                    style={{
+                      transform: `rotateY(${angle}deg) translateZ(110px)`,
+                      backgroundColor: face.color + "1A",
+                      borderColor: face.color + "33",
+                    }}
+                    className={`absolute inset-0 rounded-xl border-2 flex flex-col items-center justify-center gap-2 sm:gap-3 p-4 transition-shadow duration-300 ${
+                      isVisible ? "shadow-glow" : ""
+                    }`}
+                  >
+                    <Icon className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: face.color }} />
+                    <span className="text-xs sm:text-sm font-semibold text-foreground">{face.label}</span>
+                    <div className="flex gap-1">
+                      {[0, 1, 2].map(j => (
+                        <div
+                          key={j}
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: face.color + "66" }}
+                        />
+                      ))}
+                    </div>
+                    {/* Mini chart bars */}
+                    <div className="flex items-end gap-[2px] h-6 sm:h-8">
+                      {[35, 60, 45, 80, 55, 70, 90, 50].map((h, j) => (
+                        <div
+                          key={j}
+                          className="w-1.5 sm:w-2 rounded-t"
+                          style={{
+                            height: `${h * 0.3}px`,
+                            backgroundColor: face.color + (isVisible ? "99" : "44"),
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </motion.div>
+          </div>
+
+          {/* Label + face indicator */}
+          <div className="flex-1 text-center lg:text-left">
+            <div className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-border bg-muted/30 text-muted-foreground mb-3">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              Interactive demo
+            </div>
+            <h3 className="text-xl sm:text-2xl font-semibold text-foreground">
+              {hoveredModule
+                ? CUBE_FACES.find(f => f.id === hoveredModule)?.label
+                : "Explore every module"}
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto lg:mx-0">
+              {hoveredModule === "production" && "Monitor OEE, track production lines, and optimize throughput in real time."}
+              {hoveredModule === "inventory" && "Track 42k+ SKUs with real-time stock levels, low-stock alerts, and automated reorder."}
+              {hoveredModule === "warehouse" && "Manage 18 warehouse zones with real-time stock visibility, putaway, and picking workflows."}
+              {hoveredModule === "quality" && "Maintain 99.6% pass rate with real-time inspection tracking and Cpk monitoring."}
+              {hoveredModule === "maintenance" && "Schedule preventive maintenance, track repair tickets, and monitor machine uptime across the plant."}
+              {hoveredModule === "procurement" && "Manage 128 active POs across 36 suppliers with automated RFQs and performance tracking."}
+              {hoveredModule === "finance" && "Manage $2.41M in revenue with automated invoicing, payment tracking, and financial reporting."}
+              {hoveredModule === "hr" && "Oversee 412 employees across 12 departments with onboarding, payroll, and performance tools."}
+              {hoveredModule === "analytics" && "14 live dashboards with 48+ reports covering production, quality, maintenance, and finance."}
+              {!hoveredModule && "Hover any module card above to see it come alive on the cube. The cube auto-rotates — move your cursor near it to control the view."}
+            </p>
+            <div className="mt-4 flex items-center justify-center lg:justify-start gap-2">
+              {CUBE_FACES.map((f, i) => (
+                <button
+                  key={f.id}
+                  onClick={() => {
+                    const el = document.getElementById("modules");
+                    if (el) el.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    hoveredModule === f.id
+                      ? "w-6"
+                      : "w-2 hover:w-3 bg-foreground/20"
+                  }`}
+                  style={{
+                    backgroundColor: hoveredModule === f.id ? f.color : undefined,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+/* — page-level component — */
+function EnterpriseModules() {
+  const [hoveredModule, setHoveredModule] = useState<string | null>(null);
+
+  return (
+    <section id="modules" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-border">
       <SectionHeader
         eyebrow="Platform"
         title="Every function, one platform"
         desc="Consistent primitives across every module — with role-scoped access."
       />
-      <div className="mt-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {ENTERPRISE_MODULES.map((m, i) => (
-          <ModuleTile
-            key={m.label}
-            module={m}
-            index={i}
-            isClicked={clicked === m.label}
-            onClick={() => setClicked(clicked === m.label ? null : m.label)}
-          />
+      <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {BENTO_MODULES.map((m, i) => (
+          <BentoModuleTile key={m.id} m={m} index={i} onHover={setHoveredModule} />
         ))}
+        <ProductCube hoveredModule={hoveredModule} />
       </div>
     </section>
-  );
-}
-
-function ModuleTile({ module: m, index, isClicked, onClick }: {
-  module: typeof ENTERPRISE_MODULES[number];
-  index: number;
-  isClicked: boolean;
-  onClick: () => void;
-}) {
-  const Icon = m.icon;
-  const [count, setCount] = useState(0);
-  const countRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const target = parseInt(m.hint.replace(/[^0-9]/g, "").slice(0, 3)) || 100;
-    const duration = 1500;
-    const start = performance.now();
-    const raf = () => {
-      const elapsed = performance.now() - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.round(eased * target));
-      if (progress < 1) requestAnimationFrame(raf);
-    };
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) { requestAnimationFrame(raf); observer.disconnect(); }
-    }, { threshold: 0.3 });
-    if (countRef.current) observer.observe(countRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <motion.button
-      initial={{ opacity: 0, y: 12 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ delay: index * 0.03 }}
-      whileHover={{ y: -2 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className="group relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-left hover:border-white/[0.12] transition-all duration-200 overflow-hidden"
-    >
-      {/* Background gradient on hover */}
-      <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-br ${m.color} transition-opacity duration-300`} />
-
-      <div className="relative z-10">
-        <div className="flex items-center justify-between">
-          <div className="h-9 w-9 rounded-lg bg-white/[0.04] group-hover:bg-primary/20 grid place-items-center transition-colors duration-200">
-            <Icon className="h-4 w-4 text-white/60 group-hover:text-primary transition-colors duration-200" />
-          </div>
-          <ChevronRight className={`h-3.5 w-3.5 text-white/20 transition-all duration-200 ${
-            isClicked ? "rotate-90 text-primary" : "group-hover:translate-x-0.5"
-          }`} />
-        </div>
-        <div className="mt-3 text-sm font-medium text-white/90">{m.label}</div>
-        <div ref={countRef} className="text-[11px] text-white/40 mt-0.5">{m.hint}</div>
-
-        {/* Animated number */}
-        <AnimatePresence>
-          {isClicked && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="mt-3 pt-3 border-t border-white/[0.06] overflow-hidden"
-            >
-              <div className="text-[10px] text-white/30 uppercase tracking-wider">Live metrics</div>
-              <div className="mt-1.5 flex items-baseline gap-1">
-                <span className="text-lg font-semibold text-white tabular-nums">{count}</span>
-                <span className="text-[10px] text-success">▲ {Math.floor(count * 0.04)}%</span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.button>
   );
 }
 
@@ -597,23 +1516,23 @@ function AIIntelligence() {
   };
 
   return (
-    <section id="ai" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+    <section id="ai" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-border">
       <SectionHeader
         eyebrow="AI Intelligence"
         title="AI Copilot, live"
         desc="Real-time decisions from production, inventory, quality and maintenance streams."
       />
       <div className="mt-10 max-w-2xl mx-auto">
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 min-h-[320px] relative overflow-hidden">
+        <div className="rounded-xl border border-border bg-muted/30 p-5 min-h-[320px] relative overflow-hidden">
           {/* Header */}
-          <div className="flex items-center gap-2 pb-4 border-b border-white/[0.06]">
+          <div className="flex items-center gap-2 pb-4 border-b border-border">
             <div className="h-6 w-6 rounded-md bg-primary/20 grid place-items-center">
               <Sparkles className="h-3 w-3 text-primary" />
             </div>
-            <div className="text-sm font-medium text-white">AI Copilot</div>
+            <div className="text-sm font-medium text-foreground">AI Copilot</div>
             <div className="ml-auto flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-              <span className="text-[10px] text-white/30">Live</span>
+              <span className="text-[10px] text-muted-foreground">Live</span>
             </div>
           </div>
 
@@ -630,8 +1549,8 @@ function AIIntelligence() {
                 >
                   <span className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${typeDot[msg.type]}`} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[12px] text-white/80 leading-relaxed">{msg.text}</div>
-                    <div className="text-[10px] text-white/20 mt-1">Just now</div>
+                    <div className="text-[12px] text-foreground leading-relaxed">{msg.text}</div>
+                    <div className="text-[10px] text-foreground/30 mt-1">Just now</div>
                   </div>
                 </motion.div>
               ))}
@@ -649,13 +1568,13 @@ function AIIntelligence() {
                   <span className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: "150ms" }} />
                   <span className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
-                <span className="text-[11px] text-white/30">AI is analyzing streams...</span>
+                <span className="text-[11px] text-muted-foreground">AI is analyzing streams...</span>
               </motion.div>
             )}
 
             {/* Empty state */}
             {visible.length === 0 && (
-              <div className="flex items-center justify-center h-[200px] text-sm text-white/20">
+              <div className="flex items-center justify-center h-[200px] text-sm text-foreground/30">
                 AI insights will appear here
               </div>
             )}
@@ -700,7 +1619,7 @@ function RoleHierarchy() {
   };
 
   return (
-    <section className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+    <section className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-border">
       <SectionHeader
         eyebrow="Access Model"
         title="Role hierarchy"
@@ -720,7 +1639,7 @@ function RoleHierarchy() {
               >
                 <div className={`h-2 w-2 rounded-full ${tier.line.replace("bg-", "bg-")} bg-opacity-100`} />
                 <div className={`text-xs font-medium uppercase tracking-wider ${tier.color}`}>{tier.label}</div>
-                <div className="flex-1 h-px bg-white/[0.04]" />
+                <div className="flex-1 h-px bg-muted/50" />
               </motion.div>
 
               {/* Role pills */}
@@ -740,7 +1659,7 @@ function RoleHierarchy() {
                       className={`relative rounded-lg border px-2.5 py-1.5 text-xs transition-all duration-150 ${
                         isExpanded
                           ? "border-primary/40 bg-primary/10 text-white"
-                          : "border-white/[0.06] bg-white/[0.02] text-white/60 hover:border-white/[0.12] hover:text-white/80"
+                          : "border-border bg-muted/30 text-muted-foreground hover:border-border hover:text-foreground"
                       }`}
                     >
                       {meta.label}
@@ -763,11 +1682,11 @@ function RoleHierarchy() {
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden ml-5 mb-2"
                     >
-                      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
-                        <div className="text-[10px] uppercase tracking-wider text-white/30 mb-2">Permissions</div>
+                      <div className="rounded-lg border border-border bg-muted/30 p-3">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Permissions</div>
                         <div className="grid grid-cols-2 gap-1">
                           {perms.map(p => (
-                            <div key={p} className="flex items-center gap-1.5 text-[11px] text-white/50">
+                            <div key={p} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                               <CheckCircle2 className="h-3 w-3 text-primary/60" />
                               {p}
                             </div>
@@ -783,8 +1702,8 @@ function RoleHierarchy() {
         </div>
 
         {/* Sidebar info */}
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-          <div className="text-[10px] uppercase tracking-wider text-white/30">Security model</div>
+        <div className="rounded-xl border border-border bg-muted/30 p-5">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Security model</div>
           <div className="mt-4 space-y-3">
             {[
               { icon: KeyRound, label: "JWT Authentication" },
@@ -793,10 +1712,10 @@ function RoleHierarchy() {
               { icon: Globe, label: "Multi-tenant Isolation" },
             ].map(s => (
               <div key={s.label} className="flex items-center gap-2.5">
-                <div className="h-6 w-6 rounded bg-white/[0.04] grid place-items-center">
+                <div className="h-6 w-6 rounded bg-muted/50 grid place-items-center">
                   <s.icon className="h-3 w-3 text-primary/60" />
                 </div>
-                <span className="text-xs text-white/60">{s.label}</span>
+                <span className="text-xs text-muted-foreground">{s.label}</span>
               </div>
             ))}
           </div>
@@ -821,7 +1740,7 @@ function SecurityArchitecture() {
   ];
 
   return (
-    <section id="security" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+    <section id="security" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-border">
       <SectionHeader
         eyebrow="Enterprise Security"
         title="Built for regulated plants"
@@ -829,7 +1748,7 @@ function SecurityArchitecture() {
       />
       <div className="mt-10 grid md:grid-cols-[240px_1fr] gap-6 items-center">
         {/* Shield illustration */}
-        <div className="relative rounded-xl border border-white/[0.06] bg-white/[0.02] p-8 grid place-items-center">
+        <div className="relative rounded-xl border border-border bg-muted/30 p-8 grid place-items-center">
           <motion.div
             animate={{ scale: [1, 1.03, 1] }}
             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
@@ -848,15 +1767,15 @@ function SecurityArchitecture() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.04 }}
-              className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5 hover:border-white/[0.1] transition-colors duration-200"
+              className="rounded-xl border border-border bg-muted/30 p-3.5 hover:border-border transition-colors duration-200"
             >
               <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-lg bg-white/[0.04] grid place-items-center">
+                <div className="h-7 w-7 rounded-lg bg-muted/50 grid place-items-center">
                   <layer.icon className="h-3.5 w-3.5 text-primary/60" />
                 </div>
-                <span className="text-xs font-medium text-white/80">{layer.label}</span>
+                <span className="text-xs font-medium text-foreground">{layer.label}</span>
               </div>
-              <div className="mt-1.5 text-[10px] text-white/30 ml-9">{layer.desc}</div>
+              <div className="mt-1.5 text-[10px] text-muted-foreground ml-9">{layer.desc}</div>
             </motion.div>
           ))}
         </div>
@@ -886,7 +1805,7 @@ function AnalyticsShowcase() {
     })), []);
 
   return (
-    <section id="analytics" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+    <section id="analytics" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-border">
       <SectionHeader
         eyebrow="Analytics"
         title="Live operations dashboard"
@@ -900,15 +1819,15 @@ function AnalyticsShowcase() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.06 }}
-            className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
+            className="rounded-xl border border-border bg-muted/30 p-4"
           >
             <div className="flex items-center justify-between">
-              <div className="text-[10px] uppercase tracking-wider text-white/30">{metric.label}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{metric.label}</div>
               <span className="text-[10px] text-success flex items-center gap-0.5">
                 <TrendingUp className="h-3 w-3" /> {metric.delta}
               </span>
             </div>
-            <div className="mt-1.5 text-xl font-semibold text-white tabular-nums">{metric.value}</div>
+            <div className="mt-1.5 text-xl font-semibold text-foreground tabular-nums">{metric.value}</div>
             <div className="mt-3 h-12">
               <ResponsiveContainer>
                 {metric.chart === "area" ? (
@@ -946,11 +1865,11 @@ function AnalyticsShowcase() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.2 + i * 0.04 }}
-            className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-3"
+            className="rounded-lg border border-border bg-muted/20 p-3"
           >
-            <div className="text-[10px] text-white/30">{m.label}</div>
+            <div className="text-[10px] text-muted-foreground">{m.label}</div>
             <div className="flex items-baseline gap-1.5 mt-0.5">
-              <span className="text-sm font-medium text-white tabular-nums">{m.value}</span>
+              <span className="text-sm font-medium text-foreground tabular-nums">{m.value}</span>
               <span className="text-[10px] text-success">▲ {m.delta}</span>
             </div>
           </motion.div>
@@ -974,7 +1893,7 @@ function TrustedPlatform() {
   ];
 
   return (
-    <section className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-white/[0.04]">
+    <section className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-border">
       <SectionHeader
         eyebrow="Platform"
         title="Built for production"
@@ -988,14 +1907,14 @@ function TrustedPlatform() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.04 }}
-            className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 flex items-start gap-3"
+            className="rounded-xl border border-border bg-muted/30 p-4 flex items-start gap-3"
           >
-            <div className="h-8 w-8 rounded-lg bg-white/[0.04] grid place-items-center shrink-0">
+            <div className="h-8 w-8 rounded-lg bg-muted/50 grid place-items-center shrink-0">
               <cap.icon className="h-4 w-4 text-primary/60" />
             </div>
             <div>
-              <div className="text-sm font-medium text-white/90">{cap.label}</div>
-              <div className="text-xs text-white/40 mt-0.5">{cap.desc}</div>
+              <div className="text-sm font-medium text-foreground">{cap.label}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{cap.desc}</div>
             </div>
           </motion.div>
         ))}
@@ -1009,19 +1928,19 @@ function TrustedPlatform() {
 /* ────────────────────────────────────────────────────────── */
 function Footer() {
   return (
-    <footer className="border-t border-white/[0.04]">
+    <footer className="border-t border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-8 text-sm">
         <div>
           <div className="flex items-center gap-2">
             <div className="h-6 w-6 rounded-md bg-primary grid place-items-center">
               <Factory className="h-3 w-3 text-white" />
             </div>
-            <span className="text-sm font-semibold text-white">FactoryOS AI</span>
+            <span className="text-sm font-semibold text-foreground">FactoryOS AI</span>
           </div>
-          <p className="mt-3 text-xs text-white/40 max-w-xs leading-relaxed">
+          <p className="mt-3 text-xs text-muted-foreground max-w-xs leading-relaxed">
             The intelligent manufacturing operating system for modern enterprises.
           </p>
-          <div className="mt-4 text-[11px] text-white/20">v4.2.1 · © {new Date().getFullYear()}</div>
+          <div className="mt-4 text-[11px] text-foreground/30">v4.2.1 · © {new Date().getFullYear()}</div>
         </div>
 
         {[
@@ -1030,24 +1949,24 @@ function Footer() {
           { h: "Company", l: ["About", "Careers", "Privacy", "Terms"] },
         ].map(group => (
           <div key={group.h}>
-            <div className="text-xs font-medium text-white/60 mb-3">{group.h}</div>
+            <div className="text-xs font-medium text-muted-foreground mb-3">{group.h}</div>
             <ul className="space-y-2">
               {group.l.map(x => (
                 <li key={x}>
-                  <a href="#" className="text-xs text-white/30 hover:text-white/60 transition-colors duration-150">{x}</a>
+                  <a href="#" className="text-xs text-muted-foreground hover:text-muted-foreground transition-colors duration-150">{x}</a>
                 </li>
               ))}
             </ul>
           </div>
         ))}
       </div>
-      <div className="border-t border-white/[0.04]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2 text-[11px] text-white/20">
+      <div className="border-t border-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2 text-[11px] text-foreground/30">
           <span>© {new Date().getFullYear()} FactoryOS AI. All rights reserved.</span>
           <div className="flex items-center gap-4">
-            <a href="https://github.com" className="hover:text-white/40 transition-colors">GitHub</a>
-            <a href="#" className="hover:text-white/40 transition-colors">Privacy</a>
-            <a href="#" className="hover:text-white/40 transition-colors">Terms</a>
+            <a href="https://github.com" className="hover:text-muted-foreground transition-colors">GitHub</a>
+            <a href="#" className="hover:text-muted-foreground transition-colors">Privacy</a>
+            <a href="#" className="hover:text-muted-foreground transition-colors">Terms</a>
           </div>
         </div>
       </div>
@@ -1058,13 +1977,88 @@ function Footer() {
 /* ────────────────────────────────────────────────────────── */
 /*  SHARED COMPONENTS                                          */
 /* ────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────── */
+/*  ANIMATED SECTION DIVIDER                                  */
+/* ────────────────────────────────────────────────────────── */
+function SectionDivider() {
+  return (
+    <motion.div
+      className="w-full h-px"
+      initial={{ opacity: 0, scaleX: 0 }}
+      whileInView={{ opacity: 1, scaleX: 1 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ type: "spring", stiffness: 200, damping: 22, delay: 0.1 }}
+      style={{
+        transformOrigin: "left",
+        background: "linear-gradient(90deg, var(--color-border), var(--color-primary) 30%, var(--color-primary) 70%, var(--color-border))",
+        backgroundSize: "200% 100%",
+        animation: "shimmer 3s linear infinite",
+      }}
+    />
+  );
+}
+
 function SectionHeader({ eyebrow, title, desc }: { eyebrow: string; title: string; desc?: string }) {
   return (
-    <div className="max-w-2xl">
-      <div className="text-[10px] uppercase tracking-[0.2em] text-white/30">{eyebrow}</div>
-      <h2 className="mt-3 text-[22px] sm:text-[28px] font-semibold tracking-tight text-white">{title}</h2>
-      {desc && <p className="mt-2 text-sm text-white/40 leading-relaxed">{desc}</p>}
-    </div>
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+      className="max-w-2xl"
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.05 }}
+        className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground"
+      >
+        <span className="inline-flex items-center gap-2">
+          <motion.span
+            className="inline-block w-4 h-[1px] bg-primary/60"
+            initial={{ scaleX: 0 }}
+            whileInView={{ scaleX: 1 }}
+            viewport={{ once: true }}
+            transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.1 }}
+            style={{ transformOrigin: "left" }}
+          />
+          {eyebrow}
+        </span>
+      </motion.div>
+      <motion.h2
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.12 }}
+        className="mt-3 text-[22px] sm:text-[28px] font-semibold tracking-tight text-foreground"
+      >
+        {title}
+      </motion.h2>
+      {desc && (
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ type: "spring", stiffness: 180, damping: 20, delay: 0.18 }}
+          className="mt-2 text-sm text-muted-foreground leading-relaxed"
+        >
+          {desc}
+        </motion.p>
+      )}
+      {/* Animated gradient underline */}
+      <motion.div
+        className="mt-4 h-[2px] w-16 rounded-full"
+        initial={{ scaleX: 0, opacity: 0 }}
+        whileInView={{ scaleX: 1, opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ type: "spring", stiffness: 250, damping: 18, delay: 0.22 }}
+        style={{
+          transformOrigin: "left",
+          background: "linear-gradient(90deg, var(--color-primary), var(--color-primary) 40%, transparent)",
+        }}
+      />
+    </motion.div>
   );
 }
 
@@ -1082,7 +2076,8 @@ const NAV_LINKS = [
 function TopNav() {
   const [scrolled, setScrolled] = useState(false);
   const [mobile, setMobile] = useState(false);
-  const [dark, setDark] = useState(true);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -1091,30 +2086,26 @@ function TopNav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => {
-    document.documentElement.classList.toggle("light", !dark);
-  }, [dark]);
-
   return (
     <motion.header
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-        scrolled ? "bg-[oklch(0.14_0.02_260)]/80 backdrop-blur-xl border-b border-white/[0.04]" : "bg-transparent"
+        scrolled ? "bg-background/85 backdrop-blur-xl border-b border-border shadow-sm" : "bg-transparent"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-6">
         <Link to="/" className="flex items-center gap-2 shrink-0">
           <div className="h-7 w-7 rounded-md bg-primary grid place-items-center">
-            <Factory className="h-3.5 w-3.5 text-white" />
+            <Factory className="h-3.5 w-3.5 text-primary-foreground" />
           </div>
-          <span className="text-[13px] font-semibold tracking-tight text-white">FactoryOS <span className="text-white/40">AI</span></span>
+          <span className="text-[13px] font-semibold tracking-tight text-foreground">FactoryOS <span className="text-muted-foreground">AI</span></span>
         </Link>
 
         <nav className="hidden lg:flex items-center gap-0.5 ml-2">
           {NAV_LINKS.map(l => (
             <a key={l.href} href={l.href}
-              className="text-[12px] text-white/40 hover:text-white/80 transition-colors px-2.5 py-1.5 rounded-md hover:bg-white/[0.04]"
+              className="text-[12px] text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-md hover:bg-muted/50"
             >
               {l.label}
             </a>
@@ -1122,16 +2113,78 @@ function TopNav() {
         </nav>
 
         <div className="ml-auto flex items-center gap-1">
-          <button onClick={() => setDark(d => !d)} className="grid place-items-center h-8 w-8 rounded-md hover:bg-white/[0.04] text-white/40" aria-label="Theme">
-            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-          <Link to="/auth" className="hidden sm:inline-flex items-center h-8 px-3 rounded-md text-[12px] text-white/60 hover:text-white/80 hover:bg-white/[0.04] transition-all">
+          {/* 3-way theme switcher - visible on desktop */}
+          <div className="hidden sm:flex items-center bg-card/70 border border-border rounded-lg p-0.5 gap-0 shadow-sm">
+            {([
+              { id: "dark" as ThemeMode, icon: Moon, label: "Dark" },
+              { id: "light" as ThemeMode, icon: Sun, label: "Light" },
+              { id: "aesthetic" as ThemeMode, icon: Palette, label: "Aesthetic" },
+            ]).map(({ id, icon: Icon, label }) => (
+              <button
+                key={id}
+                onClick={() => setTheme(id)}
+                className={`relative flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md transition-all duration-200 ${
+                  theme === id
+                    ? "text-foreground bg-card shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {theme === id && (
+                  <motion.div
+                    layoutId="landingThemePill"
+                    className="absolute inset-0 rounded-md bg-card shadow-sm border border-border"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-1">
+                  <Icon className="h-3 w-3" />
+                  <span className="hidden lg:inline">{label}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Mobile theme icon */}
+          <div className="sm:hidden relative">
+            <button onClick={() => setThemeMenuOpen(o => !o)} className="grid place-items-center h-8 w-8 rounded-md hover:bg-muted/60 text-muted-foreground" aria-label="Theme">
+              {theme === "dark" ? <Moon className="h-4 w-4" /> : theme === "light" ? <Sun className="h-4 w-4" /> : <Palette className="h-4 w-4" />}
+            </button>
+            <AnimatePresence>
+              {themeMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                  className="absolute right-0 top-full mt-1 z-50 w-36 rounded-lg border border-border bg-card shadow-elevated p-1"
+                >
+                  {([
+                    { id: "dark" as ThemeMode, icon: Moon, label: "Dark" },
+                    { id: "light" as ThemeMode, icon: Sun, label: "Light" },
+                    { id: "aesthetic" as ThemeMode, icon: Palette, label: "Aesthetic" },
+                  ]).map(({ id, icon: Icon, label }) => (
+                    <button
+                      key={id}
+                      onClick={() => { setTheme(id); setThemeMenuOpen(false); }}
+                      className={`flex items-center gap-2 w-full px-3 py-2 text-xs rounded-md transition-colors ${
+                        theme === id ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {label}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <Link to="/auth" className="hidden sm:inline-flex items-center h-8 px-3 rounded-md text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all">
             Sign in
           </Link>
-          <Link to="/auth" className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[12px] font-medium text-white bg-primary hover:bg-primary/90 transition-all active:scale-[0.97]">
+          <Link to="/auth" className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[12px] font-medium text-primary-foreground bg-primary hover:bg-primary/90 transition-all active:scale-[0.97]">
             Get started <ArrowRight className="h-3 w-3" />
           </Link>
-          <button onClick={() => setMobile(true)} className="lg:hidden grid place-items-center h-8 w-8 rounded-md hover:bg-white/[0.04] text-white/40" aria-label="Menu">
+          <button onClick={() => setMobile(true)} className="lg:hidden grid place-items-center h-8 w-8 rounded-md hover:bg-muted/60 text-muted-foreground" aria-label="Menu">
             <Menu className="h-4 w-4" />
           </button>
         </div>
@@ -1143,20 +2196,20 @@ function TopNav() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="lg:hidden fixed inset-0 z-50 bg-[oklch(0.14_0.02_260)]/98 backdrop-blur-xl"
+            className="lg:hidden fixed inset-0 z-50 bg-background/98 backdrop-blur-xl"
           >
-            <div className="flex items-center justify-between h-14 px-4 border-b border-white/[0.04]">
-              <span className="text-sm font-medium text-white">Menu</span>
-              <button onClick={() => setMobile(false)} className="grid place-items-center h-8 w-8 text-white/40"><X className="h-4 w-4" /></button>
+            <div className="flex items-center justify-between h-14 px-4 border-b border-border">
+              <span className="text-sm font-medium text-foreground">Menu</span>
+              <button onClick={() => setMobile(false)} className="grid place-items-center h-8 w-8 text-muted-foreground"><X className="h-4 w-4" /></button>
             </div>
             <div className="p-4 flex flex-col gap-0.5">
               {NAV_LINKS.map(l => (
                 <a key={l.href} href={l.href} onClick={() => setMobile(false)}
-                  className="px-3 py-3 rounded-lg hover:bg-white/[0.04] text-sm text-white/60 hover:text-white">{l.label}</a>
+                  className="px-3 py-3 rounded-lg hover:bg-muted/50 text-sm text-muted-foreground hover:text-foreground">{l.label}</a>
               ))}
-              <hr className="my-3 border-white/[0.04]" />
+              <hr className="my-3 border-border" />
               <Link to="/auth" onClick={() => setMobile(false)}
-                className="px-3 py-3 rounded-lg text-sm font-medium text-white bg-primary/20 text-center">Get started</Link>
+                className="px-3 py-3 rounded-lg text-sm font-medium text-primary-foreground bg-primary/20 text-center">Get started</Link>
             </div>
           </motion.div>
         )}
@@ -1166,30 +2219,250 @@ function TopNav() {
 }
 
 /* ────────────────────────────────────────────────────────── */
+/*  LIQUID MOTION BACKGROUND (canvas shader)                  */
+/* ────────────────────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────── */
+/*  CURSOR GLOW — visible spotlight following the mouse       */
+/* ────────────────────────────────────────────────────────── */
+function CursorGlow() {
+  const glowRef = useRef<HTMLDivElement>(null);
+  const mouseX = useMotionValue(0.5);
+  const mouseY = useMotionValue(0.5);
+  const springX = useSpring(mouseX, { stiffness: 80, damping: 25 });
+  const springY = useSpring(mouseY, { stiffness: 80, damping: 25 });
+  const xPct = useTransform(springX, [0, 1], [0, 100]);
+  const yPct = useTransform(springY, [0, 1], [0, 100]);
+
+  useEffect(() => {
+    const onMouse = (e: MouseEvent) => {
+      mouseX.set(e.clientX / window.innerWidth);
+      mouseY.set(e.clientY / window.innerHeight);
+    };
+    window.addEventListener("mousemove", onMouse, { passive: true });
+    return () => window.removeEventListener("mousemove", onMouse);
+  }, [mouseX, mouseY]);
+
+  return (
+    <motion.div
+      ref={glowRef}
+      className="fixed pointer-events-none z-[5]"
+      style={{
+        left: xPct,
+        top: yPct,
+        width: "60vw",
+        height: "60vw",
+        maxWidth: "800px",
+        maxHeight: "800px",
+        transform: "translate(-50%, -50%)",
+      }}
+    >
+      <div
+        className="w-full h-full rounded-full"
+        style={{
+          background: "radial-gradient(circle, var(--accent-glow) 0%, transparent 70%)",
+          opacity: 0.35,
+        }}
+      />
+    </motion.div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  LIQUID MOTION BACKGROUND (canvas shader v2 — dramatic)   */
+/* ────────────────────────────────────────────────────────── */
+function LiquidBackground() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mouse = useRef({ x: 0.5, y: 0.5 });
+  const smoothMouse = useRef({ x: 0.5, y: 0.5 });
+  const time = useRef(0);
+  const raf = useRef<number>(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (isMobile || prefersReduced) {
+      canvas.style.display = "none";
+      return;
+    }
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let width = 0;
+    let height = 0;
+
+    function resize() {
+      width = window.innerWidth;
+      height = Math.min(window.innerHeight * 1.2, 800);
+      canvas!.width = width * devicePixelRatio;
+      canvas!.height = height * devicePixelRatio;
+      canvas!.style.width = `${width}px`;
+      canvas!.style.height = `${height}px`;
+      ctx!.scale(devicePixelRatio, devicePixelRatio);
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    const onMouse = (e: MouseEvent) => {
+      mouse.current.x = e.clientX / width;
+      mouse.current.y = e.clientY / height;
+    };
+    window.addEventListener("mousemove", onMouse, { passive: true });
+
+    function draw(t: number) {
+      time.current = t * 0.00025;
+
+      // Smooth mouse follow with spring-like lerp
+      smoothMouse.current.x += (mouse.current.x - smoothMouse.current.x) * 0.04;
+      smoothMouse.current.y += (mouse.current.y - smoothMouse.current.y) * 0.04;
+
+      ctx!.clearRect(0, 0, width, height);
+
+      const isAesthetic = document.documentElement.getAttribute("data-theme") === "aesthetic";
+
+      // Colors — more blobs, richer opacity
+      const blobs = isAesthetic
+        ? [
+            { r: 0.79, g: 0.45, b: 0.14, a: 0.18, phase: 0.0 },  // amber
+            { r: 0.31, g: 0.82, b: 0.77, a: 0.15, phase: 1.8 },  // teal
+            { r: 0.65, g: 0.35, b: 0.80, a: 0.12, phase: 3.2 },  // violet
+            { r: 0.90, g: 0.60, b: 0.30, a: 0.10, phase: 4.5 },  // gold
+            { r: 0.20, g: 0.70, b: 0.85, a: 0.10, phase: 5.8 },  // sky
+          ]
+        : [
+            { r: 0.33, g: 0.39, b: 0.96, a: 0.16, phase: 0.0 },  // blue
+            { r: 0.62, g: 0.28, b: 0.96, a: 0.14, phase: 1.5 },  // violet
+            { r: 0.05, g: 0.71, b: 0.83, a: 0.12, phase: 2.9 },  // cyan
+            { r: 0.20, g: 0.60, b: 0.90, a: 0.09, phase: 4.2 },  // light blue
+            { r: 0.80, g: 0.30, b: 0.70, a: 0.08, phase: 5.6 },  // pink
+          ];
+
+      const mx = smoothMouse.current.x;
+      const my = smoothMouse.current.y;
+
+      for (let i = 0; i < blobs.length; i++) {
+        const c = blobs[i];
+
+        // Strong cursor pull — blobs cluster near the cursor
+        const cursorPullX = (mx - 0.5) * width * 0.35 * (1 + Math.sin(time.current * 0.3 + c.phase) * 0.3);
+        const cursorPullY = (my - 0.5) * height * 0.35 * (1 + Math.cos(time.current * 0.25 + c.phase) * 0.3);
+
+        // Natural drift
+        const driftX = Math.sin(time.current * 0.35 + c.phase * 1.2) * width * 0.12;
+        const driftY = Math.cos(time.current * 0.30 + c.phase * 1.1) * height * 0.12;
+
+        const cx = width * (0.5 + Math.sin(c.phase) * 0.3) + driftX + cursorPullX;
+        const cy = height * (0.5 + Math.cos(c.phase * 0.8) * 0.25) + driftY + cursorPullY;
+
+        // Pulsing radii based on cursor proximity
+        const distToCursor = Math.sqrt(
+          Math.pow((cx / width) - mx, 2) + Math.pow((cy / height) - my, 2)
+        );
+        const pulseFactor = 1 + Math.max(0, 1 - distToCursor * 3) * 0.5;
+
+        const rx = width * (0.18 + Math.sin(time.current * 0.2 + c.phase) * 0.06) * pulseFactor;
+        const ry = height * (0.14 + Math.cos(time.current * 0.22 + c.phase) * 0.05) * pulseFactor;
+
+        // Blobs expand when cursor is near
+        const alphaBoost = Math.max(0, 1 - distToCursor * 2.5) * 0.5;
+        const finalAlpha = Math.min(c.a + alphaBoost, 0.35);
+
+        ctx!.beginPath();
+        ctx!.ellipse(cx, cy, rx, ry, time.current * 0.08 + c.phase, 0, Math.PI * 2);
+        const gradient = ctx!.createRadialGradient(cx - rx * 0.2, cy - ry * 0.2, 0, cx, cy, Math.max(rx, ry) * 1.2);
+        gradient.addColorStop(0, `oklch(${c.r} ${c.g} ${c.b} / ${finalAlpha * 1.8})`);
+        gradient.addColorStop(0.4, `oklch(${c.r} ${c.g} ${c.b} / ${finalAlpha})`);
+        gradient.addColorStop(1, `oklch(${c.r} ${c.g} ${c.b} / 0)`);
+        ctx!.fillStyle = gradient;
+        ctx!.fill();
+      }
+
+      // Extra bright highlight right at cursor position
+      const glowSize = width * 0.08;
+      const cursorGrad = ctx!.createRadialGradient(
+        mx * width, my * height, 0,
+        mx * width, my * height, glowSize
+      );
+      cursorGrad.addColorStop(0, isAesthetic
+        ? "oklch(0.79 0.17 75 / 0.20)"
+        : "oklch(0.58 0.22 259 / 0.18)"
+      );
+      cursorGrad.addColorStop(1, "oklch(0 0 0 / 0)");
+      ctx!.fillStyle = cursorGrad;
+      ctx!.fillRect(0, 0, width, height);
+
+      raf.current = requestAnimationFrame(draw);
+    }
+    raf.current = requestAnimationFrame(draw);
+
+    function onVisibility() {
+      if (document.hidden) cancelAnimationFrame(raf.current);
+      else raf.current = requestAnimationFrame(draw);
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      cancelAnimationFrame(raf.current);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("mousemove", onMouse);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 pointer-events-none z-0"
+      style={{ maskImage: "linear-gradient(to bottom, black 0%, black 65%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 65%, transparent 100%)" }}
+    />
+  );
+}
+
+/* ────────────────────────────────────────────────────────── */
 /*  PAGE                                                      */
 /* ────────────────────────────────────────────────────────── */
 function LandingPage() {
+  const SectionWrap = ({ children }: { children: React.ReactNode; alt?: boolean }) => (
+    <div className="bg-transparent">
+      {children}
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-[oklch(0.14_0.02_260)] text-white selection:bg-primary/30">
-      {/* Subtle background */}
-      <div className="fixed inset-0 -z-10 pointer-events-none">
-        <div className="absolute inset-0 bg-[oklch(0.12_0.015_260)]" />
-        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] rounded-full bg-primary/[0.02] blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] rounded-full bg-blue-500/[0.02] blur-[100px]" />
-      </div>
+    <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
+      {/* Cursor-following spotlight glow */}
+      <CursorGlow />
+
+      {/* Liquid motion background (above the fold only) */}
+      <LiquidBackground />
+
+      {/* Fallback gradient-mesh when canvas is hidden (mobile) */}
+      <div className="fixed inset-0 -z-10 pointer-events-none mesh-bg sm:opacity-0 transition-opacity duration-500" />
 
       <TopNav />
-      <div className="pt-20">
-        <NetworkCanvas />
-        <Hero />
-        <Workflow />
-        <EnterpriseModules />
-        <AIIntelligence />
-        <RoleHierarchy />
-        <SecurityArchitecture />
-        <AnalyticsShowcase />
-        <TrustedPlatform />
-        <Footer />
+      <div className="pt-20 relative z-10">
+        <SectionWrap alt={false}><NetworkCanvas /></SectionWrap>
+        <SectionDivider />
+        <SectionWrap alt={true}><Hero /></SectionWrap>
+        <SectionDivider />
+        <SectionWrap alt={false}><Workflow /></SectionWrap>
+        <SectionDivider />
+        <SectionWrap alt={true}><EnterpriseModules /></SectionWrap>
+        <SectionDivider />
+        <SectionWrap alt={false}><AIIntelligence /></SectionWrap>
+        <SectionDivider />
+        <SectionWrap alt={true}><RoleHierarchy /></SectionWrap>
+        <SectionDivider />
+        <SectionWrap alt={false}><SecurityArchitecture /></SectionWrap>
+        <SectionDivider />
+        <SectionWrap alt={true}><AnalyticsShowcase /></SectionWrap>
+        <SectionDivider />
+        <SectionWrap alt={false}><TrustedPlatform /></SectionWrap>
+        <SectionDivider />
+        <SectionWrap alt={true}><Footer /></SectionWrap>
       </div>
     </div>
   );
