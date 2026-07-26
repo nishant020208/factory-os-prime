@@ -206,40 +206,55 @@ export type Database = {
       }
       companies: {
         Row: {
+          address: string | null
           country: string | null
           created_at: string
           currency: string | null
+          gst_number: string | null
           id: string
           industry: string | null
+          invoice_qr_at_approval: boolean | null
           legal_name: string | null
           logo_url: string | null
           name: string
+          plan_tier: string | null
+          registration_number: string | null
           status: string
           timezone: string | null
           updated_at: string
         }
         Insert: {
+          address?: string | null
           country?: string | null
           created_at?: string
           currency?: string | null
+          gst_number?: string | null
           id?: string
           industry?: string | null
+          invoice_qr_at_approval?: boolean | null
           legal_name?: string | null
           logo_url?: string | null
           name: string
+          plan_tier?: string | null
+          registration_number?: string | null
           status?: string
           timezone?: string | null
           updated_at?: string
         }
         Update: {
+          address?: string | null
           country?: string | null
           created_at?: string
           currency?: string | null
+          gst_number?: string | null
           id?: string
           industry?: string | null
+          invoice_qr_at_approval?: boolean | null
           legal_name?: string | null
           logo_url?: string | null
           name?: string
+          plan_tier?: string | null
+          registration_number?: string | null
           status?: string
           timezone?: string | null
           updated_at?: string
@@ -488,6 +503,8 @@ export type Database = {
           invoice_number: string
           issue_date: string
           paid_date: string | null
+          qr_code_data: string | null
+          qr_code_url: string | null
           sales_order_id: string | null
           status: string
           tax_amount: number | null
@@ -503,6 +520,8 @@ export type Database = {
           invoice_number: string
           issue_date?: string
           paid_date?: string | null
+          qr_code_data?: string | null
+          qr_code_url?: string | null
           sales_order_id?: string | null
           status?: string
           tax_amount?: number | null
@@ -518,6 +537,8 @@ export type Database = {
           invoice_number?: string
           issue_date?: string
           paid_date?: string | null
+          qr_code_data?: string | null
+          qr_code_url?: string | null
           sales_order_id?: string | null
           status?: string
           tax_amount?: number | null
@@ -834,6 +855,7 @@ export type Database = {
           product_id: string | null
           progress: number | null
           quantity: number
+          sales_order_id: string | null
           start_date: string | null
           status: string
         }
@@ -848,6 +870,7 @@ export type Database = {
           product_id?: string | null
           progress?: number | null
           quantity?: number
+          sales_order_id?: string | null
           start_date?: string | null
           status?: string
         }
@@ -862,6 +885,7 @@ export type Database = {
           product_id?: string | null
           progress?: number | null
           quantity?: number
+          sales_order_id?: string | null
           start_date?: string | null
           status?: string
         }
@@ -963,6 +987,7 @@ export type Database = {
           job_title: string | null
           phone: string | null
           plant_id: string | null
+          preferences: Json | null
           status: string
           updated_at: string
         }
@@ -976,6 +1001,7 @@ export type Database = {
           job_title?: string | null
           phone?: string | null
           plant_id?: string | null
+          preferences?: Json | null
           status?: string
           updated_at?: string
         }
@@ -989,6 +1015,7 @@ export type Database = {
           job_title?: string | null
           phone?: string | null
           plant_id?: string | null
+          preferences?: Json | null
           status?: string
           updated_at?: string
         }
@@ -1145,6 +1172,8 @@ export type Database = {
       }
       sales_orders: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           company_id: string
           created_at: string
           currency: string | null
@@ -1155,12 +1184,15 @@ export type Database = {
           order_date: string
           priority: string | null
           progress: number | null
+          rejection_reason: string | null
           so_number: string
           status: string
           total_amount: number
           updated_at: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           company_id: string
           created_at?: string
           currency?: string | null
@@ -1171,12 +1203,15 @@ export type Database = {
           order_date?: string
           priority?: string | null
           progress?: number | null
+          rejection_reason?: string | null
           so_number: string
           status?: string
           total_amount?: number
           updated_at?: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           company_id?: string
           created_at?: string
           currency?: string | null
@@ -1187,6 +1222,7 @@ export type Database = {
           order_date?: string
           priority?: string | null
           progress?: number | null
+          rejection_reason?: string | null
           so_number?: string
           status?: string
           total_amount?: number
@@ -1544,6 +1580,330 @@ export type Database = {
           start_time?: string | null
           status?: string
           wo_number?: string
+        }
+        Relationships: []
+      }
+      profile_change_requests: {
+        Row: {
+          id: string
+          company_id: string
+          user_id: string
+          field_name: string
+          current_value: string | null
+          requested_value: string
+          status: string
+          approver_id: string | null
+          notes: string | null
+          created_at: string
+          resolved_at: string | null
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          user_id: string
+          field_name: string
+          current_value?: string | null
+          requested_value: string
+          status?: string
+          approver_id?: string | null
+          notes?: string | null
+          created_at?: string
+          resolved_at?: string | null
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          user_id?: string
+          field_name?: string
+          current_value?: string | null
+          requested_value?: string
+          status?: string
+          approver_id?: string | null
+          notes?: string | null
+          created_at?: string
+          resolved_at?: string | null
+        }
+        Relationships: []
+      }
+      order_status_history: {
+        Row: {
+          id: string
+          company_id: string
+          order_id: string
+          order_type: string
+          from_status: string | null
+          to_status: string
+          changed_by: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          order_id: string
+          order_type?: string
+          from_status?: string | null
+          to_status: string
+          changed_by?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          order_id?: string
+          order_type?: string
+          from_status?: string | null
+          to_status?: string
+          changed_by?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      qr_codes: {
+        Row: {
+          id: string
+          company_id: string
+          entity_type: string
+          entity_id: string
+          qr_data: string
+          qr_url: string | null
+          created_at: string
+          expires_at: string | null
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          entity_type: string
+          entity_id: string
+          qr_data: string
+          qr_url?: string | null
+          created_at?: string
+          expires_at?: string | null
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          entity_type?: string
+          entity_id?: string
+          qr_data?: string
+          qr_url?: string | null
+          created_at?: string
+          expires_at?: string | null
+        }
+        Relationships: []
+      }
+      company_registrations: {
+        Row: {
+          id: string
+          company_name: string
+          legal_name: string | null
+          email: string
+          phone: string | null
+          country: string | null
+          industry: string | null
+          registration_data: Json | null
+          status: string
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_name: string
+          legal_name?: string | null
+          email: string
+          phone?: string | null
+          country?: string | null
+          industry?: string | null
+          registration_data?: Json | null
+          status?: string
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          company_name?: string
+          legal_name?: string | null
+          email?: string
+          phone?: string | null
+          country?: string | null
+          industry?: string | null
+          registration_data?: Json | null
+          status?: string
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      platform_settings: {
+        Row: {
+          id: string
+          key: string
+          value: Json
+          description: string | null
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          value: Json
+          description?: string | null
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          value?: Json
+          description?: string | null
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      customer_documents: {
+        Row: {
+          id: string
+          company_id: string
+          customer_id: string
+          title: string
+          description: string | null
+          file_url: string
+          file_type: string | null
+          file_size: number | null
+          uploaded_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          customer_id: string
+          title: string
+          description?: string | null
+          file_url: string
+          file_type?: string | null
+          file_size?: number | null
+          uploaded_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          customer_id?: string
+          title?: string
+          description?: string | null
+          file_url?: string
+          file_type?: string | null
+          file_size?: number | null
+          uploaded_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      employee_departments: {
+        Row: {
+          id: string
+          company_id: string
+          employee_id: string
+          department_id: string
+          is_primary: boolean | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          employee_id: string
+          department_id: string
+          is_primary?: boolean | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          employee_id?: string
+          department_id?: string
+          is_primary?: boolean | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      inventory_adjustments: {
+        Row: {
+          id: string
+          company_id: string
+          product_id: string
+          warehouse_id: string
+          old_quantity: number
+          new_quantity: number
+          delta: number
+          reason: string
+          adjusted_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          product_id: string
+          warehouse_id: string
+          old_quantity: number
+          new_quantity: number
+          delta: number
+          reason: string
+          adjusted_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          product_id?: string
+          warehouse_id?: string
+          old_quantity?: number
+          new_quantity?: number
+          delta?: number
+          reason?: string
+          adjusted_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      dashboard_notes: {
+        Row: {
+          id: string
+          company_id: string
+          user_id: string
+          dashboard_type: string
+          content: string
+          source: string | null
+          is_pinned: boolean | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          user_id: string
+          dashboard_type: string
+          content: string
+          source?: string | null
+          is_pinned?: boolean | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          user_id?: string
+          dashboard_type?: string
+          content?: string
+          source?: string | null
+          is_pinned?: boolean | null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }

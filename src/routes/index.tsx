@@ -32,17 +32,30 @@ export const Route = createFileRoute("/")({
 /* ────────────────────────────────────────────────────────── */
 /*  SECTION 1 — INTERACTIVE NETWORK CANVAS                    */
 /* ────────────────────────────────────────────────────────── */
+const NODE_COLORS: Record<string, string> = {
+  warehouse: "oklch(0.72 0.19 145)",
+  quality: "oklch(0.67 0.18 145)",
+  inventory: "oklch(0.79 0.17 75)",
+  production: "oklch(0.58 0.22 259)",
+  finance: "oklch(0.65 0.20 160)",
+  hr: "oklch(0.62 0.19 300)",
+  ai: "oklch(0.65 0.22 280)",
+  procurement: "oklch(0.62 0.23 340)",
+  crm: "oklch(0.55 0.20 270)",
+  analytics: "oklch(0.72 0.14 210)",
+};
+
 const NETWORK_NODES = [
-  { id: "inventory", label: "Inventory", icon: Boxes, x: 10, y: 30 },
-  { id: "warehouse", label: "Warehouse", icon: Warehouse, x: 30, y: 15 },
-  { id: "production", label: "Production", icon: Cog, x: 50, y: 30 },
-  { id: "quality", label: "Quality", icon: ShieldCheck, x: 70, y: 15 },
-  { id: "finance", label: "Finance", icon: Landmark, x: 90, y: 30 },
-  { id: "hr", label: "HR", icon: Users, x: 10, y: 65 },
-  { id: "crm", label: "CRM", icon: Network, x: 30, y: 80 },
-  { id: "ai", label: "AI", icon: Sparkles, x: 50, y: 65 },
-  { id: "analytics", label: "Analytics", icon: Activity, x: 70, y: 80 },
-  { id: "procurement", label: "Procurement", icon: ShoppingCart, x: 90, y: 65 },
+  { id: "inventory", label: "Inventory", icon: Boxes, x: 10, y: 30, color: NODE_COLORS.inventory },
+  { id: "warehouse", label: "Warehouse", icon: Warehouse, x: 30, y: 15, color: NODE_COLORS.warehouse },
+  { id: "production", label: "Production", icon: Cog, x: 50, y: 30, color: NODE_COLORS.production },
+  { id: "quality", label: "Quality", icon: ShieldCheck, x: 70, y: 15, color: NODE_COLORS.quality },
+  { id: "finance", label: "Finance", icon: Landmark, x: 90, y: 30, color: NODE_COLORS.finance },
+  { id: "hr", label: "HR", icon: Users, x: 10, y: 65, color: NODE_COLORS.hr },
+  { id: "crm", label: "CRM", icon: Network, x: 30, y: 80, color: NODE_COLORS.crm },
+  { id: "ai", label: "AI", icon: Sparkles, x: 50, y: 65, color: NODE_COLORS.ai },
+  { id: "analytics", label: "Analytics", icon: Activity, x: 70, y: 80, color: NODE_COLORS.analytics },
+  { id: "procurement", label: "Procurement", icon: ShoppingCart, x: 90, y: 65, color: NODE_COLORS.procurement },
 ] as const;
 
 const CONNECTIONS = [
@@ -142,6 +155,47 @@ function NetworkCanvas() {
       {/* Nodes */}
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative w-[90%] h-[90%] max-w-5xl">
+          {/* Orbital trail ellipses — drawn behind badges */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
+            {NETWORK_NODES.map((node, i) => {
+              const dx = node.x - 50;
+              const dy = node.y - 50;
+              const distPct = Math.sqrt(dx * dx + dy * dy);
+              const rx = distPct * 0.15;
+              const ry = rx * 0.7;
+              const startAngle = Math.atan2(dy, dx);
+              const orbitDur = 25 + (i % 5) * 3;
+              const omega = (2 * Math.PI) / orbitDur;
+              // Time for badge to reach bottom of ellipse (nearest point, angle = PI/2 in screen coords)
+              const tBottom = ((Math.PI / 2 - startAngle + 2 * Math.PI) % (2 * Math.PI)) / omega;
+              // Delay: animation starts so the 10% keyframe peak aligns with badge at bottom
+              // We need (tBottom + |delay|) mod orbitDur = 0.1 * orbitDur
+              const peakTime = 0.1 * orbitDur;
+              const rawOffset = (peakTime - tBottom) % orbitDur;
+              const normalizedOffset = rawOffset < 0 ? rawOffset + orbitDur : rawOffset;
+              const pulseDelay = -normalizedOffset;
+              return (
+                <ellipse
+                  key={node.id}
+                  cx="50%"
+                  cy="50%"
+                  rx={`${rx}%`}
+                  ry={`${ry}%`}
+                  fill="none"
+                  stroke={node.color}
+                  strokeWidth="0.5"
+                  strokeOpacity="0.08"
+                  strokeDasharray="2 4"
+                  style={{
+                    animation: `orbit-rotate 60s linear infinite, trail-pulse ${orbitDur}s ease-in-out infinite`,
+                    animationDelay: `${-(i * 4)}s, ${pulseDelay}s`,
+                    transformOrigin: "center",
+                  }}
+                />
+              );
+            })}
+          </svg>
+          {/* Badges */}
           {NETWORK_NODES.map((node, i) => (
             <NodeItem
               key={node.id}
@@ -151,7 +205,6 @@ function NetworkCanvas() {
               onHover={setHovered}
               mouseX={mouseX}
               mouseY={mouseY}
-              containerRef={containerRef}
             />
           ))}
         </div>
@@ -192,52 +245,157 @@ function ClosestLine({ cx, cy, mouseX, mouseY }: { cx: string; cy: string; mouse
   );
 }
 
-function NodeItem({ node, index, hovered, onHover, mouseX, mouseY, containerRef }: {
+function NodeItem({ node, index, hovered, onHover, mouseX, mouseY }: {
   node: typeof NETWORK_NODES[number];
   index: number;
   hovered: number | null;
   onHover: (i: number | null) => void;
-  mouseX: any; mouseY: any; containerRef: any;
+  mouseX: any; mouseY: any;
 }) {
-  const springX = useSpring(useMotionValue(0), { stiffness: 120, damping: 12 });
-  const springY = useSpring(useMotionValue(0), { stiffness: 120, damping: 12 });
+  const mouseSpringX = useSpring(useMotionValue(0), { stiffness: 120, damping: 12 });
+  const mouseSpringY = useSpring(useMotionValue(0), { stiffness: 120, damping: 12 });
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   useEffect(() => {
     const unsubX = mouseX.on("change", (v: number) => {
       const dx = (v - node.x / 100) * 20;
-      springX.set(hovered === index ? dx * 0.5 : dx * 0.15);
+      mouseSpringX.set(hovered === index ? dx * 0.5 : dx * 0.15);
     });
     const unsubY = mouseY.on("change", (v: number) => {
       const dy = (v - node.y / 100) * 20;
-      springY.set(hovered === index ? dy * 0.5 : dy * 0.15);
+      mouseSpringY.set(hovered === index ? dy * 0.5 : dy * 0.15);
     });
     return () => { unsubX(); unsubY(); };
-  }, [mouseX, mouseY, node.x, node.y, hovered, index, springX, springY]);
+  }, [mouseX, mouseY, node.x, node.y, hovered, index, mouseSpringX, mouseSpringY]);
+
+  // ── Orbital motion ──
+  // Center of badge cluster: (50%, 50%)
+  const cx = 50, cy = 50;
+  const dx = node.x - cx, dy = node.y - cy;
+  const distPct = Math.sqrt(dx * dx + dy * dy);
+  const startAngle = Math.atan2(dy, dx);
+  // Orbit radius scales with distance from center (badges further out orbit wider)
+  const orbitRadius = distPct * 0.15;
+  // Duration varies: 25-37s per badge (within spec's 25-40s range)
+  const orbitDur = 25 + (index % 5) * 3;
+  const omega = (2 * Math.PI) / orbitDur;
+  // Elliptical squish: vertical axis 70% of horizontal
+  const ellipseFactor = 0.7;
+
+  const orbitAngleMV = useMotionValue(0);
+  useEffect(() => {
+    if (reducedMotion) { orbitAngleMV.set(0); return; }
+    const delayMs = index * 350;
+    const startDelay = setTimeout(() => {
+      let lastTime: number | null = null;
+      function raf(t: number) {
+        if (!lastTime) lastTime = t;
+        const dt = (t - lastTime) / 1000;
+        lastTime = t;
+        const current = orbitAngleMV.get();
+        orbitAngleMV.set(current + omega * dt);
+        rafId = requestAnimationFrame(raf);
+      }
+      let rafId = requestAnimationFrame(raf);
+      cleanup = () => cancelAnimationFrame(rafId);
+    }, delayMs);
+    let cleanup: (() => void) | null = null;
+    return () => {
+      clearTimeout(startDelay);
+      if (cleanup) cleanup();
+    };
+  }, [index, reducedMotion]);
+
+  // Derive X/Y offsets from orbit angle (subtract startAngle so offset is 0 at t=0)
+  const orbitOffsetX = useTransform(orbitAngleMV, (a: number) => {
+    const angle = startAngle + a;
+    return orbitRadius * (Math.cos(angle) - Math.cos(startAngle));
+  });
+  const orbitOffsetY = useTransform(orbitAngleMV, (a: number) => {
+    const angle = startAngle + a;
+    return ellipseFactor * orbitRadius * (Math.sin(angle) - Math.sin(startAngle));
+  });
+
+  // Compose orbit + mouse spring → final position
+  const composedX = useTransform([orbitOffsetX, mouseSpringX], (vals: number[]) => vals[0] + vals[1]);
+  const composedY = useTransform([orbitOffsetY, mouseSpringY], (vals: number[]) => vals[0] + vals[1]);
 
   const isHovered = hovered === index;
   const Icon = node.icon;
+  const accent = node.color;
+  const glowBg = accent.replace(")", " / 0.15)");
+  const borderGlow = accent.replace(")", " / 0.4)");
 
   return (
     <motion.button
-      style={{ x: springX, y: springY, left: `${node.x}%`, top: `${node.y}%` }}
+      style={{ x: composedX, y: composedY, left: `${node.x}%`, top: `${node.y}%` }}
       onMouseEnter={() => onHover(index)}
       onMouseLeave={() => onHover(null)}
       onClick={() => {
-        const id = node.id === "ai" ? "ai" : node.id === "analytics" ? "analytics" : node.id === "crm" ? "modules" : "modules";
+        const id: string = node.id === "ai" ? "ai" : node.id === "analytics" ? "analytics" : "modules";
         document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+      }}
+      initial={{ opacity: 0, scale: 0.7 }}
+      animate={{
+        opacity: 1,
+        scale: reducedMotion ? 1 : isHovered ? 1.12 : 1,
+      }}
+      transition={{
+        opacity: { type: "spring", stiffness: 180, damping: 18, delay: index * 0.07 },
+        scale: { type: "spring", stiffness: 250, damping: 18 },
       }}
       className="absolute -translate-x-1/2 -translate-y-1/2"
     >
+      {/* Colored glow behind the badge (orbits with badge) */}
+      <motion.div
+        className="absolute inset-0 -m-2 rounded-xl pointer-events-none"
+        animate={{
+          opacity: isHovered ? 1 : 0.6,
+          scale: isHovered ? 1.3 : 1,
+        }}
+        transition={{ duration: 0.3 }}
+        style={{
+          background: `radial-gradient(circle at 50% 50%, ${glowBg}, transparent 70%)`,
+          filter: "blur(4px)",
+        }}
+      />
+
       <motion.div
         animate={{
-          scale: isHovered ? 1.15 : 1,
-          borderColor: isHovered ? "oklch(0.58 0.22 259 / 0.5)" : "color-mix(in oklab, var(--color-border) 80%, transparent)",
-        }}            transition={{ duration: 0.2 }}
+          borderColor: isHovered ? borderGlow : "color-mix(in oklab, var(--color-border) 80%, transparent)",
+          boxShadow: isHovered ? `0 0 20px ${glowBg}` : "0 0 0px transparent",
+          y: isHovered ? -4 : 0,
+        }}
+        transition={{ type: "spring", stiffness: 200, damping: 16 }}
         className="flex items-center gap-2.5 px-3 py-2 rounded-lg border bg-card/70 backdrop-blur-sm cursor-pointer whitespace-nowrap"
-      >          <div className={`h-6 w-6 rounded grid place-items-center transition-colors ${isHovered ? "bg-primary" : "bg-foreground/10"}`}>
-          <Icon className={`h-3 w-3 ${isHovered ? "text-foreground" : "text-muted-foreground"}`} />
+      >
+        <div
+          className="h-6 w-6 rounded grid place-items-center"
+          style={{
+            backgroundColor: isHovered ? accent : "color-mix(in oklab, var(--color-foreground) 10%, transparent)",
+          }}
+        >
+          <Icon
+            className="h-3 w-3"
+            style={{
+              color: isHovered ? "white" : "color-mix(in oklab, var(--color-foreground) 50%, transparent)",
+            }}
+          />
         </div>
-        <span className={`text-xs font-medium transition-colors ${isHovered ? "text-foreground" : "text-muted-foreground"}`}>
+        <span
+          className="text-xs font-medium"
+          style={{
+            color: isHovered ? accent : "var(--color-muted-foreground)",
+          }}
+        >
           {node.label}
         </span>
       </motion.div>
@@ -396,9 +554,11 @@ function GradientOrbs() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
       {[
-        { size: 500, x: "15%", y: "20%", color: "oklch(0.58 0.22 259 / 0.12)", dur: 8, delay: 0 },
-        { size: 400, x: "60%", y: "10%", color: "oklch(0.62 0.19 300 / 0.08)", dur: 10, delay: 2 },
-        { size: 350, x: "40%", y: "60%", color: "oklch(0.72 0.14 210 / 0.06)", dur: 12, delay: 4 },
+        { size: 420, x: "12%", y: "15%", color: "oklch(0.72 0.19 145 / 0.08)", dur: 22, delay: 0 },
+        { size: 380, x: "55%", y: "8%", color: "oklch(0.62 0.19 300 / 0.06)", dur: 26, delay: 3 },
+        { size: 340, x: "30%", y: "55%", color: "oklch(0.79 0.17 75 / 0.05)", dur: 24, delay: 6 },
+        { size: 300, x: "75%", y: "70%", color: "oklch(0.62 0.23 340 / 0.05)", dur: 28, delay: 9 },
+        { size: 260, x: "85%", y: "25%", color: "oklch(0.72 0.14 210 / 0.06)", dur: 20, delay: 12 },
       ].map((orb, i) => (
         <motion.div
           key={i}
@@ -406,12 +566,12 @@ function GradientOrbs() {
           style={{
             width: orb.size,
             height: orb.size,
-            background: `radial-gradient(circle, ${orb.color} 0%, transparent 70%)`,
+            background: `radial-gradient(circle at 40% 40%, ${orb.color} 0%, transparent 70%)`,
           }}
           animate={{
-            x: [0, 30, -20, 0],
-            y: [0, -25, 15, 0],
-            scale: [1, 1.08, 0.95, 1],
+            x: [0, 25, -15, 10, 0],
+            y: [0, -20, 12, -8, 0],
+            scale: [1, 1.05, 0.97, 1.03, 1],
           }}
           transition={{
             duration: orb.dur,
@@ -667,15 +827,15 @@ function PlayIcon({ className }: { className?: string }) {
 /*  SECTION 3 — MANUFACTURING WORKFLOW                         */
 /* ────────────────────────────────────────────────────────── */
 const WORKFLOW_STAGES = [
-  { id: "order", label: "Customer Order", icon: ShoppingCart, desc: "Order received and verified" },
-  { id: "inventory", label: "Inventory", icon: Boxes, desc: "Stock levels confirmed" },
-  { id: "warehouse", label: "Warehouse", icon: Warehouse, desc: "Materials allocated" },
-  { id: "production", label: "Production", icon: Cog, desc: "Batch in progress" },
-  { id: "quality", label: "Quality", icon: ShieldCheck, desc: "QC inspection passed" },
-  { id: "dispatch", label: "Dispatch", icon: Truck, desc: "Shipping scheduled" },
-  { id: "finance", label: "Finance", icon: Landmark, desc: "Invoice generated" },
-  { id: "analytics", label: "Analytics", icon: Activity, desc: "Performance logged" },
-  { id: "ai", label: "AI", icon: Sparkles, desc: "Optimization complete" },
+  { id: "order", label: "Customer Order", icon: ShoppingCart, desc: "Order received and verified", color: "oklch(0.58 0.22 259)", bg: "oklch(0.58 0.22 259 / 0.1)" },
+  { id: "inventory", label: "Inventory", icon: Boxes, desc: "Stock levels confirmed", color: "oklch(0.72 0.19 145)", bg: "oklch(0.72 0.19 145 / 0.1)" },
+  { id: "warehouse", label: "Warehouse", icon: Warehouse, desc: "Materials allocated", color: "oklch(0.62 0.19 300)", bg: "oklch(0.62 0.19 300 / 0.1)" },
+  { id: "production", label: "Production", icon: Cog, desc: "Batch in progress", color: "oklch(0.58 0.22 259)", bg: "oklch(0.58 0.22 259 / 0.1)" },
+  { id: "quality", label: "Quality", icon: ShieldCheck, desc: "QC inspection passed", color: "oklch(0.67 0.18 220)", bg: "oklch(0.67 0.18 220 / 0.1)" },
+  { id: "dispatch", label: "Dispatch", icon: Truck, desc: "Shipping scheduled", color: "oklch(0.79 0.17 75)", bg: "oklch(0.79 0.17 75 / 0.1)" },
+  { id: "finance", label: "Finance", icon: Landmark, desc: "Invoice generated", color: "oklch(0.72 0.19 145)", bg: "oklch(0.72 0.19 145 / 0.1)" },
+  { id: "analytics", label: "Analytics", icon: Activity, desc: "Performance logged", color: "oklch(0.62 0.23 340)", bg: "oklch(0.62 0.23 340 / 0.1)" },
+  { id: "ai", label: "AI", icon: Sparkles, desc: "Optimization complete", color: "oklch(0.72 0.14 210)", bg: "oklch(0.72 0.14 210 / 0.1)" },
 ];
 
 function Workflow() {
@@ -732,7 +892,50 @@ function Workflow() {
         desc="Every stage of your manufacturing pipeline, live and connected."
       />
       <div className="mt-10 relative">
-        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2.5">
+        {/* Pipeline connection line — flowing gradient between stages */}
+        <div className="hidden lg:block absolute top-[34px] left-[4%] right-[4%] h-px z-0 overflow-hidden">
+          <div className="w-full h-full bg-foreground/[0.06]" />
+          <motion.div
+            className="absolute inset-y-0 left-0 h-full"
+            animate={{
+              width: `${((activeIdx + 1) / WORKFLOW_STAGES.length) * 100}%`,
+            }}
+            transition={{ type: "spring", stiffness: 100, damping: 20 }}
+            style={{
+              background: `linear-gradient(90deg, ${WORKFLOW_STAGES[activeIdx].color}, ${WORKFLOW_STAGES[activeIdx].color} 60%, transparent)`,
+            }}
+          />
+          {/* Flowing dots along the pipeline */}
+          <motion.div
+            className="absolute inset-y-0 h-1 w-1 rounded-full"
+            style={{ backgroundColor: WORKFLOW_STAGES[activeIdx].color }}
+            animate={{
+              left: ["0%", "100%"],
+              opacity: [0, 1, 1, 0],
+            }}
+            transition={{
+              duration: 2.2,
+              repeat: Infinity,
+              ease: "linear",
+            }}
+          />
+          <motion.div
+            className="absolute inset-y-0 h-0.5 w-0.5 rounded-full opacity-60"
+            style={{ backgroundColor: WORKFLOW_STAGES[activeIdx].color }}
+            animate={{
+              left: ["-20%", "105%"],
+              opacity: [0, 0.6, 0.6, 0],
+            }}
+            transition={{
+              duration: 2.8,
+              repeat: Infinity,
+              ease: "linear",
+              delay: 0.8,
+            }}
+          />
+        </div>
+
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2.5 relative z-10">
           {WORKFLOW_STAGES.map((stage, i) => {
             const isActive = i === activeIdx;
             const isPast = i < activeIdx;
@@ -751,46 +954,100 @@ function Workflow() {
               >
                 <motion.div
                   animate={{
-                    borderColor: isActive ? "oklch(0.58 0.22 259 / 0.4)" : isPast ? "oklch(0.72 0.19 145 / 0.25)" : "color-mix(in oklab, var(--color-foreground) 8%, transparent)",
-                    backgroundColor: isActive ? "oklch(0.58 0.22 259 / 0.08)" : "color-mix(in oklab, var(--color-foreground) 3%, transparent)",
+                    borderColor: isActive ? `${stage.color.replace(")", " / 0.5)")}` : isPast ? `${stage.color.replace(")", " / 0.3)")}` : "color-mix(in oklab, var(--color-foreground) 8%, transparent)",
+                    backgroundColor: isActive ? stage.bg : isPast ? `${stage.color.replace(")", " / 0.06)")}` : "color-mix(in oklab, var(--color-foreground) 3%, transparent)",
+                    boxShadow: isActive ? `0 0 24px ${stage.color.replace(")", " / 0.2)")}` : "0 0 0px transparent",
                   }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 18 }}
                   className="relative rounded-xl border p-3 overflow-hidden"
                 >
-                  {/* Ripple pulse on becoming active */}
+                  {/* Ripple pulse on becoming active — using stage color */}
                   <AnimatePresence>
                     {isActive && (
                       <motion.div
                         key="ripple"
                         className="absolute inset-0 rounded-xl pointer-events-none"
-                        initial={{ opacity: 0.35, scale: 0.95 }}
-                        animate={{ opacity: 0, scale: 1.08 }}
-                        exit={{ opacity: 0, scale: 1.08 }}
-                        transition={{ duration: 0.6, ease: "easeOut" }}
+                        initial={{ opacity: 0.4, scale: 0.92 }}
+                        animate={{ opacity: 0, scale: 1.12 }}
+                        exit={{ opacity: 0, scale: 1.12 }}
+                        transition={{ duration: 0.7, ease: "easeOut" }}
                         style={{
-                          background: "oklch(0.58 0.22 259 / 0.15)",
+                          background: `${stage.color.replace(")", " / 0.2)")}`,
                           borderRadius: "inherit",
                         }}
                       />
                     )}
                   </AnimatePresence>
+
+                  {/* Colored gradient background glow for active stage */}
+                  {isActive && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="absolute -top-12 -right-12 w-24 h-24 rounded-full pointer-events-none"
+                      style={{
+                        background: `radial-gradient(circle, ${stage.color.replace(")", " / 0.15)")}, transparent 70%)`,
+                        filter: "blur(8px)",
+                      }}
+                    />
+                  )}
+
                   <div className="relative z-10">
-                    <div className={`h-7 w-7 rounded-lg grid place-items-center ${
-                      isActive ? "bg-primary" : isPast ? "bg-success/20" : "bg-foreground/10"
-                    }`}>
+                    {/* Icon with stage color */}
+                    <motion.div
+                      animate={{
+                        scale: isActive ? [1, 1.1, 1] : 1,
+                      }}
+                      transition={{
+                        duration: 0.6,
+                        ease: "easeOut",
+                      }}
+                      className={`h-7 w-7 rounded-lg grid place-items-center ${
+                        isActive ? "" : isPast ? "" : "bg-foreground/10"
+                      }`}
+                      style={{
+                        backgroundColor: isActive ? stage.color : isPast ? `${stage.color.replace(")", " / 0.2)")}` : undefined,
+                      }}
+                    >
                       <Icon className={`h-3.5 w-3.5 ${
-                        isActive ? "text-white" : isPast ? "text-success" : "text-muted-foreground"
+                        isActive ? "text-white" : isPast ? "text-foreground/80" : "text-muted-foreground"
                       }`} />
+                    </motion.div>
+
+                    {/* Label with stage color for active */}
+                    <div
+                      className="mt-2 text-[11px] font-medium truncate transition-colors duration-300"
+                      style={{
+                        color: isActive ? stage.color : isPast ? "var(--color-foreground)" : "var(--color-foreground)",
+                      }}
+                    >
+                      {stage.label}
                     </div>
-                    <div className="mt-2 text-[11px] font-medium text-foreground truncate">{stage.label}</div>
+
+                    {/* Colored progress bar */}
                     <div className="h-0.5 mt-2 rounded-full bg-foreground/10 overflow-hidden">
                       <motion.div
-                        className="h-full bg-primary"
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: stage.color }}
                         initial={{ width: "0%" }}
-                        animate={{ width: isActive ? "100%" : isPast ? "100%" : "0%" }}
+                        animate={{ 
+                          width: isActive ? "100%" : isPast ? "100%" : "0%",
+                          opacity: isPast ? 0.6 : 1,
+                        }}
                         transition={{ duration: 0.6 }}
                       />
                     </div>
+
+                    {/* Time estimate badge */}
+                    {(isActive || expanded === i) && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-1.5 text-[9px] text-muted-foreground/60 tabular-nums"
+                      >
+                        ~{(i + 1) * 12}m
+                      </motion.div>
+                    )}
                   </div>
                 </motion.div>
 
@@ -803,12 +1060,14 @@ function Workflow() {
                       exit={{ opacity: 0, y: 4, scale: 0.96 }}
                       transition={{ duration: 0.15 }}
                       className="absolute top-full left-0 mt-2 z-20 w-48 rounded-lg border border-border bg-card p-3 shadow-xl backdrop-blur-xl"
+                      style={{ borderColor: `${stage.color.replace(")", " / 0.3)")}` }}
                     >
-                      <div className="text-xs font-medium text-foreground">{stage.label}</div>
+                      <div className="text-xs font-medium text-foreground" style={{ color: stage.color }}>{stage.label}</div>
                       <div className="text-[11px] text-muted-foreground mt-0.5">{stage.desc}</div>
                       <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <Clock className="h-3 w-3" /> {(i + 1) * 12}m avg.
+                        <Clock className="h-3 w-3" /> Avg. {(i + 1) * 12}m
                       </div>
+                      <div className="mt-2 h-px w-full" style={{ background: `linear-gradient(90deg, ${stage.color.replace(")", " / 0.3)")}, transparent)` }} />
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -817,14 +1076,65 @@ function Workflow() {
           })}
         </div>
 
-        {/* Live status bar */}
-        <div className="mt-6 rounded-xl border border-border bg-muted/30 px-4 py-3 flex items-center gap-3 text-xs">
-          <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-          <span className="text-muted-foreground">Current:</span>
-          <span className="text-foreground font-medium">{WORKFLOW_STAGES[activeIdx].label}</span>
+        {/* Live status bar with stage color */}
+        <div 
+          className="mt-6 rounded-xl border px-4 py-3 flex items-center gap-3 text-xs transition-all duration-500"
+          style={{
+            borderColor: `${WORKFLOW_STAGES[activeIdx].color.replace(")", " / 0.25)")}`,
+            backgroundColor: `${WORKFLOW_STAGES[activeIdx].color.replace(")", " / 0.04)")}`,
+          }}
+        >
+          <motion.span
+            key={activeIdx}
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: WORKFLOW_STAGES[activeIdx].color }}
+          />
+          <motion.span
+            key={`label-${activeIdx}`}
+            initial={{ opacity: 0, x: -4 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.2 }}
+            className="text-muted-foreground"
+          >
+            Current:
+          </motion.span>
+          <motion.span
+            key={`name-${activeIdx}`}
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 200, damping: 16 }}
+            className="font-medium"
+            style={{ color: WORKFLOW_STAGES[activeIdx].color }}
+          >
+            {WORKFLOW_STAGES[activeIdx].label}
+          </motion.span>
           <span className="text-foreground/30 mx-1">·</span>
-          <span className="text-muted-foreground">{WORKFLOW_STAGES[activeIdx].desc}</span>
-          <span className="ml-auto text-foreground/30 tabular-nums">Order #ORD-{4821 + activeIdx}</span>
+          <motion.span
+            key={`desc-${activeIdx}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-muted-foreground"
+          >
+            {WORKFLOW_STAGES[activeIdx].desc}
+          </motion.span>
+          
+          {/* Progress indicator */}
+          <div className="ml-auto flex items-center gap-2">
+            <motion.div
+              key={`progress-${activeIdx}`}
+              initial={{ width: 0 }}
+              animate={{ width: 32 }}
+              className="h-1 rounded-full"
+              style={{
+                background: `linear-gradient(90deg, ${WORKFLOW_STAGES[activeIdx].color}, ${WORKFLOW_STAGES[activeIdx].color}80)`,
+              }}
+            />
+            <span className="text-foreground/40 tabular-nums text-[10px]">
+              {activeIdx + 1}/{WORKFLOW_STAGES.length}
+            </span>
+          </div>
         </div>
       </div>
     </section>
