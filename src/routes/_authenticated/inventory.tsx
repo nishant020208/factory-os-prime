@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
+import { notifyMaterialReservation } from "@/lib/notifications";
 import { adjustInventory } from "@/lib/order-lifecycle";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -79,6 +80,13 @@ function InventoryPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inv-stock"] });
       queryClient.invalidateQueries({ queryKey: ["inv-products"] });
+      // Fire material reservation notification when stock is adjusted for production reserve
+      if (companyId && adjustForm.reason.toLowerCase().includes("reserve")) {
+        const product = (products.data ?? []).find((p: any) => p.id === adjustForm.product_id);
+        const materialName = product?.name ?? "Material";
+        const label = `Internal-${materialName.slice(0, 12)}`;
+        notifyMaterialReservation(companyId, label, materialName);
+      }
       toast.success("Stock adjusted successfully");
       setShowAdjust(false);
       setAdjustForm({ product_id: "", warehouse_id: "", new_quantity: "0", reason: "" });

@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Truck, Package, MapPin, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ResourceView, type FormField } from "@/components/resource-view";
 import { Kpi, StatusBadge } from "@/components/ui-parts";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
+import { notifyDispatchReady } from "@/lib/notifications";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dispatch")({
   head: () => ({ meta: [
@@ -53,6 +55,7 @@ type DispatchRow = {
 
 function DispatchPage() {
   const { companyId } = useAuth();
+  const queryClient = useQueryClient();
   const { data: prodOrders } = useQuery({
     queryKey: ["dispatch-orders"],
     queryFn: async () => (await supabase.from("production_orders").select("*").order("created_at", { ascending: false })).data ?? [],
@@ -95,14 +98,26 @@ function DispatchPage() {
       formFields={DISPATCH_FORM_FIELDS}
       onSubmit={async (data) => {
         if (!companyId) return;
-        const { error } = await supabase.from("shipments").insert({
-          company_id: companyId,
-          shipment_number: data.order_number,
-          carrier: data.carrier,
-          destination: data.destination,
-          status: data.status ?? "pending",
-        });
+        const { data: inserted, error } = await supabase
+          .from("shipments")
+          .insert({
+            company_id: companyId,
+            shipment_number: data.order_number,
+            carrier: data.carrier,
+            destination: data.destination,
+            status: data.status ?? "pending",
+          })
+          .select("id")
+          .single();
         if (error) throw error;
+
+        // Fire notification if shipment is dispatch-ready
+        if (inserted && (data.status === "shipped" || data.status === "in_transit")) {
+          await notifyDispatchReady(companyId, data.order_number, inserted.id);
+        }
+
+        queryClient.invalidateQueries({ queryKey: ["dispatch-orders"] });
+        toast.success("Shipment created");
       }}
       kpis={
         <>

@@ -1,10 +1,6 @@
 import type { AppRole } from "@/lib/roles";
 
-/**
- * Priority order: earlier roles win when a user has multiple roles.
- * Root Super Admin ALWAYS wins and is platform-only.
- */
-export const ROLE_PRIORITY: AppRole[] = [
+const ROLE_PRIORITY: AppRole[] = [
   "root_super_admin",
   "company_admin",
   "plant_admin",
@@ -27,17 +23,12 @@ export function primaryRole(roles: AppRole[]): AppRole | null {
   return roles[0] ?? null;
 }
 
-/** Home route per role. Root Super Admin lives on /platform. */
 export function homeForRole(role: AppRole | null): string {
   if (!role) return "/auth";
   if (role === "root_super_admin") return "/platform";
   return "/dashboard";
 }
 
-/**
- * Route → allowed roles. A "*" prefix means anyone authenticated.
- * Root Super Admin is EXCLUDED from every ERP route on purpose.
- */
 const ALL_COMPANY: AppRole[] = ROLE_PRIORITY.filter(r => r !== "root_super_admin");
 
 const NON_EXTERNAL: AppRole[] = ALL_COMPANY.filter(
@@ -46,24 +37,26 @@ const NON_EXTERNAL: AppRole[] = ALL_COMPANY.filter(
 
 const ONLY: (...rs: AppRole[]) => AppRole[] = (...rs) => rs;
 
-/** Path prefix → allowed roles. Longest match wins. */
 export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/platform": ONLY("root_super_admin"),
 
-  // Company-admin only
   "/company":     ONLY("company_admin"),
   "/plants":      ONLY("company_admin", "plant_admin"),
   "/departments": ONLY("company_admin", "plant_admin"),
   "/roles":       ONLY("company_admin"),
   "/whitelist":   ONLY("company_admin"),
-  "/knowledge":   ALL_COMPANY,
+  "/knowledge":      ALL_COMPANY,
+  "/notifications":  ALL_COMPANY,
   "/analytics":   ONLY("company_admin", "plant_admin", "plant_manager", "finance_manager"),
   "/settings":    ONLY("company_admin", "plant_admin", "customer_portal", "supplier_portal", "auditor"),
 
-  // Dashboard: every authenticated non-root
+  // NEW: Materials (Company Admin + Production Manager read)
+  "/materials":         ONLY("company_admin", "production_manager"),
+  "/customer-requests": ONLY("company_admin"),
+  "/approved-orders":   ONLY("production_manager", "company_admin"),
+
   "/dashboard": ALL_COMPANY,
 
-  // HR
   "/employees":    ONLY("company_admin", "plant_admin", "hr_manager"),
   "/attendance":   ONLY("company_admin", "hr_manager", "plant_manager"),
   "/leaves":       ONLY("company_admin", "hr_manager"),
@@ -72,11 +65,8 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/performance":  ONLY("company_admin", "hr_manager"),
   "/hr-reports":   ONLY("company_admin", "hr_manager"),
   "/payroll":      ONLY("company_admin", "hr_manager", "finance_manager"),
-
-  // Team page (kept for compatibility)
   "/team":         ONLY("company_admin", "plant_admin", "hr_manager"),
 
-  // Production
   "/production":            ONLY("company_admin", "plant_admin", "plant_manager", "production_manager", "production_operator"),
   "/production-planning":   ONLY("company_admin", "plant_admin", "plant_manager", "production_manager"),
   "/scheduling":            ONLY("company_admin", "plant_manager", "production_manager"),
@@ -90,7 +80,6 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/production-logs":       ONLY("production_operator", "company_admin", "production_manager"),
   "/issue-reporting":       ONLY("production_operator", "company_admin", "maintenance_engineer"),
 
-  // Warehouse / Inventory
   "/inventory":       ONLY("company_admin", "plant_admin", "plant_manager", "warehouse_manager", "production_manager"),
   "/warehouse":       ONLY("company_admin", "plant_admin", "plant_manager", "warehouse_manager"),
   "/stock-movement":  ONLY("company_admin", "warehouse_manager"),
@@ -100,7 +89,6 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/cycle-count":     ONLY("company_admin", "warehouse_manager"),
   "/products":        ONLY("company_admin", "plant_admin", "production_manager", "warehouse_manager"),
 
-  // Procurement / Suppliers
   "/procurement":         ONLY("company_admin", "procurement_manager"),
   "/suppliers":           ONLY("company_admin", "procurement_manager", "plant_admin"),
   "/purchase-requests":   ONLY("company_admin", "procurement_manager"),
@@ -108,7 +96,6 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/vendor-comparison":   ONLY("company_admin", "procurement_manager"),
   "/goods-receipt":       ONLY("company_admin", "procurement_manager", "warehouse_manager"),
 
-  // Quality
   "/quality":              ONLY("company_admin", "plant_admin", "plant_manager", "quality_inspector"),
   "/incoming-inspection":  ONLY("company_admin", "quality_inspector"),
   "/in-process-inspection":ONLY("company_admin", "quality_inspector"),
@@ -117,7 +104,6 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/capa":                 ONLY("company_admin", "quality_inspector"),
   "/quality-reports":      ONLY("company_admin", "quality_inspector", "plant_manager"),
 
-  // Maintenance
   "/machines":              ONLY("company_admin", "plant_admin", "plant_manager", "maintenance_engineer", "production_manager"),
   "/maintenance":           ONLY("company_admin", "plant_admin", "plant_manager", "maintenance_engineer"),
   "/schedules":             ONLY("company_admin", "maintenance_engineer"),
@@ -126,7 +112,6 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/spare-parts":           ONLY("company_admin", "maintenance_engineer", "warehouse_manager"),
   "/maintenance-reports":   ONLY("company_admin", "maintenance_engineer"),
 
-  // Finance
   "/finance":         ONLY("company_admin", "finance_manager"),
   "/invoices":        ONLY("company_admin", "finance_manager"),
   "/expenses":        ONLY("company_admin", "finance_manager"),
@@ -135,11 +120,9 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/profit-loss":     ONLY("company_admin", "finance_manager"),
   "/finance-reports": ONLY("company_admin", "finance_manager"),
 
-  // CRM / Customers
   "/customers": ONLY("company_admin", "plant_admin"),
   "/crm":       ONLY("company_admin"),
 
-  // External portals
   "/orders":            ONLY("customer_portal", "company_admin"),
   "/customer-invoices": ONLY("customer_portal", "company_admin"),
   "/shipments":         ONLY("customer_portal", "company_admin"),
@@ -152,26 +135,23 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/payments":             ONLY("supplier_portal", "company_admin", "finance_manager"),
   "/supplier-performance": ONLY("supplier_portal", "company_admin", "procurement_manager"),
 
-  // Auditor
   "/audit":      NON_EXTERNAL.concat(["auditor"]),
   "/compliance": ONLY("auditor", "company_admin"),
 
-  // Reports & AI (broad but not for external portals or root)
   "/reports":   NON_EXTERNAL,
   "/ai-center": NON_EXTERNAL,
 
-  // Plant Admin / Plant Manager overview stubs
   "/plant-overview":    ONLY("plant_admin", "company_admin"),
   "/plant-performance": ONLY("plant_manager", "plant_admin", "company_admin"),
 };
 
 export function canAccess(pathname: string, roles: AppRole[]): boolean {
   if (!roles.length) return false;
-  // Root Super Admin only ever allowed on /platform and /auth
   if (roles.includes("root_super_admin")) {
+    // Root super admin can access /platform/* AND /notifications
+    if (pathname === "/notifications" || pathname.startsWith("/notifications/")) return true;
     return pathname.startsWith("/platform");
   }
-  // Find longest matching prefix
   let matched: AppRole[] | null = null;
   let matchedLen = -1;
   for (const [prefix, allowed] of Object.entries(ROUTE_ACCESS)) {
@@ -179,6 +159,6 @@ export function canAccess(pathname: string, roles: AppRole[]): boolean {
       if (prefix.length > matchedLen) { matched = allowed; matchedLen = prefix.length; }
     }
   }
-  if (!matched) return true; // unknown route = allow (fallback), guard is best-effort
+  if (!matched) return true;
   return matched.some(r => roles.includes(r));
 }

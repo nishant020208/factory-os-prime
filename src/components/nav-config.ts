@@ -7,7 +7,8 @@ import {
   FileSearch, HeartPulse, Timer, Receipt, DollarSign, Wallet, PiggyBank,
   UserPlus, GraduationCap, BadgeCheck, ListTodo, MessageSquare, FileText,
   Truck as TruckIcon, CreditCard, Star, Shield, LineChart, BookOpen, User,
-  AlertOctagon, ClipboardX, Route as RouteIcon, Send, Files,
+  AlertOctagon, ClipboardX, Route as RouteIcon, Send, Files, Database,
+  ClipboardPen, UserCheck, Bell,
 } from "lucide-react";
 import type { AppRole } from "@/lib/roles";
 
@@ -22,6 +23,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
   root_super_admin: [
     { label: "Platform", items: [
       { to: "/platform",           label: "Dashboard",         icon: LayoutDashboard },
+      { to: "/notifications",      label: "Notifications",     icon: Bell, badge: "!" },
       { to: "/platform/whitelist", label: "Admin Whitelist",   icon: FileCheck2 },
       { to: "/platform/pending",   label: "Pending Requests",  icon: Timer, badge: "!" },
       { to: "/platform/companies", label: "Approved Companies",icon: Building2 },
@@ -36,11 +38,17 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
 
   company_admin: [
     { label: "Overview", items: [
-      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { to: "/company",   label: "My Company",   icon: Building2, badge: "New" },
-      { to: "/plants",    label: "Plants",    icon: Factory },
-      { to: "/departments", label: "Departments", icon: TreePine },
-      { to: "/orders",    label: "Order Approvals", icon: ShoppingCart, badge: "!" },
+      { to: "/dashboard",    label: "Dashboard",      icon: LayoutDashboard },
+      { to: "/notifications", label: "Notifications",  icon: Bell, badge: "!" },
+      { to: "/company",      label: "My Company",     icon: Building2, badge: "New" },
+      { to: "/plants",       label: "Plants",         icon: Factory },
+      { to: "/departments",  label: "Departments",    icon: TreePine },
+      { to: "/orders",       label: "Order Approvals",icon: ShoppingCart, badge: "!" },
+    ]},
+    { label: "Customers", items: [
+      { to: "/customer-requests", label: "Customer Requests", icon: UserPlus, badge: "!" },
+      { to: "/customers",         label: "Customers",         icon: UserRound },
+      { to: "/materials",         label: "Materials",         icon: Database },
     ]},
     { label: "People", items: [
       { to: "/employees", label: "Employees", icon: Users },
@@ -60,7 +68,6 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
     { label: "Commerce", items: [
       { to: "/procurement",label: "Procurement",icon: ShoppingCart },
       { to: "/suppliers",  label: "Suppliers",  icon: Truck },
-      { to: "/customers",  label: "Customers",  icon: UserRound },
       { to: "/crm",        label: "CRM",        icon: HeartPulse },
       { to: "/finance",    label: "Finance",    icon: Landmark },
       { to: "/hr-reports", label: "HR",         icon: Users },
@@ -77,6 +84,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
   plant_admin: [
     { label: "Plant", items: [
       { to: "/dashboard",       label: "Dashboard",      icon: LayoutDashboard },
+      { to: "/notifications",   label: "Notifications",  icon: Bell, badge: "!" },
       { to: "/plant-overview",  label: "Plant Overview", icon: Factory },
       { to: "/departments",     label: "Departments",    icon: TreePine },
       { to: "/employees",       label: "Employees",      icon: Users },
@@ -96,6 +104,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
   plant_manager: [
     { label: "Plant", items: [
       { to: "/dashboard",         label: "Dashboard",         icon: LayoutDashboard },
+      { to: "/notifications",     label: "Notifications",     icon: Bell, badge: "!" },
       { to: "/plant-performance", label: "Plant Performance", icon: Gauge },
     ]},
     { label: "Operations", items: [
@@ -113,6 +122,8 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
   production_manager: [
     { label: "Planning", items: [
       { to: "/dashboard",           label: "Dashboard",           icon: LayoutDashboard },
+      { to: "/notifications",       label: "Notifications",       icon: Bell, badge: "!" },
+      { to: "/approved-orders",     label: "Approved Orders",     icon: ClipboardPen, badge: "!" },
       { to: "/production-planning", label: "Production Planning", icon: Calendar },
       { to: "/production",          label: "Production Orders",   icon: Factory },
       { to: "/work-orders",         label: "Work Orders",         icon: ListTodo },
@@ -128,6 +139,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
   warehouse_manager: [
     { label: "Warehouse", items: [
       { to: "/dashboard",     label: "Dashboard",     icon: LayoutDashboard },
+      { to: "/notifications", label: "Notifications", icon: Bell, badge: "!" },
       { to: "/inventory",     label: "Inventory",     icon: Boxes },
       { to: "/warehouse",     label: "Warehouses",    icon: Warehouse },
       { to: "/stock-movement",label: "Stock Movement",icon: ArrowLeftRight },
@@ -144,6 +156,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
   procurement_manager: [
     { label: "Procurement", items: [
       { to: "/dashboard",         label: "Dashboard",           icon: LayoutDashboard },
+      { to: "/notifications",     label: "Notifications",       icon: Bell, badge: "!" },
       { to: "/suppliers",         label: "Suppliers",           icon: Truck },
       { to: "/purchase-requests", label: "Purchase Requests",   icon: FileText },
       { to: "/procurement",       label: "Purchase Orders",     icon: ShoppingCart },
@@ -159,6 +172,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
   quality_inspector: [
     { label: "Quality", items: [
       { to: "/dashboard",              label: "Dashboard",             icon: LayoutDashboard },
+      { to: "/notifications",          label: "Notifications",         icon: Bell, badge: "!" },
       { to: "/incoming-inspection",    label: "Incoming Inspection",   icon: PackageOpen },
       { to: "/in-process-inspection",  label: "In-Process Inspection", icon: ClipboardCheck },
       { to: "/final-inspection",       label: "Final Inspection",      icon: BadgeCheck },
@@ -173,6 +187,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
   maintenance_engineer: [
     { label: "Maintenance", items: [
       { to: "/dashboard",       label: "Dashboard",       icon: LayoutDashboard },
+      { to: "/notifications",   label: "Notifications",   icon: Bell, badge: "!" },
       { to: "/machines",        label: "Machines",        icon: Cog },
       { to: "/maintenance",     label: "Maintenance",     icon: Wrench },
       { to: "/schedules",       label: "Schedules",       icon: Calendar },
@@ -187,13 +202,14 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
 
   finance_manager: [
     { label: "Finance", items: [
-      { to: "/dashboard",   label: "Dashboard",     icon: LayoutDashboard },
-      { to: "/invoices",    label: "Invoices",      icon: Receipt },
-      { to: "/expenses",    label: "Expenses",      icon: DollarSign },
-      { to: "/payroll",     label: "Payroll",       icon: Wallet },
-      { to: "/taxes",       label: "Taxes",         icon: FileText },
-      { to: "/budgets",     label: "Budgets",       icon: PiggyBank },
-      { to: "/profit-loss", label: "Profit & Loss", icon: LineChart },
+      { to: "/dashboard",     label: "Dashboard",     icon: LayoutDashboard },
+      { to: "/notifications", label: "Notifications", icon: Bell, badge: "!" },
+      { to: "/invoices",      label: "Invoices",      icon: Receipt },
+      { to: "/expenses",      label: "Expenses",      icon: DollarSign },
+      { to: "/payroll",       label: "Payroll",       icon: Wallet },
+      { to: "/taxes",         label: "Taxes",         icon: FileText },
+      { to: "/budgets",       label: "Budgets",       icon: PiggyBank },
+      { to: "/profit-loss",   label: "Profit & Loss", icon: LineChart },
     ]},
     { label: "Reports", items: [
       { to: "/finance-reports", label: "Reports", icon: ClipboardList },
@@ -202,14 +218,15 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
 
   hr_manager: [
     { label: "People", items: [
-      { to: "/dashboard",   label: "Dashboard",   icon: LayoutDashboard },
-      { to: "/employees",   label: "Employees",   icon: Users },
-      { to: "/attendance",  label: "Attendance",  icon: Timer },
-      { to: "/leaves",      label: "Leaves",      icon: Calendar },
-      { to: "/recruitment", label: "Recruitment", icon: UserPlus },
-      { to: "/training",    label: "Training",    icon: GraduationCap },
-      { to: "/performance", label: "Performance", icon: Star },
-      { to: "/payroll",     label: "Payroll",     icon: Wallet },
+      { to: "/dashboard",     label: "Dashboard",     icon: LayoutDashboard },
+      { to: "/notifications", label: "Notifications", icon: Bell, badge: "!" },
+      { to: "/employees",     label: "Employees",     icon: Users },
+      { to: "/attendance",    label: "Attendance",    icon: Timer },
+      { to: "/leaves",        label: "Leaves",        icon: Calendar },
+      { to: "/recruitment",   label: "Recruitment",   icon: UserPlus },
+      { to: "/training",      label: "Training",      icon: GraduationCap },
+      { to: "/performance",   label: "Performance",   icon: Star },
+      { to: "/payroll",       label: "Payroll",       icon: Wallet },
     ]},
     { label: "Reports", items: [
       { to: "/hr-reports", label: "Reports", icon: ClipboardList },
@@ -219,6 +236,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
   production_operator: [
     { label: "My Shift", items: [
       { to: "/dashboard",              label: "Dashboard",       icon: LayoutDashboard },
+      { to: "/notifications",          label: "Notifications",   icon: Bell, badge: "!" },
       { to: "/assigned-work-orders",   label: "Work Orders",     icon: ListTodo },
       { to: "/assigned-machines",      label: "My Machines",     icon: Cog },
       { to: "/tasks",                  label: "Tasks",           icon: ClipboardCheck },
@@ -229,41 +247,43 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
 
   customer_portal: [
     { label: "My Account", items: [
-      { to: "/dashboard",         label: "Dashboard", icon: LayoutDashboard },
-      { to: "/orders",            label: "Orders",    icon: ShoppingCart },
-      { to: "/customer-invoices", label: "Invoices",  icon: Receipt },
-      { to: "/shipments",         label: "Shipments", icon: TruckIcon },
-      { to: "/support",           label: "Support",   icon: MessageSquare },
-      { to: "/documents",         label: "Documents", icon: Files },
-      { to: "/settings",          label: "Settings",  icon: Settings },
+      { to: "/dashboard",         label: "Dashboard",     icon: LayoutDashboard },
+      { to: "/notifications",     label: "Notifications", icon: Bell, badge: "!" },
+      { to: "/orders",            label: "Orders",        icon: ShoppingCart },
+      { to: "/customer-invoices", label: "Invoices",      icon: Receipt },
+      { to: "/shipments",         label: "Shipments",     icon: TruckIcon },
+      { to: "/support",           label: "Support",       icon: MessageSquare },
+      { to: "/documents",         label: "Documents",     icon: Files },
+      { to: "/settings",          label: "Settings",      icon: Settings },
     ]},
   ],
 
   supplier_portal: [
     { label: "My Account", items: [
-      { to: "/dashboard",             label: "Dashboard",    icon: LayoutDashboard },
-      { to: "/supplier-pos",          label: "Purchase Orders", icon: ShoppingCart },
-      { to: "/deliveries",            label: "Deliveries",   icon: TruckIcon },
-      { to: "/supplier-invoices",     label: "Invoices",     icon: Receipt },
-      { to: "/payments",              label: "Payments",     icon: CreditCard },
-      { to: "/supplier-performance",  label: "Performance",  icon: Star },
-      { to: "/settings",              label: "Settings",     icon: Settings },
+      { to: "/dashboard",             label: "Dashboard",        icon: LayoutDashboard },
+      { to: "/notifications",         label: "Notifications",    icon: Bell, badge: "!" },
+      { to: "/supplier-pos",          label: "Purchase Orders",  icon: ShoppingCart },
+      { to: "/deliveries",            label: "Deliveries",       icon: TruckIcon },
+      { to: "/supplier-invoices",     label: "Invoices",         icon: Receipt },
+      { to: "/payments",              label: "Payments",         icon: CreditCard },
+      { to: "/supplier-performance",  label: "Performance",      icon: Star },
+      { to: "/settings",              label: "Settings",         icon: Settings },
     ]},
   ],
 
   auditor: [
     { label: "Audit", items: [
-      { to: "/dashboard",  label: "Dashboard",  icon: LayoutDashboard },
-      { to: "/audit",      label: "Audit Logs", icon: ScrollText },
-      { to: "/reports",    label: "Reports",    icon: ClipboardList },
-      { to: "/compliance", label: "Compliance", icon: Shield },
-      { to: "/documents",  label: "Documents",  icon: Files },
-      { to: "/settings",   label: "Settings",   icon: Settings },
+      { to: "/dashboard",     label: "Dashboard",     icon: LayoutDashboard },
+      { to: "/notifications", label: "Notifications", icon: Bell, badge: "!" },
+      { to: "/audit",         label: "Audit Logs",    icon: ScrollText },
+      { to: "/reports",       label: "Reports",       icon: ClipboardList },
+      { to: "/compliance",    label: "Compliance",    icon: Shield },
+      { to: "/documents",     label: "Documents",     icon: Files },
+      { to: "/settings",      label: "Settings",      icon: Settings },
     ]},
   ],
 };
 
-/** Back-compat export used only by legacy places; prefer NAV_BY_ROLE. */
 export const NAV_SECTIONS: NavSection[] = NAV_BY_ROLE.company_admin;
 
 export function navForRole(role: AppRole | null): NavSection[] {

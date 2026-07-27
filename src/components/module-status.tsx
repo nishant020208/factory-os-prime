@@ -4,6 +4,14 @@ import { BrainCircuit, Shield, Radio, Send, Sparkles, Loader2 } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
+import { primaryRole } from "@/lib/route-access";
+import {
+  checkRoleScope,
+  getBlockMessage,
+  getAllowedLabels,
+  DOMAIN_LABELS,
+} from "@/lib/role-scope";
 
 /**
  * Status bar shown on every module page:
@@ -26,6 +34,8 @@ export function ModuleStatusBar({ moduleName }: { moduleName: string }) {
     </div>
   );
 }
+
+
 
 /** Pre-defined AI responses for each module */
 const MODULE_AI_RESPONSES: Record<string, string[]> = {
@@ -254,11 +264,16 @@ const SLUG_ALIASES: Record<string, string> = {
   "approved-companies": "documents",
 };
 
+
+
 /**
  * Working AI Copilot for every module.
  * Shows contextual insights, answers questions, and provides recommendations.
+ * Now role-scoped: blocks answers about domains outside the user's role.
  */
 export function ModuleCopilot({ moduleName }: { moduleName: string }) {
+  const { roles } = useAuth();
+  const role = primaryRole(roles);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
   const [input, setInput] = useState("");
@@ -280,6 +295,23 @@ export function ModuleCopilot({ moduleName }: { moduleName: string }) {
 
     // Simulate AI processing
     await new Promise(r => setTimeout(r, 800 + Math.random() * 600));
+
+    // Check role scope first — block if question is about a restricted domain
+    const blockedDomain = checkRoleScope(role, userMsg);
+    if (blockedDomain) {
+      const domainLabel = DOMAIN_LABELS[blockedDomain] ?? blockedDomain;
+      const blockMsg = getBlockMessage(role);
+      const aiResponse = `🚫 **Access Restricted**
+
+You asked about **${domainLabel}** data, which is outside your role's scope.
+
+${blockMsg}
+
+Your role (${role}) has access to: ${getAllowedLabels(role).join(", ")}`;
+      setMessages(prev => [...prev, { role: "ai", text: aiResponse }]);
+      setLoading(false);
+      return;
+    }
 
     // Generate contextual response
     const lower = userMsg.toLowerCase();
