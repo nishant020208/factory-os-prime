@@ -12,6 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  notifyNewOrder,
+  notifyOrderApproved,
+  notifyOrderRejected,
+} from "@/lib/notifications";
+import { getCustomerUserId } from "@/lib/customer-lookup";
 import { approveCustomerOrder, rejectCustomerOrder } from "@/lib/order-lifecycle";
 
 export const Route = createFileRoute("/_authenticated/orders")({
@@ -56,6 +62,11 @@ function OrdersPage() {
     queryFn: async () => (await supabase.from("customers").select("id,name").eq("status", "active").order("name")).data ?? [],
     enabled: !!companyId,
   });
+
+  // Resolve role flags — declare BEFORE any useQuery that references them (TDZ fix)
+  const isCompanyAdmin = roles.includes("company_admin");
+  const isCustomer = roles.includes("customer_portal");
+  const isProductionManager = roles.includes("production_manager");
 
   // Resolve customer_id for portal users (they should only see their own orders)
   const { data: myCustomerId } = useQuery({
@@ -147,25 +158,39 @@ function OrdersPage() {
     queryKey: ["orders-invoices", companyId],
     queryFn: async () => (await supabase.from("invoices").select("*").order("issue_date", { ascending: false })).data ?? [],
     enabled: !!companyId,
-  });      // Create order mutation
+  });  // Create order mutation
   const createMutation = useMutation({
     mutationFn: async (formData: Record<string, string>) => {
       const now = new Date().toISOString();
       const customerId = formData.customer_id;
       if (!customerId) throw new Error("Please select a customer");
-      const { error } = await supabase.from("sales_orders").insert({
-        company_id: companyId!,
-        so_number: formData.so_number || `SO-${Date.now().toString().slice(-6)}`,
-        customer_id: customerId,
-        status: "pending_approval",
-        priority: formData.priority || "medium",
-        total_amount: parseFloat(formData.total_amount) || 0,
-        order_date: now,
-        due_date: formData.due_date || null,
-        progress: 0,
-        notes: formData.notes || null,
-      });
+
+      const soNumber = formData.so_number || `SO-${Date.now().toString().slice(-6)}`;
+
+      const { data: inserted, error } = await supabase
+        .from("sales_orders")
+        .insert({
+          company_id: companyId!,
+          so_number: soNumber,
+          customer_id: customerId,
+          status: "pending_approval",
+          priority: formData.priority || "medium",
+          total_amount: parseFloat(formData.total_amount) || 0,
+          order_date: now,
+          due_date: formData.due_date || null,
+          progress: 0,
+          notes: formData.notes || null,
+        })
+        .select("id")
+        .single();
+
       if (error) throw error;
+
+      // Fire notification to Company Admin
+      if (inserted && companyId) {
+        const customerName = customerList?.find((c: any) => c.id === customerId)?.name ?? "Customer";
+        await notifyNewOrder(companyId, soNumber, customerName, inserted.id);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders-sales"] });
@@ -180,20 +205,19 @@ function OrdersPage() {
       if (!companyId || !user) throw new Error("Not authenticated");
       setApproving(orderId);
       const order = salesOrders?.find((o: any) => o.id === orderId);
-      const customerId = order?.customer_id;
-      await approveCustomerOrder(orderId, companyId, user.id, customerId);
-      // Create a notification for production manager
-      await supabase.from("notifications").insert({
-        company_id: companyId,
-        title: "New Approved Order - Production Action Needed",
-        body: `Order ${order?.so_number} has been approved. Please create a production order.`,
-        severity: "info",
-      });
+      if (!order) throw new Error("Order not found");
+
+      // Update status + record history (preserves order_status_history tracking)
+      await approveCustomerOrder(orderId, companyId, user.id, order.customer_id);
+
+      // Fire role-targeted notifications: Customer + Production Manager
+      const customerUserId = await getCustomerUserId(order.customer_id);
+      await notifyOrderApproved(companyId, order.so_number, customerUserId ?? "", orderId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders-sales"] });
       queryClient.invalidateQueries({ queryKey: ["orders-history"] });
-      toast.success("Order approved and production notified");
+      toast.success("Order approved — Customer & Production Manager notified");
       setApproving(null);
     },
     onError: (err: any) => { toast.error(err.message); setApproving(null); },
@@ -204,12 +228,20 @@ function OrdersPage() {
     mutationFn: async ({ orderId, reason }: { orderId: string; reason: string }) => {
       if (!companyId || !user) throw new Error("Not authenticated");
       setRejecting(orderId);
+      const order = salesOrders?.find((o: any) => o.id === orderId);
+      if (!order) throw new Error("Order not found");
+
+      // Update status + record history (preserves order_status_history tracking)
       await rejectCustomerOrder(orderId, companyId, user.id, reason);
+
+      // Fire notification to Customer only
+      const customerUserId = await getCustomerUserId(order.customer_id);
+      await notifyOrderRejected(companyId, order.so_number, customerUserId ?? "", reason, orderId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders-sales"] });
       queryClient.invalidateQueries({ queryKey: ["orders-history"] });
-      toast.success("Order has been rejected");
+      toast.success("Order rejected — Customer notified");
       setRejectDialog({ open: false, orderId: "" });
       setRejectReason("");
       setRejecting(null);
@@ -233,9 +265,6 @@ function OrdersPage() {
     };
   });
 
-  const isCompanyAdmin = roles.includes("company_admin");
-  const isCustomer = roles.includes("customer_portal");
-  const isProductionManager = roles.includes("production_manager");
   const pendingApproval = rows.filter((r: any) => r.status === "pending_approval").length;
   const inProd = rows.filter((r: any) => r.status === "in_production" || r.status === "approved").length;
   const delivered = rows.filter((r: any) => r.status === "delivered" || r.status === "completed").length;

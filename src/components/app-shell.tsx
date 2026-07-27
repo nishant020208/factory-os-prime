@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/command";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useNotifications, setNavigateHandler } from "@/hooks/use-notifications";
 import { ROLE_MAP } from "@/lib/roles";
 import { navForRole } from "@/components/nav-config";
 import { primaryRole, homeForRole } from "@/lib/route-access";
@@ -52,7 +53,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 function FactorySidebar() {
-  const { state } = useSidebar();
+  const { state, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { roles } = useAuth();
@@ -60,10 +61,14 @@ function FactorySidebar() {
   const sections = useMemo(() => navForRole(role), [role]);
   const home = homeForRole(role);
 
+  function closeMobile() {
+    setOpenMobile(false);
+  }
+
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border">
-        <Link to={home} className="flex items-center gap-2 px-2 py-2">
+        <Link to={home} onClick={closeMobile} className="flex items-center gap-2 px-2 py-2">
           <div className="h-8 w-8 rounded-lg bg-[image:var(--gradient-primary)] shadow-glow grid place-items-center shrink-0">
             <Factory className="h-4 w-4 text-white" />
           </div>
@@ -88,7 +93,7 @@ function FactorySidebar() {
                   return (
                     <SidebarMenuItem key={it.to}>
                       <SidebarMenuButton asChild isActive={active} tooltip={it.label}>
-                        <Link to={it.to} className="flex items-center gap-2">
+                        <Link to={it.to} onClick={closeMobile} className="flex items-center gap-2">
                           <it.icon className="h-4 w-4" />
                           {!collapsed && <span className="truncate">{it.label}</span>}
                           {!collapsed && it.badge && (
@@ -134,6 +139,11 @@ function TopBar() {
   const router = useRouter();
   const { profile, roles, companyId } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { unreadCount } = useNotifications();
+  // Register TanStack Router navigate handler for in-app navigation (no full page reloads)
+  useEffect(() => {
+    setNavigateHandler((to: string) => router.navigate({ to }));
+  }, [router]);
   const [cmdOpen, setCmdOpen] = useState(false);
   const role = useMemo(() => primaryRole(roles), [roles]);
   const sections = useMemo(() => navForRole(role), [role]);
@@ -243,9 +253,21 @@ function TopBar() {
             )}
           </AnimatePresence>
         </div>
-        <Button variant="ghost" size="icon" className="h-9 w-9 relative" aria-label="Notifications">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 relative"
+          aria-label="Notifications"
+          onClick={() => router.navigate({ to: "/notifications" })}
+        >
           <Bell className="h-4 w-4" />
-          <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-primary animate-pulse-glow" />
+          {unreadCount > 0 ? (
+            <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] px-1 rounded-full bg-primary text-[9px] font-bold text-primary-foreground flex items-center justify-center leading-none">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          ) : (
+            <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
+          )}
         </Button>
 
         <DropdownMenu>

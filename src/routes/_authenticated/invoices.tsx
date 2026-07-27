@@ -6,6 +6,8 @@ import { ResourceView, type FormField } from "@/components/resource-view";
 import { Kpi, StatusBadge, Panel } from "@/components/ui-parts";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { notifyInvoiceGenerated, notifyPaymentStatusChanged } from "@/lib/notifications";
+import { getCustomerUserId } from "@/lib/customer-lookup";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -90,6 +92,15 @@ function InvoicesPage() {
         paid_date: new Date().toISOString(),
       }).eq("id", invoice.id);
 
+      // Fire payment notification to Customer
+      if (invoice.customer_id && companyId) {
+        const customerUserId = await getCustomerUserId(invoice.customer_id);
+        await notifyPaymentStatusChanged(
+          companyId, invoice.invoice_number,
+          customerUserId ?? "", "paid", invoice.id
+        );
+      }
+
       // Create payment record
       await supabase.from("payments").insert({
         company_id: companyId,
@@ -137,16 +148,29 @@ function InvoicesPage() {
         formFields={INVOICE_FORM_FIELDS}
         onSubmit={async (formData) => {
           if (!companyId) return;
-          const { error } = await supabase.from("invoices").insert({
-            company_id: companyId,
-            invoice_number: formData.invoice_number,
-            total_amount: parseFloat(formData.total_amount) || 0,
-            tax_amount: parseFloat(formData.tax_amount) || 0,
-            due_date: formData.due_date || null,
-            status: formData.status || "draft",
-            issue_date: new Date().toISOString(),
-          });
+          const { data: inserted, error } = await supabase
+            .from("invoices")
+            .insert({
+              company_id: companyId,
+              invoice_number: formData.invoice_number,
+              total_amount: parseFloat(formData.total_amount) || 0,
+              tax_amount: parseFloat(formData.tax_amount) || 0,
+              due_date: formData.due_date || null,
+              status: formData.status || "draft",
+              issue_date: new Date().toISOString(),
+            })
+            .select("id")
+            .single();
           if (error) throw error;
+
+          // Fire notification if invoice has a customer
+          if (inserted && formData.customer_id) {
+            const customerUserId = await getCustomerUserId(formData.customer_id);
+            await notifyInvoiceGenerated(
+              companyId, formData.invoice_number,
+              customerUserId ?? "", inserted.id
+            );
+          }
         }}
         kpis={
           <>
