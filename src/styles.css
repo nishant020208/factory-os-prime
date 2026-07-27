@@ -397,3 +397,59 @@
 
 @custom-media --motionOK (prefers-reduced-motion: no-preference);
 @custom-media --motionNotOK (prefers-reduced-motion: reduce);
+
+/* ============================================================ */
+/*  MOBILE RESPONSIVE UTILITIES                                 */
+/*  Applied via className in components — no extra JS needed.   */
+/* ============================================================ */
+
+/* Scrollable tables on mobile — wrap your <table> in this */
+@utility table-scroll {
+  @media (width < 768px) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    display: block;
+    width: 100%;
+  }
+}
+
+/* Hide on mobile, show on desktop+ */
+@utility hide-mobile {
+  @media (width < 640px) { display: none !important; }
+}
+
+/* Hide on desktop, show on mobile */
+@utility show-mobile {
+  @media (width >= 640px) { display: none !important; }
+}
+
+/* Responsive grid: 1 col mobile, 2 cols tablet, 3 cols desktop */
+@utility grid-responsive {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  @media (width >= 640px) { grid-template-columns: repeat(2, 1fr); }
+  @media (width >= 1024px) { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* KPI cards: 2 cols mobile, 4 cols tablet */
+@utility kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  @media (width >= 640px) { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* Sidebar breaks in mid-sized screens — keep it as overlay */
+@media (width < 1024px) {
+  [data-sidebar="sidebar"] {
+    --sidebar-width-mobile: 18rem;
+  }
+}
+
+/* Landing page responsive typography */
+@media (width < 640px) {
+  .text-display-xl { font-size: 2rem; line-height: 1.1; }
+  .text-display-lg { font-size: 1.75rem; line-height: 1.15; }
+  .text-display { font-size: 1.5rem; line-height: 1.2; }
+}

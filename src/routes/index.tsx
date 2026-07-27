@@ -935,7 +935,7 @@ function Workflow() {
           />
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2.5 relative z-10">
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5 sm:gap-2.5 relative z-10">
           {WORKFLOW_STAGES.map((stage, i) => {
             const isActive = i === activeIdx;
             const isPast = i < activeIdx;
@@ -959,7 +959,7 @@ function Workflow() {
                     boxShadow: isActive ? `0 0 24px ${stage.color.replace(")", " / 0.2)")}` : "0 0 0px transparent",
                   }}
                   transition={{ type: "spring", stiffness: 200, damping: 18 }}
-                  className="relative rounded-xl border p-3 overflow-hidden"
+                  className="relative rounded-lg sm:rounded-xl border p-1.5 sm:p-3 overflow-hidden"
                 >
                   {/* Ripple pulse on becoming active — using stage color */}
                   <AnimatePresence>

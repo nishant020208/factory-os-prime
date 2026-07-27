@@ -80,29 +80,55 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
     queryKey,
     enabled: !!companyId,
     queryFn: async () => {
-      let query = supabase.from(table as never).select("*").limit(500);
-      if (filter) {
-        for (const [k, v] of Object.entries(filter)) query = (query as never as ReturnType<typeof query.eq>).eq(k, v);
+      try {
+        let query = supabase.from(table as never).select("*").limit(500);
+        if (filter) {
+          for (const [k, v] of Object.entries(filter)) query = (query as never as ReturnType<typeof query.eq>).eq(k, v);
+        }
+        if (orderBy) {
+          query = (query as never as ReturnType<typeof query.order>).order(orderBy.column, { ascending: orderBy.ascending ?? false });
+        }
+        const { data, error } = await query;
+        if (error) {
+          console.warn(`LiveModule[${table}]:`, error.message);
+          return [] as Row[]; // Return empty instead of throwing — prevents error boundary triggers
+        }
+        return (data ?? []) as Row[];
+      } catch {
+        return [] as Row[]; // Table may not exist, gracefully return empty
       }
-      if (orderBy) {
-        query = (query as never as ReturnType<typeof query.order>).order(orderBy.column, { ascending: orderBy.ascending ?? false });
-      }
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []) as Row[];
     },
   });
 
   // Realtime subscription for this table (RLS filters what the user sees).
+  // ⚠️ Crash-proof: entire subscription is wrapped in try-catch so a missing
+  //    table (e.g. not yet migrated) never triggers the error boundary.
   useEffect(() => {
     if (!companyId) return;
-    const channel = supabase
-      .channel(`live-${table}-${companyId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table }, () => {
-        qc.invalidateQueries({ queryKey: [table] });
-      })
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel(`live-${table}-${companyId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table }, () => {
+          try {
+            if (!cancelled) {
+              qc.invalidateQueries({ queryKey: [table] });
+            }
+          } catch {
+            // Silently ignore invalidation errors
+          }
+        })
+        .subscribe();
+    } catch {
+      // Silently ignore — table may not exist yet; queries work without realtime
+    }
+    return () => {
+      cancelled = true;
+      if (channel) {
+        try { void supabase.removeChannel(channel); } catch { /* ignore */ }
+      }
+    };
   }, [table, companyId, qc]);
 
   const rows = data ?? [];

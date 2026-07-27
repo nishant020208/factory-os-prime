@@ -24,28 +24,46 @@ export function useAuth(): AuthState {
         if (mounted) setState({ session: null, user: null, loading: false, roles: [], companyId: null, profile: null });
         return;
       }
-      const [{ data: rolesData }, { data: profile }] = await Promise.all([
-        supabase.from("user_roles").select("role,company_id").eq("user_id", session.user.id),
-        supabase.from("profiles").select("full_name,email,avatar_url,company_id").eq("id", session.user.id).maybeSingle(),
-      ]);
-      if (!mounted) return;
-      setState({
-        session,
-        user: session.user,
-        loading: false,
-        roles: (rolesData ?? []).map(r => r.role as AppRole),
-        companyId: profile?.company_id ?? rolesData?.[0]?.company_id ?? null,
-        profile: profile ? { full_name: profile.full_name, email: profile.email, avatar_url: profile.avatar_url } : null,
-      });
+      try {
+        const [rolesRes, profileRes] = await Promise.all([
+          supabase.from("user_roles").select("role,company_id").eq("user_id", session.user.id),
+          supabase.from("profiles").select("full_name,email,avatar_url,company_id").eq("id", session.user.id).maybeSingle(),
+        ]);
+        if (!mounted) return;
+        const rolesData = rolesRes.data ?? [];
+        const profile = profileRes.data;
+        setState({
+          session,
+          user: session.user,
+          loading: false,
+          roles: rolesData.length ? (rolesData as Array<{ role: string }>).map(r => r.role as AppRole) : [],
+          companyId: profile?.company_id ?? (rolesData as Array<{ company_id?: string }>)?.[0]?.company_id ?? null,
+          profile: profile ? { full_name: profile.full_name, email: profile.email, avatar_url: profile.avatar_url } : { full_name: null, email: session.user.email ?? "", avatar_url: null },
+        });
+      } catch {
+        // Graceful degradation — if queries fail (table missing, RLS issue),
+        // still reflect the authenticated user without roles/company data
+        if (!mounted) return;
+        setState({
+          session,
+          user: session.user,
+          loading: false,
+          roles: [],
+          companyId: null,
+          profile: { full_name: null, email: session.user.email ?? "", avatar_url: null },
+        });
+      }
     }
 
-    supabase.auth.getSession().then(({ data }) => hydrate(data.session));
+    supabase.auth.getSession().then(({ data }) => hydrate(data.session)).catch(() => {
+      if (mounted) setState(s => ({ ...s, loading: false }));
+    });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED" || event === "INITIAL_SESSION") {
         hydrate(session);
       }
     });
-    return () => { mounted = false; sub.subscription.unsubscribe(); };
+    return () => { mounted = false; try { sub.subscription.unsubscribe(); } catch {} };
   }, []);
 
   return state;

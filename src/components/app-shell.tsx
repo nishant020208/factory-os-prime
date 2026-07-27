@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <FactorySidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <TopBar />
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+          <main className="flex-1 p-3 sm:p-6 lg:p-8 overflow-y-auto">
             <motion.div
               key={useRouterState({ select: (s) => s.location.pathname })}
               initial={{ opacity: 0, y: 8 }}
@@ -171,7 +171,7 @@ function TopBar() {
   return (
     <>
     <header className="sticky top-0 z-30 border-b border-white/5 bg-background/70 backdrop-blur-xl">
-      <div className="flex items-center gap-3 px-3 sm:px-4 h-14">
+      <div className="flex items-center gap-1 sm:gap-3 px-2 sm:px-4 h-14">
         <SidebarTrigger />
         <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
           <span className="px-2 py-0.5 rounded-md bg-card border border-white/5">{tenantLabel}</span>
@@ -180,11 +180,11 @@ function TopBar() {
 
         <button
           onClick={() => setCmdOpen(true)}
-          className="ml-auto flex items-center gap-2 text-xs text-muted-foreground bg-card/60 border border-white/5 rounded-lg px-3 h-9 hover:border-primary/30 transition min-w-[220px]"
+          className="ml-auto flex items-center gap-2 text-xs text-muted-foreground bg-card/60 border border-white/5 rounded-lg px-2 sm:px-3 h-9 hover:border-primary/30 transition min-w-[40px] sm:min-w-[220px]"
         >
-          <Search className="h-3.5 w-3.5" />
-          <span className="flex-1 text-left">Search…</span>
-          <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 flex items-center gap-0.5">
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <span className="hidden sm:inline flex-1 text-left">Search…</span>
+          <kbd className="hidden sm:flex text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 items-center gap-0.5">
             <Command className="h-2.5 w-2.5" />K
           </kbd>
         </button>
@@ -272,11 +272,11 @@ function TopBar() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 hover:bg-card rounded-lg px-2 h-9">
+            <button className="flex items-center gap-1 sm:gap-2 hover:bg-card rounded-lg px-1 sm:px-2 h-9">
               <Avatar className="h-7 w-7"><AvatarFallback className="text-xs bg-primary/20 text-primary">
                 {(profile?.full_name ?? profile?.email ?? "U").slice(0, 1).toUpperCase()}
               </AvatarFallback></Avatar>
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              <ChevronDown className="hidden sm:block h-3.5 w-3.5 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
