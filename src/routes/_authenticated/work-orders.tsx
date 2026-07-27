@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
+import { notifyWorkOrderAssigned, notifyWorkOrderCompleted, notifyQualityPassed, notifyBatchFailed } from "@/lib/notifications";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -59,13 +60,13 @@ function WorkOrdersPage() {
   // Fetch production orders
   const { data: prodOrders } = useQuery({
     queryKey: ["wo-prod-orders", companyId],
-    queryFn: async () => (await supabase.from("production_orders").select("id, order_number").eq("company_id", companyId)).data ?? [],
+    queryFn: async () => (await supabase.from("production_orders").select("id, order_number").eq("company_id", companyId!)).data ?? [],
   });
 
   // Fetch machines (exclude those under maintenance)
   const { data: machines } = useQuery({
     queryKey: ["wo-machines", companyId],
-    queryFn: async () => (await supabase.from("machines").select("id, name, status").eq("company_id", companyId).order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("machines").select("id, name, status").eq("company_id", companyId!).order("name")).data ?? [],
   });
 
   // Fetch operators (production operators from user_roles)
@@ -76,7 +77,7 @@ function WorkOrdersPage() {
       const { data } = await supabase
         .from("user_roles")
         .select("user_id, profiles!inner(full_name)")
-        .eq("company_id", companyId)
+        .eq("company_id", companyId!)
         .eq("role", "production_operator");
       return (data ?? []).map((r: any) => ({
         id: r.user_id,
@@ -125,7 +126,12 @@ function WorkOrdersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work-orders"] });
-      toast.success("Operator assigned");
+      // Fire notification to the assigned operator
+      const assignedWO = workOrders?.find((w: any) => w.id === showAssign.woId);
+      if (assignedWO && companyId) {
+        notifyWorkOrderAssigned(companyId, assignedWO.wo_number, assignOp, showAssign.woId);
+      }
+      toast.success("Operator assigned — notification sent");
       setShowAssign({ open: false, woId: "" });
       setAssignOp("");
     },
@@ -136,15 +142,22 @@ function WorkOrdersPage() {
   const updateProgressMutation = useMutation({
     mutationFn: async ({ woId, progress }: { woId: string; progress: number }) => {
       const newStatus = progress >= 100 ? "completed" : "in_progress";
-      const { error } = await supabase.from("work_orders").update({
+      const { error } = await (supabase.from("work_orders") as any).update({
         progress,
         status: newStatus,
         end_time: progress >= 100 ? new Date().toISOString() : null,
       }).eq("id", woId);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["work-orders"] });
+      // Fire notification when work order reaches 100%
+      if (variables.progress >= 100 && companyId) {
+        const completedWO = workOrders?.find((w: any) => w.id === variables.woId);
+        if (completedWO) {
+          notifyWorkOrderCompleted(companyId, completedWO.wo_number, completedWO.operator_name || "Operator", variables.woId);
+        }
+      }
       toast.success("Progress updated");
     },
     onError: (err: any) => toast.error(err.message),
@@ -254,6 +267,39 @@ function WorkOrdersPage() {
                               {pct}%
                             </Button>
                           ))}
+                        </div>
+                      )}
+                      {roles.includes("quality_inspector") && wo.status === "completed" && wo.progress >= 100 && (
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs text-success"
+                            onClick={async () => {
+                              if (!companyId) return;
+                              await supabase.from("work_orders").update({ status: "quality_passed" }).eq("id", wo.id);
+                              queryClient.invalidateQueries({ queryKey: ["work-orders"] });
+                              notifyQualityPassed(companyId, wo.wo_number, wo.id);
+                              toast.success(`${wo.wo_number} passed — Warehouse notified`);
+                            }}
+                          >
+                            <CheckCircle2 className="h-3 w-3 mr-1" />Pass
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs text-destructive"
+                            onClick={async () => {
+                              const reason = prompt("Rejection notes:");
+                              if (!reason || !companyId) return;
+                              await (supabase.from("work_orders") as any).update({ status: "quality_failed", rejection_notes: reason }).eq("id", wo.id);
+                              queryClient.invalidateQueries({ queryKey: ["work-orders"] });
+                              notifyBatchFailed(companyId, wo.wo_number, reason, wo.id);
+                              toast.error(`${wo.wo_number} failed — operator notified`);
+                            }}
+                          >
+                            <AlertTriangle className="h-3 w-3 mr-1" />Fail
+                          </Button>
                         </div>
                       )}
                     </div>

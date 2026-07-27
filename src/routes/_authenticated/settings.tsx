@@ -77,7 +77,7 @@ function SettingsPage() {
 
   // Direct profile update (for root/company admin)
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: Record<string, string>) => {
+    mutationFn: async (data: any) => {
       if (!user) throw new Error("Not authenticated");
       const { error } = await supabase.from("profiles").update({
         full_name: data.full_name,
@@ -124,6 +124,7 @@ function SettingsPage() {
 
       if (action === "approved") {
         // Apply the change to the profile
+        // @ts-expect-error — Supabase types reject computed keys
         await supabase.from("profiles").update({
           [req.field_name]: req.requested_value,
         }).eq("id", req.user_id);
@@ -245,7 +246,7 @@ function SettingsPage() {
               <div className="flex justify-end mt-4">
                 <Button
                   className="bg-[image:var(--gradient-primary)] shadow-glow"
-                  onClick={() => updateProfileMutation.mutate(profileForm)}
+                  onClick={() => updateProfileMutation.mutate(profileForm as any)}
                   disabled={updateProfileMutation.isPending}
                 >
                   {updateProfileMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <SaveAll className="h-4 w-4 mr-1.5" />}
@@ -257,7 +258,8 @@ function SettingsPage() {
 
           {/* Change Request Form (for non-admin roles) */}
           {!canEditDirectly && (
-            <Panel title="Request a Change" className="mt-4">
+            <div className="mt-4">
+            <Panel title="Request a Change">
               <div className="text-sm text-muted-foreground mb-4">
                 Need to update your role, email, or department? Submit a change request and your Company Admin will review it.
               </div>
@@ -290,7 +292,7 @@ function SettingsPage() {
                 <div className="space-y-1.5 pt-5">
                   <Button
                     className="w-full"
-                    onClick={() => submitChangeRequestMutation.mutate(changeRequestForm)}
+                    onClick={() => submitChangeRequestMutation.mutate({ field: changeRequestForm.field, value: changeRequestForm.requested_value })}
                     disabled={!changeRequestForm.field || !changeRequestForm.requested_value || submitChangeRequestMutation.isPending}
                   >
                     <Send className="h-4 w-4 mr-1.5" />Submit Request
@@ -298,6 +300,7 @@ function SettingsPage() {
                 </div>
               </div>
             </Panel>
+            </div>
           )}
         </TabsContent>
 

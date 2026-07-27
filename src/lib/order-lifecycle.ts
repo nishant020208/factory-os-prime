@@ -116,7 +116,7 @@ export async function updateSalesOrderStatus(
 
   const { error } = await supabase
     .from("sales_orders")
-    .update(updateData)
+    .update(updateData as any)
     .eq("id", orderId)
     .eq("company_id", companyId);
 

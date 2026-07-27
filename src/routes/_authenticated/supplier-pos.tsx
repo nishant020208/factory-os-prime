@@ -63,7 +63,7 @@ function SupplierPosPage() {
         entity: "purchase_orders",
         entity_id: poId,
         metadata: { notes },
-      });
+      } as any);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["supplier-pos"] });
@@ -89,7 +89,7 @@ function SupplierPosPage() {
         if (error) throw error;
       } else {
         const { error } = await supabase.from("shipments").insert({
-          company_id: companyId,
+          company_id: companyId!,
           shipment_number: `SHIP-${Date.now().toString().slice(-6)}`,
           carrier,
           tracking_number: tracking,

@@ -36,7 +36,7 @@ function ApprovedOrdersPage() {
     queryFn: async () => (await supabase
       .from("customer_orders")
       .select("*, customers!left(business_name, email)")
-      .eq("company_id", companyId)
+      .eq("company_id", companyId!)
       .in("status", ["approved", "material_confirmed", "awaiting_advance_payment", "advance_paid"])
       .order("created_at", { ascending: false })
     ).data ?? [],
@@ -45,7 +45,7 @@ function ApprovedOrdersPage() {
 
   const { data: materials } = useQuery({
     queryKey: ["ao-materials", companyId],
-    queryFn: async () => (await supabase.from("materials").select("*").eq("company_id", companyId).eq("is_active", true).order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("materials").select("*").eq("company_id", companyId!).eq("is_active", true).order("name")).data ?? [],
     enabled: !!companyId,
   });
 

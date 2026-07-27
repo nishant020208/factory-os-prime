@@ -103,7 +103,7 @@ function InvoicesPage() {
 
       // Create payment record
       await supabase.from("payments").insert({
-        company_id: companyId,
+        company_id: companyId!,
         payment_number: `PAY-${Date.now().toString().slice(-6)}`,
         invoice_id: invoice.id,
         customer_id: invoice.customer_id,
