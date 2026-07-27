@@ -71,6 +71,19 @@ function NetworkCanvas() {
   const mouseY = useMotionValue(0);
   const [hovered, setHovered] = useState<number | null>(null);
   const [activePulse, setActivePulse] = useState(0);
+  const [pixelSize, setPixelSize] = useState({ w: 0, h: 0 });
+
+  // Track rendered pixel dimensions for CSS offset-path pixel computation
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setPixelSize({ w: width, h: height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const t = setInterval(() => setActivePulse(p => (p + 1) % CONNECTIONS.length), 1800);
@@ -81,6 +94,20 @@ function NetworkCanvas() {
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect) { mouseX.set((e.clientX - rect.left) / rect.width); mouseY.set((e.clientY - rect.top) / rect.height); }
   }, [mouseX, mouseY]);
+
+  // Convert viewBox (0-100) coordinates to CSS pixel coordinates
+  // CSS Motion Path's `offset-path: path()` interprets coordinates in CSS pixel space,
+  // not SVG viewBox space. This function maps viewBox coords to actual rendered pixels
+  // using the container's measured dimensions and the SVG's preserveAspectRatio logic.
+  const vbToPx = useCallback((vx: number, vy: number): { x: number; y: number } => {
+    const { w, h } = pixelSize;
+    if (w === 0 || h === 0) return { x: vx, y: vy };
+    // viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"
+    const scale = Math.min(w / 100, h / 100);
+    const ox = (w - 100 * scale) / 2;
+    const oy = (h - 100 * scale) / 2;
+    return { x: Math.round(ox + vx * scale), y: Math.round(oy + vy * scale) };
+  }, [pixelSize]);
 
   return (
     <section ref={containerRef} onMouseMove={onMove} className="relative w-full h-[420px] sm:h-[520px] overflow-hidden select-none">
@@ -108,6 +135,13 @@ function NetworkCanvas() {
           const cxVal = +((ax + bx) / 2), cyVal = +((ay + by) / 2);
           const isPulsing = activePulse === i;
           const d = `M${ax} ${ay} C${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${bx} ${by}`;
+          // Compute CSS pixel-space path for offset-path (CSS Motion Path interprets
+          // path coordinates in CSS pixels, not SVG viewBox units)
+          const pA = vbToPx(ax, ay);
+          const pB = vbToPx(bx, by);
+          const pC1 = vbToPx(cpx1, cpy1);
+          const pC2 = vbToPx(cpx2, cpy2);
+          const pixelD = `M${pA.x} ${pA.y} C${pC1.x} ${pC1.y}, ${pC2.x} ${pC2.y}, ${pB.x} ${pB.y}`;
           return (
             <g key={i}>
               {/* Bezier curve — plain numbers match viewBox coordinate space */}
@@ -127,6 +161,7 @@ function NetworkCanvas() {
                 />
               )}
               {/* Flowing data dots along bezier — animate via CSS Motion Path */}
+              {/* Uses pixel-space path (pixelD) so CSS offset-path traces the rendered curve */}
               {Array.from({ length: 3 }).map((_, di) => (
                 <motion.circle
                   key={`dot-${di}`}
@@ -144,7 +179,7 @@ function NetworkCanvas() {
                     ease: "linear",
                   }}
                   style={{
-                    offsetPath: `path("${d}")`,
+                    offsetPath: `path("${pixelD}")`,
                   }}
                 />
               ))}
