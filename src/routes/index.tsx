@@ -97,38 +97,41 @@ function NetworkCanvas() {
       </div>
 
       {/* SVG Connections with bezier curves */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+      {/* viewBox="0 0 100 100" lets us use plain numbers (no % signs) in path d="" —
+          the SVG maps 0..100 to its rendered pixel size automatically */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
         {CONNECTIONS.map(([from, to], i) => {
           const a = NETWORK_NODES[from], b = NETWORK_NODES[to];
           const ax = a.x, ay = a.y, bx = b.x, by = b.y;
-          const cpx1 = `${ax + (bx - ax) * 0.3}%`, cpy1 = `${ay + (by - ay) * 0.1 - 3}%`;
-          const cpx2 = `${ax + (bx - ax) * 0.7}%`, cpy2 = `${by + (ay - by) * 0.1 + 3}%`;
-          const cx = `${(ax + bx) / 2}%`, cy = `${(ay + by) / 2}%`;
+          const cpx1 = +(ax + (bx - ax) * 0.3), cpy1 = +(ay + (by - ay) * 0.1 - 3);
+          const cpx2 = +(ax + (bx - ax) * 0.7), cpy2 = +(by + (ay - by) * 0.1 + 3);
+          const cxVal = +((ax + bx) / 2), cyVal = +((ay + by) / 2);
           const isPulsing = activePulse === i;
+          const d = `M${ax} ${ay} C${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${bx} ${by}`;
           return (
             <g key={i}>
-              {/* Bezier curve instead of straight line */}
+              {/* Bezier curve — plain numbers match viewBox coordinate space */}
               <path
-                d={`M${ax}% ${ay}% C${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${bx}% ${by}%`}
+                d={d}
                 className="stroke-foreground/[0.06]"
                 fill="none"
-                strokeWidth="1"
+                strokeWidth="0.5"
               />
               {isPulsing && (
                 <path
-                  d={`M${ax}% ${ay}% C${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${bx}% ${by}%`}
+                  d={d}
                   className="stroke-primary/15"
                   fill="none"
-                  strokeWidth="1.5"
-                  strokeDasharray="4 6"
+                  strokeWidth="1"
+                  strokeDasharray="2 4"
                 />
               )}
-              {/* Flowing data dots along bezier — all cycle 0%→100% with stagger */}
+              {/* Flowing data dots along bezier — animate via CSS Motion Path */}
               {Array.from({ length: 3 }).map((_, di) => (
                 <motion.circle
                   key={`dot-${di}`}
-                  r="1.5"
-                  className={`fill-primary/40`}
+                  r="0.6"
+                  className="fill-primary/50"
                   initial={{ offsetDistance: "0%" }}
                   animate={{
                     offsetDistance: ["0%", "100%"],
@@ -141,12 +144,12 @@ function NetworkCanvas() {
                     ease: "linear",
                   }}
                   style={{
-                    offsetPath: `path("M${ax}% ${ay}% C${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${bx}% ${by}%")`,
+                    offsetPath: `path("${d}")`,
                   }}
                 />
               ))}
               {/* Mouse-reactive glow on connection */}
-              <ClosestLine cx={cx} cy={cy} mouseX={mouseX} mouseY={mouseY} />
+              <ClosestLine cx={cxVal} cy={cyVal} mouseX={mouseX} mouseY={mouseY} />
             </g>
           );
         })}
@@ -156,13 +159,14 @@ function NetworkCanvas() {
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative w-[90%] h-[90%] max-w-5xl">
           {/* Orbital trail ellipses — drawn behind badges */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
+          {/* viewBox="0 0 100 100" matches the coordinate system used by badges */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
             {NETWORK_NODES.map((node, i) => {
               const dx = node.x - 50;
               const dy = node.y - 50;
               const distPct = Math.sqrt(dx * dx + dy * dy);
-              const rx = distPct * 0.15;
-              const ry = rx * 0.7;
+              const rx = +(distPct * 0.15);
+              const ry = +(rx * 0.7);
               const startAngle = Math.atan2(dy, dx);
               const orbitDur = 25 + (i % 5) * 3;
               const omega = (2 * Math.PI) / orbitDur;
@@ -177,15 +181,15 @@ function NetworkCanvas() {
               return (
                 <ellipse
                   key={node.id}
-                  cx="50%"
-                  cy="50%"
-                  rx={`${rx}%`}
-                  ry={`${ry}%`}
+                  cx={50}
+                  cy={50}
+                  rx={rx}
+                  ry={ry}
                   fill="none"
                   stroke={node.color}
-                  strokeWidth="0.5"
+                  strokeWidth="0.3"
                   strokeOpacity="0.08"
-                  strokeDasharray="2 4"
+                  strokeDasharray="1 3"
                   style={{
                     animation: `orbit-rotate 60s linear infinite, trail-pulse ${orbitDur}s ease-in-out infinite`,
                     animationDelay: `${-(i * 4)}s, ${pulseDelay}s`,
@@ -223,9 +227,9 @@ function NetworkCanvas() {
   );
 }
 
-function ClosestLine({ cx, cy, mouseX, mouseY }: { cx: string; cy: string; mouseX: any; mouseY: any }) {
+function ClosestLine({ cx, cy, mouseX, mouseY }: { cx: number; cy: number; mouseX: any; mouseY: any }) {
   const dist = useTransform(
-    useVelocity(useTransform(mouseX, (v: number) => Math.abs(parseFloat(cx) / 100 - v))),
+    useVelocity(useTransform(mouseX, (v: number) => Math.abs(cx / 100 - v))),
     [0, 0.25], [1, 0]
   );
   const scale = useTransform(dist, [0, 1], [5, 1]);
