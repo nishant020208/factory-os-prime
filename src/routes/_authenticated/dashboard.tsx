@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { primaryRole } from "@/lib/route-access";
+import { safeDate } from "@/lib/utils";
 import type { AppRole } from "@/lib/roles";
 import { ROLE_MAP } from "@/lib/roles";
 import { getDashboardNotes, saveDashboardNote } from "@/lib/order-lifecycle";
@@ -160,7 +161,7 @@ function AIInsights({ items, dashboardType = "default" }: { items: { t: string; 
           <div key={note.id} className="rounded-xl bg-card/40 border border-primary/10 p-3">
             <div className="flex items-center justify-between text-[10px] text-muted-foreground">
               <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" /> Note</span>
-              <span>{new Date(note.created_at).toLocaleDateString()}</span>
+              <span>{safeDate(note.created_at)}</span>
             </div>
             <div className="mt-1 text-sm">{note.content}</div>
           </div>
@@ -174,13 +175,13 @@ function AIInsights({ items, dashboardType = "default" }: { items: { t: string; 
 function WorkflowConnectionPanel() {
   const { companyId } = useAuth();
   const opts = { enabled: !!companyId };
-  const { data: salesOrders } = useQuery({ queryKey: ["wf-so", companyId], queryFn: async () => (await supabase.from("sales_orders").select("so_number,status,priority")).data ?? [], ...opts });
-  const { data: prodOrders } = useQuery({ queryKey: ["wf-po", companyId], queryFn: async () => (await supabase.from("production_orders").select("order_number,status,progress")).data ?? [], ...opts });
-  const { data: shipments } = useQuery({ queryKey: ["wf-shp", companyId], queryFn: async () => (await supabase.from("shipments").select("shipment_number,status")).data ?? [], ...opts });
-  const { data: invoices } = useQuery({ queryKey: ["wf-inv", companyId], queryFn: async () => (await supabase.from("invoices").select("invoice_number,status")).data ?? [], ...opts });
-  const { data: payments } = useQuery({ queryKey: ["wf-pay", companyId], queryFn: async () => (await supabase.from("payments").select("payment_number,status")).data ?? [], ...opts });
-  const { data: inspections } = useQuery({ queryKey: ["wf-qi", companyId], queryFn: async () => (await supabase.from("quality_inspections").select("inspection_number,result")).data ?? [], ...opts });
-  const { data: tickets } = useQuery({ queryKey: ["wf-tkt", companyId], queryFn: async () => (await supabase.from("support_tickets").select("ticket_number,status")).data ?? [], ...opts });
+  const { data: salesOrders } = useQuery({ queryKey: ["wf-so", companyId], queryFn: async () => { try { return (await supabase.from("sales_orders").select("so_number,status,priority")).data ?? []; } catch { console.warn("[dashboard] sales_orders"); return []; } }, ...opts });
+  const { data: prodOrders } = useQuery({ queryKey: ["wf-po", companyId], queryFn: async () => { try { return (await supabase.from("production_orders").select("order_number,status,progress")).data ?? []; } catch { console.warn("[dashboard] production_orders"); return []; } }, ...opts });
+  const { data: shipments } = useQuery({ queryKey: ["wf-shp", companyId], queryFn: async () => { try { return (await supabase.from("shipments").select("shipment_number,status")).data ?? []; } catch { console.warn("[dashboard] shipments"); return []; } }, ...opts });
+  const { data: invoices } = useQuery({ queryKey: ["wf-inv", companyId], queryFn: async () => { try { return (await supabase.from("invoices").select("invoice_number,status")).data ?? []; } catch { console.warn("[dashboard] invoices"); return []; } }, ...opts });
+  const { data: payments } = useQuery({ queryKey: ["wf-pay", companyId], queryFn: async () => { try { return (await supabase.from("payments").select("payment_number,status")).data ?? []; } catch { console.warn("[dashboard] payments"); return []; } }, ...opts });
+  const { data: inspections } = useQuery({ queryKey: ["wf-qi", companyId], queryFn: async () => { try { return (await supabase.from("quality_inspections").select("inspection_number,result")).data ?? []; } catch { console.warn("[dashboard] quality_inspections"); return []; } }, ...opts });
+  const { data: tickets } = useQuery({ queryKey: ["wf-tkt", companyId], queryFn: async () => { try { return (await supabase.from("support_tickets").select("ticket_number,status")).data ?? []; } catch { console.warn("[dashboard] support_tickets"); return []; } }, ...opts });
 
   const soDone = salesOrders?.filter(s => s.status === "completed" || s.status === "delivered").length ?? 0;
   const soTotal = salesOrders?.length ?? 0;
@@ -234,12 +235,14 @@ function PendingApprovalsPanel() {
   const { data: pendingOrders } = useQuery({
     queryKey: ["pending-approvals", companyId],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("sales_orders")
-        .select("*, customers!inner(name)")
-        .eq("status", "pending_approval")
-        .order("created_at", { ascending: false });
-      return data ?? [];
+      try {
+        const { data } = await supabase
+          .from("sales_orders")
+          .select("*, customers!inner(name)")
+          .eq("status", "pending_approval")
+          .order("created_at", { ascending: false });
+        return data ?? [];
+      } catch { return []; }
     },
     enabled: !!companyId,
   });
@@ -270,19 +273,14 @@ function PendingApprovalsPanel() {
 
 /* ─────────── COMPANY ADMIN ─────────── */
 function CompanyAdminDashboard() {
-  const production = useQuery({ queryKey: ["prod-orders-recent"],
-    queryFn: async () => (await supabase.from("production_orders").select("*").order("created_at", { ascending: false }).limit(6)).data ?? [] });
-  const machines = useQuery({ queryKey: ["machines-recent"],
-    queryFn: async () => (await supabase.from("machines").select("*").order("name")).data ?? [] });
-  const products = useQuery({ queryKey: ["products-count"],
-    queryFn: async () => (await supabase.from("products").select("*", { count: "exact", head: true })).count ?? 0 });
-  const customers = useQuery({ queryKey: ["cust-count"],
-    queryFn: async () => (await supabase.from("customers").select("*", { count: "exact", head: true })).count ?? 0 });
-  const employees = useQuery({ queryKey: ["emp-count"],
-    queryFn: async () => (await supabase.from("employees").select("*", { count: "exact", head: true })).count ?? 0 });
+  const production = useQuery({ queryKey: ["prod-orders-recent"], queryFn: async () => { try { return (await supabase.from("production_orders").select("*").order("created_at", { ascending: false }).limit(6)).data ?? []; } catch { return []; } } });
+  const machines = useQuery({ queryKey: ["machines-recent"], queryFn: async () => { try { return (await supabase.from("machines").select("*").order("name")).data ?? []; } catch { return []; } } });
+  const products = useQuery({ queryKey: ["products-count"], queryFn: async () => { try { return (await supabase.from("products").select("*", { count: "exact", head: true })).count ?? 0; } catch { return 0; } } });
+  const customers = useQuery({ queryKey: ["cust-count"], queryFn: async () => { try { return (await supabase.from("customers").select("*", { count: "exact", head: true })).count ?? 0; } catch { return 0; } } });
+  const employees = useQuery({ queryKey: ["emp-count"], queryFn: async () => { try { return (await supabase.from("employees").select("*", { count: "exact", head: true })).count ?? 0; } catch { return 0; } } });
   const { data: changeRequests } = useQuery({
     queryKey: ["change-requests"],
-    queryFn: async () => (await supabase.from("profile_change_requests").select("*").eq("status", "pending").order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () => { try { return (await supabase.from("profile_change_requests").select("*").eq("status", "pending").order("created_at", { ascending: false })).data ?? []; } catch { return []; } },
   });
 
   const outputTrend = trend(14);
@@ -460,11 +458,10 @@ function PlantManagerDashboard() {
 
 /* ─────────── PRODUCTION MANAGER ─────────── */
 function ProductionManagerDashboard() {
-  const orders = useQuery({ queryKey: ["prod-orders"],
-    queryFn: async () => (await supabase.from("production_orders").select("*").order("due_date").limit(8)).data ?? [] });
+  const orders = useQuery({ queryKey: ["prod-orders"], queryFn: async () => { try { return (await supabase.from("production_orders").select("*").order("due_date").limit(8)).data ?? []; } catch { return []; } } });
   const { data: approvedOrders } = useQuery({
     queryKey: ["approved-sales-orders"],
-    queryFn: async () => (await supabase.from("sales_orders").select("*, customers!inner(name)").eq("status", "approved").order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () => { try { return (await supabase.from("sales_orders").select("*, customers!inner(name)").eq("status", "approved").order("created_at", { ascending: false })).data ?? []; } catch { return []; } },
   });
   return (
     <Shell eyebrow="Production" title="Production Planning" sub="Schedule, work orders and capacity for the next 14 days.">
@@ -497,7 +494,7 @@ function ProductionManagerDashboard() {
                 <div key={o.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 py-2.5">
                   <div><div className="font-medium">{o.order_number}</div><div className="text-[11px] text-muted-foreground">Qty {o.quantity}</div></div>
                   <StatusBadge status={o.status} />
-                  <div className="text-xs text-muted-foreground">{o.due_date ? new Date(o.due_date).toLocaleDateString() : "—"}</div>
+                  <div className="text-xs text-muted-foreground">{safeDate(o.due_date)}</div>
                 </div>
               ))}
             </div>
@@ -514,8 +511,7 @@ function ProductionManagerDashboard() {
 
 /* ─────────── WAREHOUSE MANAGER ─────────── */
 function WarehouseDashboard() {
-  const inv = useQuery({ queryKey: ["inv"],
-    queryFn: async () => (await supabase.from("inventory").select("*, products!inner(name,reorder_level)").limit(200)).data ?? [] });
+  const inv = useQuery({ queryKey: ["inv"], queryFn: async () => { try { return (await supabase.from("inventory").select("*, products!inner(name,reorder_level)").limit(200)).data ?? []; } catch { return []; } } });
   const low = inv.data?.filter((i: any) => Number(i.quantity ?? 0) <= Number(i.products?.reorder_level ?? 0)).length ?? 0;
   return (
     <Shell eyebrow="Logistics" title="Warehouse Control" sub="Stock movements, receiving, dispatch and cycle counts.">
@@ -538,8 +534,7 @@ function WarehouseDashboard() {
 
 /* ─────────── PROCUREMENT MANAGER ─────────── */
 function ProcurementDashboard() {
-  const pos = useQuery({ queryKey: ["pos"],
-    queryFn: async () => (await supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }).limit(10)).data ?? [] });
+  const pos = useQuery({ queryKey: ["pos"], queryFn: async () => { try { return (await supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }).limit(10)).data ?? []; } catch { return []; } } });
   return (
     <Shell eyebrow="Procurement" title="Procurement Center" sub="Suppliers, POs, RFQs and goods receipt live view.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -556,7 +551,7 @@ function ProcurementDashboard() {
                 <div key={p.id} className="grid grid-cols-[1fr_auto_auto] gap-3 py-2.5 items-center">
                   <div><div className="font-medium">{p.po_number ?? p.id.slice(0,8)}</div><div className="text-[11px] text-muted-foreground">Total ${Number(p.total_amount ?? 0).toLocaleString()}</div></div>
                   <StatusBadge status={p.status} />
-                  <div className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleDateString()}</div>
+                  <div className="text-xs text-muted-foreground">{safeDate(p.created_at)}</div>
                 </div>
               ))}
             </div>
@@ -594,8 +589,7 @@ function QualityDashboard() {
 
 /* ─────────── MAINTENANCE ENGINEER ─────────── */
 function MaintenanceDashboard() {
-  const machines = useQuery({ queryKey: ["m-machines"],
-    queryFn: async () => (await supabase.from("machines").select("*").order("name")).data ?? [] });
+  const machines = useQuery({ queryKey: ["m-machines"], queryFn: async () => { try { return (await supabase.from("machines").select("*").order("name")).data ?? []; } catch { return []; } } });
   const down = machines.data?.filter(m => m.status === "down" || m.status === "maintenance").length ?? 0;
   return (
     <Shell eyebrow="Maintenance" title="Reliability & Uptime" sub="Predictive maintenance, breakdowns and spare parts.">
@@ -722,8 +716,7 @@ function SupplierDashboard() {
 
 /* ─────────── AUDITOR ─────────── */
 function AuditorDashboard() {
-  const logs = useQuery({ queryKey: ["audit-recent"],
-    queryFn: async () => (await supabase.from("audit_logs").select("*, profiles(full_name)").order("created_at", { ascending: false }).limit(20)).data ?? [] });
+  const logs = useQuery({ queryKey: ["audit-recent"], queryFn: async () => { try { return (await supabase.from("audit_logs").select("*, profiles(full_name)").order("created_at", { ascending: false }).limit(20)).data ?? []; } catch { return []; } } });
   return (
     <Shell eyebrow="Audit" title="Compliance Overview" sub="Read-only view of activity and compliance across the company.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -739,7 +732,7 @@ function AuditorDashboard() {
               <div key={l.id} className="grid grid-cols-[auto_1fr_auto] gap-3 py-2 items-center">
                 <ScrollText className="h-4 w-4 text-muted-foreground" />
                 <div><span className="font-medium">{l.action}</span> <span className="text-muted-foreground">· {l.entity ?? "system"}</span></div>
-                <div className="text-xs text-muted-foreground tabular-nums">{new Date(l.created_at).toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground tabular-nums">{safeDate(l.created_at, true)}</div>
               </div>
             ))}
           </div>

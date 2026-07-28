@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet, Link, createRootRouteWithContext, useRouter, HeadContent, Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -34,25 +34,57 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const [showDetails, setShowDetails] = useState(false);
   useEffect(() => { reportLovableError(error, { boundary: "tanstack_root_error_component" }); }, [error]);
+
+  // Extract meaningful error info
+  const errorMessage = error?.message || "Unknown error";
+  const errorName = error?.name || "Error";
+  const errorStack = error?.stack || "";
+  const isAuthError = errorMessage.includes("supabase") || errorMessage.includes("auth") || errorMessage.includes("session");
+  const isNetworkError = errorMessage.includes("fetch") || errorMessage.includes("network") || errorMessage.includes("Failed to fetch");
+  const isTableMissing = errorMessage.includes("relation") || errorMessage.includes("does not exist") || errorMessage.includes("42P01");
+
+  let hint = "";
+  if (isAuthError) hint = "There was an authentication issue. Try signing out and back in.";
+  else if (isNetworkError) hint = "A network request failed. Check your connection and try again.";
+  else if (isTableMissing) hint = "A database table is missing. Contact your system administrator.";
+  else hint = "An unexpected error occurred. Retrying usually resolves it.";
+
   return (
     <div className="flex min-h-screen items-center justify-center aurora-bg px-4">
       <div className="glass-strong rounded-2xl px-10 py-14 max-w-md text-center shadow-elegant">
-        <h1 className="text-xl font-semibold">This module didn't load</h1>
+        <h1 className="text-xl font-semibold">This page didn't load</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          FactoryOS hit a transient error. You can retry or head back to the operations home.
+          {hint}
         </p>
+        <div className="mt-2 text-xs text-muted-foreground/50 font-mono bg-card/50 rounded-lg px-3 py-2 truncate max-w-full">
+          {errorName}: {errorMessage.substring(0, 100)}
+        </div>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => { router.invalidate(); reset(); }}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-all"
           >
             Retry
           </button>
-          <a href="/" className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted">
+          <a href="/" className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted transition-all">
             Home
           </a>
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted transition-all"
+          >
+            {showDetails ? "Hide details" : "Details"}
+          </button>
         </div>
+        {showDetails && errorStack && (
+          <div className="mt-4 text-left">
+            <pre className="text-[10px] text-muted-foreground/60 bg-card/80 rounded-lg p-3 overflow-auto max-h-40 whitespace-pre-wrap break-all">
+              {errorStack}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );
