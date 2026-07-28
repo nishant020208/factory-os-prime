@@ -28,6 +28,8 @@ import { useNotifications, setNavigateHandler } from "@/hooks/use-notifications"
 import { ROLE_MAP } from "@/lib/roles";
 import { navForRole } from "@/components/nav-config";
 import { primaryRole, homeForRole } from "@/lib/route-access";
+import { useI18n } from "@/lib/i18n";
+import { LoadingScreen } from "@/components/loading-screen";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
