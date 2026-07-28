@@ -89,17 +89,19 @@ function FactorySidebar() {
       <SidebarContent className="scrollbar-thin">
         {sections.map((section) => (
           <SidebarGroup key={section.label}>
-            {!collapsed && <SidebarGroupLabel>{section.label}</SidebarGroupLabel>}
+            {!collapsed && <SidebarGroupLabel>{t(section.label)}</SidebarGroupLabel>}
             <SidebarGroupContent>
               <SidebarMenu>
                 {section.items.map((it) => {
                   const active = pathname === it.to || (it.to !== home && pathname.startsWith(it.to + "/"));
+                  const label = t(it.label);
                   return (
                     <SidebarMenuItem key={it.to}>
-                      <SidebarMenuButton asChild isActive={active} tooltip={it.label}>
+                      <SidebarMenuButton asChild isActive={active} tooltip={label}>
                         <Link to={it.to} onClick={closeMobile} className="flex items-center gap-2">
                           <it.icon className="h-4 w-4" />
-                          {!collapsed && <span className="truncate">{it.label}</span>}
+                          {!collapsed && <span className="truncate">{label}</span>}
+
                           {!collapsed && it.badge && (
                             <Badge variant="secondary" className="ml-auto text-[10px] py-0 h-4">{it.badge}</Badge>
                           )}
