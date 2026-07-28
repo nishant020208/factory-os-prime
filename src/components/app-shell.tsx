@@ -294,13 +294,14 @@ function TopBar() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {role !== "root_super_admin" && (
-              <DropdownMenuItem asChild><Link to="/settings"><Settings className="h-3.5 w-3.5 mr-2" />Settings</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/settings"><Settings className="h-3.5 w-3.5 mr-2" />{t("Settings")}</Link></DropdownMenuItem>
             )}
             {role === "root_super_admin" && (
               <DropdownMenuItem asChild><Link to="/platform/settings"><Settings className="h-3.5 w-3.5 mr-2" />Platform Settings</Link></DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={signOut} className="text-destructive"><LogOut className="h-3.5 w-3.5 mr-2" />Sign out</DropdownMenuItem>
+            <DropdownMenuItem onClick={signOut} className="text-destructive"><LogOut className="h-3.5 w-3.5 mr-2" />{t("Sign out")}</DropdownMenuItem>
+
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
