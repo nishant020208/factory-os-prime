@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+import { safeDate } from "@/lib/utils";
 import { useI18n, LOCALES, type Locale } from "@/lib/i18n";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -392,7 +393,7 @@ function SettingsPage() {
                       New: <span className="text-primary font-medium">{req.requested_value}</span>
                     </div>
                     <div className="text-[10px] text-muted-foreground mt-0.5">
-                      {new Date(req.created_at).toLocaleString()}
+                      {safeDate(req.created_at, true)}
                     </div>
                   </div>
                   <div className="flex gap-1 shrink-0">

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Panel } from "@/components/ui-parts";
 import { ModuleCopilot } from "@/components/module-status";
+import { safeDate } from "@/lib/utils";
 import { ScrollText } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/platform/audit")({
@@ -26,7 +27,7 @@ function PlatformAudit() {
               <ScrollText className="h-4 w-4 text-muted-foreground" />
               <div><span className="font-medium">{l.action}</span> <span className="text-muted-foreground">· {l.entity ?? "system"}</span></div>
               <div className="text-[11px] text-muted-foreground font-mono">{l.company_id?.slice(0,8) ?? "platform"}</div>
-              <div className="text-xs text-muted-foreground tabular-nums">{new Date(l.created_at).toLocaleString()}</div>
+              <div className="text-xs text-muted-foreground tabular-nums">{safeDate(l.created_at, true)}</div>
             </div>
           ))}
           {data?.length === 0 && <div className="py-8 text-xs text-muted-foreground text-center">No audit events yet.</div>}

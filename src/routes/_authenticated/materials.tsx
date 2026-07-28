@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useState } from "react";
+import { safeDate } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/materials")({
   head: () => ({ meta: [
@@ -131,7 +132,7 @@ function MaterialsPage() {
                 <TableCell>{m.unit}</TableCell>
                 <TableCell className="font-mono text-xs">${Number(m.unit_cost ?? 0).toFixed(2)}</TableCell>
                 <TableCell><StatusBadge status={m.is_active ? "active" : "inactive"} /></TableCell>
-                <TableCell className="text-xs text-muted-foreground">{new Date(m.created_at).toLocaleDateString()}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{safeDate(m.created_at)}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {

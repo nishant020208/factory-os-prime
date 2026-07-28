@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useState, useRef } from "react";
+import { safeDate } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/documents")({
   head: () => ({ meta: [
@@ -181,7 +182,7 @@ function DocumentsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{new Date(doc.created_at).toLocaleDateString()}</span>
+                  <span className="text-xs text-muted-foreground">{safeDate(doc.created_at)}</span>
                   {doc.file_url && (
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.open(doc.file_url, "_blank")}>
                       <Eye className="h-3.5 w-3.5" />
@@ -227,7 +228,7 @@ function DocumentsPage() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <StatusBadge status={doc.status ?? "published"} />
-                  <span className="text-xs text-muted-foreground hidden sm:inline">{new Date(doc.created_at).toLocaleDateString()}</span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">{safeDate(doc.created_at)}</span>
                   {doc.file_url && (
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.open(doc.file_url, "_blank")}>
                       <Download className="h-3.5 w-3.5" />

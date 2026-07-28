@@ -16,6 +16,7 @@ import { adjustInventory } from "@/lib/order-lifecycle";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { useState } from "react";
+import { safeDate } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/inventory")({
   head: () => ({ meta: [
@@ -249,7 +250,7 @@ function InventoryPage() {
                   {adj.reason}
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-0.5">
-                  {new Date(adj.created_at).toLocaleString()}
+                  {safeDate(adj.created_at, true)}
                 </div>
               </div>
             ))}

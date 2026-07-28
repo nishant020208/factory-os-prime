@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { safeDate } from "@/lib/utils";
 import { Building2, CheckCircle2, XCircle, Loader2, Timer, Mail, Globe, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Panel, Kpi, StatusBadge } from "@/components/ui-parts";
@@ -164,7 +165,7 @@ function PendingPage() {
                         {reg.phone && <span>Phone: {reg.phone}</span>}
                       </div>
                       <div className="text-[10px] text-muted-foreground mt-1">
-                        Registered {new Date(reg.created_at).toLocaleString()}
+                        Registered {safeDate(reg.created_at, true)}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0 ml-4">

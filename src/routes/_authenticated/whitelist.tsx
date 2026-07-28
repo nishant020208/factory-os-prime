@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { safeDate } from "@/lib/utils";
 import { FileCheck2, Plus, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Panel, StatusBadge, Kpi } from "@/components/ui-parts";
@@ -115,7 +116,7 @@ function WhitelistPage() {
                   <TableCell className="font-medium">{w.email}</TableCell>
                   <TableCell className="capitalize text-muted-foreground">{w.role.replace(/_/g, " ")}</TableCell>
                   <TableCell><StatusBadge status={w.status} /></TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{new Date(w.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{safeDate(w.created_at)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

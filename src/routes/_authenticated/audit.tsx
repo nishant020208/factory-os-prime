@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Panel } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
+import { safeDate } from "@/lib/utils";
 import { ScrollText } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/audit")({
@@ -30,7 +31,7 @@ function AuditPage() {
               <div key={l.id} className="grid grid-cols-[auto_1fr_auto] gap-3 py-2 items-center">
                 <ScrollText className="h-4 w-4 text-muted-foreground" />
                 <div><span className="font-medium">{l.action}</span> <span className="text-muted-foreground">· {l.entity ?? "system"}</span></div>
-                <div className="text-xs text-muted-foreground tabular-nums">{new Date(l.created_at).toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground tabular-nums">{safeDate(l.created_at, true)}</div>
               </div>
             ))}
           </div>
