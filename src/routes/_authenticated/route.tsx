@@ -1,22 +1,35 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
+import { RouteLoading } from "@/components/route-loading";
 import { canAccess, homeForRole, primaryRole } from "@/lib/route-access";
 import type { AppRole } from "@/lib/roles";
 import { I18nProvider } from "@/lib/i18n";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
+  pendingComponent: () => (
+    <AppShell>
+      <RouteLoading label="Loading module..." />
+    </AppShell>
+  ),
+  pendingMs: 100,
+  pendingMinMs: 200,
   beforeLoad: async ({ location }) => {
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) {
       throw redirect({ to: "/auth", search: { redirect: location.href } });
     }
-    const { data: rolesData } = await supabase
+    const { data: rolesData, error: rolesError } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", data.user.id);
-    const roles = (rolesData ?? []).map(r => r.role as AppRole);
+    // Graceful fallback: if roles query fails, try profiles
+    let roles: AppRole[] = [];
+    if (!rolesError && rolesData) {
+      roles = rolesData.map(r => r.role as AppRole);
+    }
     const role = primaryRole(roles);
 
     if (role === "root_super_admin" && !location.pathname.startsWith("/platform")) {
@@ -31,7 +44,58 @@ export const Route = createFileRoute("/_authenticated")({
     return { user: data.user, roles, role };
   },
   component: Layout,
+  errorComponent: AuthErrorBoundary,
 });
+
+function AuthErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const msg = error?.message || "Unknown error";
+  const isAuthError = msg.includes("auth") || msg.includes("session") || msg.includes("JWT");
+  const isNotFound = msg.includes("relation") || msg.includes("does not exist") || msg.includes("42P01");
+  const hint = isAuthError
+    ? "🔑 Your session may have expired. Try signing out and back in."
+    : isNotFound
+    ? "🗄️ A database table wasn't found. The data may be loading from a different source or the page is still being set up. Try navigating to another tab and back."
+    : "⚠️ An unexpected error occurred. Retrying usually resolves it.";
+
+  return (
+    <AppShell>
+      <div className="max-w-[600px] mx-auto py-20 px-4 text-center">
+        <div className="glass rounded-2xl p-10 shadow-card">
+          <h2 className="text-lg font-semibold mb-2">This module didn't load</h2>
+          <p className="text-sm text-muted-foreground mb-4">{hint}</p>
+          <div className="flex justify-center gap-3 mb-4">
+            <button
+              onClick={() => { reset(); }}
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-all"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => window.history.back()}
+              className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted transition-all"
+            >
+              Go back
+            </button>
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted transition-all"
+            >
+              {expanded ? "Hide" : "Details"}
+            </button>
+          </div>
+          {expanded && (
+            <div className="text-left">
+              <pre className="text-[10px] text-muted-foreground/60 bg-card/80 rounded-lg p-3 overflow-auto max-h-32 whitespace-pre-wrap break-all">
+                {msg.slice(0, 500)}
+              </pre>
+            </div>
+          )}
+        </div>
+      </div>
+    </AppShell>
+  );
+}
 
 function Layout() {
   const { role } = Route.useRouteContext();

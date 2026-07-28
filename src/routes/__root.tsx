@@ -41,15 +41,20 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const errorMessage = error?.message || "Unknown error";
   const errorName = error?.name || "Error";
   const errorStack = error?.stack || "";
-  const isAuthError = errorMessage.includes("supabase") || errorMessage.includes("auth") || errorMessage.includes("session");
-  const isNetworkError = errorMessage.includes("fetch") || errorMessage.includes("network") || errorMessage.includes("Failed to fetch");
-  const isTableMissing = errorMessage.includes("relation") || errorMessage.includes("does not exist") || errorMessage.includes("42P01");
+  const isAuthError = errorMessage.includes("supabase") || errorMessage.includes("auth") || errorMessage.includes("session") || errorMessage.includes("JWT");
+  const isNetworkError = errorMessage.includes("fetch") || errorMessage.includes("network") || errorMessage.includes("Failed to fetch") || errorMessage.includes("networkerror");
+  const isTableMissing = errorMessage.includes("relation") || errorMessage.includes("does not exist") || errorMessage.includes("42P01") || errorMessage.includes("not found");
+  const isRlsError = errorMessage.includes("permission") || errorMessage.includes("policy") || errorMessage.includes("violates row-level");
+  const isQueryError = errorMessage.includes("query") || errorMessage.includes("Database") || errorMessage.includes("select") || errorName === "PostgrestError" || errorMessage.includes("column");
 
   let hint = "";
-  if (isAuthError) hint = "There was an authentication issue. Try signing out and back in.";
-  else if (isNetworkError) hint = "A network request failed. Check your connection and try again.";
-  else if (isTableMissing) hint = "A database table is missing. Contact your system administrator.";
-  else hint = "An unexpected error occurred. Retrying usually resolves it.";
+  if (isAuthError) hint = "🔑 Your session may have expired. Try signing out and back in. If the issue persists, clear your browser cache.";
+  else if (isTableMissing) hint = "🗄️ A database table wasn't found. This usually means a migration hasn't been applied yet or the data is loading from a different source. Try navigating to another tab and back.";
+  else if (isNetworkError) hint = "🌐 A network request failed. Check your connection and try again. If you're using a VPN, try disabling it.";
+  else if (isRlsError) hint = "🔒 Your role may not have permission to access this data. Try signing in with a different role or contact your system administrator.";
+  else if (isQueryError) hint = "📊 A database query failed. The page you're trying to access may reference a table or column that doesn't match the current schema. The development team has been notified.";
+  else if (errorMessage.includes("transform") || errorMessage.includes("parse") || errorMessage.includes("JSON")) hint = "🔄 Data format mismatch detected. This is usually a temporary issue — retrying should resolve it.";
+  else hint = "⚠️ An unexpected error occurred. Retrying usually resolves it. If not, try navigating to another section and coming back.";
 
   return (
     <div className="flex min-h-screen items-center justify-center aurora-bg px-4">
@@ -58,7 +63,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <p className="mt-2 text-sm text-muted-foreground">
           {hint}
         </p>
-        <div className="mt-2 text-xs text-muted-foreground/50 font-mono bg-card/50 rounded-lg px-3 py-2 truncate max-w-full">
+        <div className="mt-3 text-xs text-muted-foreground/50 font-mono bg-card/50 rounded-lg px-3 py-2 truncate max-w-full">
           {errorName}: {errorMessage.substring(0, 100)}
         </div>
         <div className="mt-6 flex flex-wrap justify-center gap-2">

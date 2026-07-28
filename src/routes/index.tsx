@@ -924,23 +924,33 @@ const WORKFLOW_STAGES = [
 ];
 
 function Workflow() {
+  const sectionRef = useRef<HTMLElement>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const playTimerRef = useRef<number | null>(null);
+  const lastScrollIdx = useRef(-1);
 
-  // Ambient auto-advance
+  // Pause ambient timer while section is in view (scroll-driven takes over)
+  const [sectionInView, setSectionInView] = useState(false);
   useEffect(() => {
-    if (playing) return; // don't run ambient when playing
-    const t = setInterval(() => setActiveIdx(i => (i + 1) % WORKFLOW_STAGES.length), 2200);
-    return () => clearInterval(t);
-  }, [playing]);
+    const el = sectionRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => setSectionInView(entry.isIntersecting),
+      { threshold: 0.05 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   // Watch workflow auto-play
   useEffect(() => {
     const onPlay = () => {
       if (playing) return;
       setPlaying(true);
+      setScrollProgress(0);
       setActiveIdx(0);
       setExpanded(0);
 
@@ -948,7 +958,6 @@ function Workflow() {
       playTimerRef.current = window.setInterval(() => {
         step++;
         if (step >= WORKFLOW_STAGES.length) {
-          // Finished — reset
           setPlaying(false);
           setExpanded(null);
           if (playTimerRef.current) {
@@ -958,6 +967,7 @@ function Workflow() {
           return;
         }
         setActiveIdx(step);
+        setScrollProgress((step + 1) / WORKFLOW_STAGES.length);
         setExpanded(step);
       }, 1200);
     };
@@ -969,8 +979,55 @@ function Workflow() {
     };
   }, [playing]);
 
+  // Scroll-driven animation: IntersectionObserver + ResizeObserver + scroll progress
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+
+    let winH = window.innerHeight;
+
+    const onResize = () => { winH = window.innerHeight; };
+    window.addEventListener("resize", onResize);
+
+    const onScroll = () => {
+      if (playing) return;
+      const rect = el.getBoundingClientRect();
+      // Progress: 0 when section bottom enters viewport, 1 when section top leaves
+      const totalVisible = rect.height + winH;
+      const scrolledPast = winH - rect.top;
+      const pct = Math.max(0, Math.min(1, scrolledPast / totalVisible));
+      setScrollProgress(pct);
+      const idx = Math.min(Math.floor(pct * WORKFLOW_STAGES.length), WORKFLOW_STAGES.length - 1);
+      if (idx !== lastScrollIdx.current) {
+        lastScrollIdx.current = idx;
+        setActiveIdx(idx);
+      }
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    // Initial measurement (synchronous to avoid initial 0-width flash)
+    onScroll();
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, [playing]);
+
+  // Ambient auto-advance timer: only runs when section is NOT mid-scroll (so it doesn't fight scroll)
+  useEffect(() => {
+    if (playing) return;
+    if (sectionInView && scrollProgress > 0.02 && scrollProgress < 0.98) {
+      return; // scroll position is driving the stage — pause timer
+    }
+    const t = setInterval(() => {
+      setActiveIdx(i => (i + 1) % WORKFLOW_STAGES.length);
+    }, 2200);
+    return () => clearInterval(t);
+  }, [playing, sectionInView, scrollProgress]);
+
   return (
-    <section id="flow" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-border">
+    <section ref={sectionRef} id="flow" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-border">
       <SectionHeader
         eyebrow="Manufacturing Workflow"
         title="From order to delivery"
@@ -982,11 +1039,8 @@ function Workflow() {
           <div className="w-full h-full bg-foreground/[0.06]" />
           <motion.div
             className="absolute inset-y-0 left-0 h-full"
-            animate={{
-              width: `${((activeIdx + 1) / WORKFLOW_STAGES.length) * 100}%`,
-            }}
-            transition={{ type: "spring", stiffness: 100, damping: 20 }}
             style={{
+              width: `${scrollProgress * 100}%`,
               background: `linear-gradient(90deg, ${WORKFLOW_STAGES[activeIdx].color}, ${WORKFLOW_STAGES[activeIdx].color} 60%, transparent)`,
             }}
           />
@@ -1362,7 +1416,17 @@ function BentoModuleTile({ m, index, onHover }: { m: BentoModule; index: number;
   const countRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  // Spring-driven 3D tilt
+  // Reduced motion check
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  // Spring-driven 3D tilt (disabled for reduced motion)
   const tiltX = useMotionValue(0);
   const tiltY = useMotionValue(0);
   const springTiltX = useSpring(tiltX, { stiffness: 200, damping: 18 });
@@ -1391,13 +1455,14 @@ function BentoModuleTile({ m, index, onHover }: { m: BentoModule; index: number;
                   }, []);
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (reducedMotion) return;
     const el = buttonRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width - 0.5;
     const y = (e.clientY - r.top) / r.height - 0.5;
     tiltX.set(x * 8);
-    tiltY.set(-y * 8);
+    tiltY.set(y * 8);
   };
 
   const handleMouseEnter = () => {
@@ -1412,8 +1477,10 @@ function BentoModuleTile({ m, index, onHover }: { m: BentoModule; index: number;
 
   const isTwoCol = m.size === "2x1";
 
-  // Glow background position — tracks cursor tilt for holographic sweep (extracted for hook rules)
-  const tiltBgPos = useTransform(springTiltX, [-4, 4], ["100% 50%", "0% 50%"]);
+  // Glow background position — tracks cursor tilt for holographic sweep, both axes
+  const tiltBgPosX = useTransform(springTiltX, [-4, 4], ["100%", "0%"]);
+  const tiltBgPosY = useTransform(springTiltY, [-4, 4], ["100%", "0%"]);
+  const tiltBgPos = useTransform([tiltBgPosX, tiltBgPosY], (vals: string[]) => `${vals[0]} ${vals[1]}`);
   const glowColor = m.colorHex.replace(")", " / 0.13)");
 
   return (
@@ -1435,9 +1502,9 @@ function BentoModuleTile({ m, index, onHover }: { m: BentoModule; index: number;
           isTwoCol ? "p-5" : "p-4"
         } h-full bg-muted/30 group`}
         style={{
-          rotateX: springTiltY,
-          rotateY: springTiltX,
-          perspective: 600,
+          rotateX: reducedMotion ? 0 : springTiltY,
+          rotateY: reducedMotion ? 0 : springTiltX,
+          perspective: reducedMotion ? "none" : 600,
           transformStyle: "preserve-3d",
         }}
       >
