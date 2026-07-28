@@ -173,7 +173,7 @@ function TopBar() {
   }
 
   const roleLabel = role ? ROLE_MAP[role]?.label : "";
-  const tenantLabel = role === "root_super_admin" ? "Platform" : (companyId ? "Your Company" : "—");
+  const tenantLabel = role === "root_super_admin" ? t("Platform") : (companyId ? t("Your Company") : "—");
 
   return (
     <>
@@ -190,11 +190,12 @@ function TopBar() {
           className="ml-auto flex items-center gap-2 text-xs text-muted-foreground bg-card/60 border border-white/5 rounded-lg px-2 sm:px-3 h-9 hover:border-primary/30 transition min-w-[40px] sm:min-w-[220px]"
         >
           <Search className="h-3.5 w-3.5 shrink-0" />
-          <span className="hidden sm:inline flex-1 text-left">Search…</span>
+          <span className="hidden sm:inline flex-1 text-left">{t("Search…")}</span>
           <kbd className="hidden sm:flex text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 items-center gap-0.5">
             <Command className="h-2.5 w-2.5" />K
           </kbd>
         </button>
+
 
         {/* 3-way theme switcher - visible as segmented control on wide screens */}
         <div className="hidden lg:flex items-center bg-card/60 border border-white/5 rounded-lg p-0.5 gap-0">
