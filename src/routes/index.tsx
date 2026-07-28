@@ -71,19 +71,46 @@ function NetworkCanvas() {
   const mouseY = useMotionValue(0);
   const [hovered, setHovered] = useState<number | null>(null);
   const [activePulse, setActivePulse] = useState(0);
-  const [pixelSize, setPixelSize] = useState({ w: 0, h: 0 });
+  const [badgePositions, setBadgePositions] = useState<Record<string, {x: number, y: number}>>({});
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
-  // Track rendered pixel dimensions for CSS offset-path pixel computation
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      setPixelSize({ w: width, h: height });
+  // Track badge pixel positions via getBoundingClientRect relative to inner container
+  const updateBadgePositions = useCallback(() => {
+    const section = containerRef.current;
+    if (!section) return;
+    const inner = section.querySelector('[data-badges-container]') as HTMLElement | null;
+    if (!inner) return;
+    const innerRect = inner.getBoundingClientRect();
+    if (innerRect.width === 0 || innerRect.height === 0) return;
+
+    const pos: Record<string, {x: number, y: number}> = {};
+    const els = section.querySelectorAll('[data-node-id]');
+    els.forEach(el => {
+      const id = el.getAttribute('data-node-id');
+      if (!id) return;
+      const rect = el.getBoundingClientRect();
+      // Position is center of badge element relative to inner container
+      pos[id] = {
+        x: rect.left + rect.width / 2 - innerRect.left,
+        y: rect.top + rect.height / 2 - innerRect.top,
+      };
     });
-    ro.observe(el);
-    return () => ro.disconnect();
+    setBadgePositions(pos);
+    setContainerSize({ w: innerRect.width, h: innerRect.height });
   }, []);
+
+  // ResizeObserver on container + inner to recalculate badge positions dynamically
+  useEffect(() => {
+    const section = containerRef.current;
+    if (!section) return;
+    const ro = new ResizeObserver(() => updateBadgePositions());
+    ro.observe(section);
+    const inner = section.querySelector('[data-badges-container]');
+    if (inner) ro.observe(inner);
+    // Initial measurement
+    requestAnimationFrame(updateBadgePositions);
+    return () => ro.disconnect();
+  }, [updateBadgePositions]);
 
   useEffect(() => {
     const t = setInterval(() => setActivePulse(p => (p + 1) % CONNECTIONS.length), 1800);
@@ -94,20 +121,6 @@ function NetworkCanvas() {
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect) { mouseX.set((e.clientX - rect.left) / rect.width); mouseY.set((e.clientY - rect.top) / rect.height); }
   }, [mouseX, mouseY]);
-
-  // Convert viewBox (0-100) coordinates to CSS pixel coordinates
-  // CSS Motion Path's `offset-path: path()` interprets coordinates in CSS pixel space,
-  // not SVG viewBox space. This function maps viewBox coords to actual rendered pixels
-  // using the container's measured dimensions and the SVG's preserveAspectRatio logic.
-  const vbToPx = useCallback((vx: number, vy: number): { x: number; y: number } => {
-    const { w, h } = pixelSize;
-    if (w === 0 || h === 0) return { x: vx, y: vy };
-    // viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"
-    const scale = Math.min(w / 100, h / 100);
-    const ox = (w - 100 * scale) / 2;
-    const oy = (h - 100 * scale) / 2;
-    return { x: Math.round(ox + vx * scale), y: Math.round(oy + vy * scale) };
-  }, [pixelSize]);
 
   return (
     <section ref={containerRef} onMouseMove={onMove} className="relative w-full h-[420px] sm:h-[520px] overflow-hidden select-none">
@@ -125,29 +138,57 @@ function NetworkCanvas() {
 
       {/* Nodes wrapper — centered 90% container for badges + connections */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="relative w-[90%] h-[90%] max-w-5xl">
+        <div data-badges-container className="relative w-[90%] h-[90%] max-w-5xl">
 
-          {/* SVG Connections with bezier curves — inside the same 90% container as badges
-              so viewBox 0-100 aligns with badge left/top percentage positions */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+          {/* SVG Connections with bezier curves — NO viewBox, using pixel coordinates
+              from getBoundingClientRect so paths match badge DOM positions on any screen size.
+              ResizeObserver triggers full recalculation on resize. */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" style={{ overflow: 'visible' }}>
             {CONNECTIONS.map(([from, to], i) => {
               const a = NETWORK_NODES[from], b = NETWORK_NODES[to];
-              const ax = a.x, ay = a.y, bx = b.x, by = b.y;
-              const cpx1 = +(ax + (bx - ax) * 0.3), cpy1 = +(ay + (by - ay) * 0.1 - 3);
-              const cpx2 = +(ax + (bx - ax) * 0.7), cpy2 = +(by + (ay - by) * 0.1 + 3);
-              const cxVal = +((ax + bx) / 2), cyVal = +((ay + by) / 2);
+              const pa = badgePositions[a.id];
+              const pb = badgePositions[b.id];
+              // Fallback: use percentage-based viewBox estimate if pixel positions not yet available
+              if (!pa || !pb) {
+                const { w, h } = containerSize;
+                const scaleX = w / 100, scaleY = h / 100;
+                const ax = a.x * scaleX, ay = a.y * scaleY;
+                const bx = b.x * scaleX, by = b.y * scaleY;
+                const cpx1 = ax + (bx - ax) * 0.3, cpy1 = ay + (by - ay) * 0.1 - 3;
+                const cpx2 = ax + (bx - ax) * 0.7, cpy2 = by + (ay - by) * 0.1 + 3;
+                const d = `M${ax} ${ay} C${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${bx} ${by}`;
+                const cxMid = (ax + bx) / 2, cyMid = (ay + by) / 2;
+                return (
+                  <g key={i}>
+                    <path d={d} className="stroke-foreground/[0.06]" fill="none" strokeWidth="0.5" />
+                    {activePulse === i && (
+                      <path d={d} className="stroke-primary/15" fill="none" strokeWidth="1" strokeDasharray="2 4" />
+                    )}
+                    {Array.from({ length: 3 }).map((_, di) => (
+                      <motion.circle
+                        key={`dot-${di}`}
+                        r="0.6"
+                        className="fill-primary/50"
+                        initial={{ offsetDistance: "0%" }}
+                        animate={{ offsetDistance: ["0%", "100%"], opacity: [0, 0.8, 0] }}
+                        transition={{ duration: 3, repeat: Infinity, delay: -di * 1.0, ease: "linear" }}
+                        style={{ offsetPath: `path("${d}")` }}
+                      />
+                    ))}
+                    <ClosestLine cx={cxMid} cy={cyMid} cw={w} ch={h} mouseX={mouseX} mouseY={mouseY} />
+                  </g>
+                );
+              }
+              const { x: ax, y: ay } = pa;
+              const { x: bx, y: by } = pb;
+              const cpx1 = ax + (bx - ax) * 0.3, cpy1 = ay + (by - ay) * 0.1 - 3;
+              const cpx2 = ax + (bx - ax) * 0.7, cpy2 = by + (ay - by) * 0.1 + 3;
               const isPulsing = activePulse === i;
               const d = `M${ax} ${ay} C${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${bx} ${by}`;
-              // Compute CSS pixel-space path for offset-path (CSS Motion Path interprets
-              // path coordinates in CSS pixels, not SVG viewBox units)
-              const pA = vbToPx(ax, ay);
-              const pB = vbToPx(bx, by);
-              const pC1 = vbToPx(cpx1, cpy1);
-              const pC2 = vbToPx(cpx2, cpy2);
-              const pixelD = `M${pA.x} ${pA.y} C${pC1.x} ${pC1.y}, ${pC2.x} ${pC2.y}, ${pB.x} ${pB.y}`;
+              const cxMid = (ax + bx) / 2, cyMid = (ay + by) / 2;
               return (
                 <g key={i}>
-                  {/* Bezier curve — plain numbers match viewBox coordinate space */}
+                  {/* Bezier curve — pixel coordinates from getBoundingClientRect */}
                   <path
                     d={d}
                     className="stroke-foreground/[0.06]"
@@ -163,7 +204,7 @@ function NetworkCanvas() {
                       strokeDasharray="2 4"
                     />
                   )}
-                  {/* Flowing data dots along bezier — animate via CSS Motion Path */}
+                  {/* Flowing data dots along bezier — same pixel path for CSS offset-path */}
                   {Array.from({ length: 3 }).map((_, di) => (
                     <motion.circle
                       key={`dot-${di}`}
@@ -181,12 +222,12 @@ function NetworkCanvas() {
                         ease: "linear",
                       }}
                       style={{
-                        offsetPath: `path("${pixelD}")`,
+                        offsetPath: `path("${d}")`,
                       }}
                     />
                   ))}
                   {/* Mouse-reactive glow on connection */}
-                  <ClosestLine cx={cxVal} cy={cyVal} mouseX={mouseX} mouseY={mouseY} />
+                  <ClosestLine cx={cxMid} cy={cyMid} cw={containerSize.w} ch={containerSize.h} mouseX={mouseX} mouseY={mouseY} />
                 </g>
               );
             })}
@@ -261,9 +302,14 @@ function NetworkCanvas() {
   );
 }
 
-function ClosestLine({ cx, cy, mouseX, mouseY }: { cx: number; cy: number; mouseX: any; mouseY: any }) {
+function ClosestLine({ cx, cy, cw, ch, mouseX, mouseY }: { cx: number; cy: number; cw: number; ch: number; mouseX: any; mouseY: any }) {
+  // Normalize pixel coordinates to 0-1 for distance comparison with mouseX/mouseY (0-1 range)
+  const normX = cw > 0 ? cx / cw : 0.5;
+  const normY = ch > 0 ? cy / ch : 0.5;
+  const distX = useTransform(mouseX, (v: number) => Math.abs(normX - v));
+  const distY = useTransform(mouseY, (v: number) => Math.abs(normY - v));
   const dist = useTransform(
-    useVelocity(useTransform(mouseX, (v: number) => Math.abs(cx / 100 - v))),
+    useVelocity(distX),
     [0, 0.25], [1, 0]
   );
   const scale = useTransform(dist, [0, 1], [5, 1]);
@@ -374,6 +420,7 @@ function NodeItem({ node, index, hovered, onHover, mouseX, mouseY }: {
 
   return (
     <motion.button
+      data-node-id={node.id}
       style={{ x: composedX, y: composedY, left: `${node.x}%`, top: `${node.y}%` }}
       onMouseEnter={() => onHover(index)}
       onMouseLeave={() => onHover(null)}
