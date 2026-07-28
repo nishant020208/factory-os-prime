@@ -145,6 +145,7 @@ function TopBar() {
   const router = useRouter();
   const { profile, roles, companyId } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
   const { unreadCount } = useNotifications();
   // Register TanStack Router navigate handler for in-app navigation (no full page reloads)
   useEffect(() => {
