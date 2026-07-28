@@ -32,6 +32,8 @@ import { useI18n } from "@/lib/i18n";
 import { LoadingScreen } from "@/components/loading-screen";
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { loading } = useAuth();
+  if (loading) return <LoadingScreen />;
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full aurora-bg">
@@ -53,6 +55,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     </SidebarProvider>
   );
 }
+
 
 function FactorySidebar() {
   const { state, setOpenMobile } = useSidebar();
