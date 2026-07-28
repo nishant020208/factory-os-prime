@@ -123,76 +123,75 @@ function NetworkCanvas() {
         </svg>
       </div>
 
-      {/* SVG Connections with bezier curves */}
-      {/* viewBox="0 0 100 100" lets us use plain numbers (no % signs) in path d="" —
-          the SVG maps 0..100 to its rendered pixel size automatically */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
-        {CONNECTIONS.map(([from, to], i) => {
-          const a = NETWORK_NODES[from], b = NETWORK_NODES[to];
-          const ax = a.x, ay = a.y, bx = b.x, by = b.y;
-          const cpx1 = +(ax + (bx - ax) * 0.3), cpy1 = +(ay + (by - ay) * 0.1 - 3);
-          const cpx2 = +(ax + (bx - ax) * 0.7), cpy2 = +(by + (ay - by) * 0.1 + 3);
-          const cxVal = +((ax + bx) / 2), cyVal = +((ay + by) / 2);
-          const isPulsing = activePulse === i;
-          const d = `M${ax} ${ay} C${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${bx} ${by}`;
-          // Compute CSS pixel-space path for offset-path (CSS Motion Path interprets
-          // path coordinates in CSS pixels, not SVG viewBox units)
-          const pA = vbToPx(ax, ay);
-          const pB = vbToPx(bx, by);
-          const pC1 = vbToPx(cpx1, cpy1);
-          const pC2 = vbToPx(cpx2, cpy2);
-          const pixelD = `M${pA.x} ${pA.y} C${pC1.x} ${pC1.y}, ${pC2.x} ${pC2.y}, ${pB.x} ${pB.y}`;
-          return (
-            <g key={i}>
-              {/* Bezier curve — plain numbers match viewBox coordinate space */}
-              <path
-                d={d}
-                className="stroke-foreground/[0.06]"
-                fill="none"
-                strokeWidth="0.5"
-              />
-              {isPulsing && (
-                <path
-                  d={d}
-                  className="stroke-primary/15"
-                  fill="none"
-                  strokeWidth="1"
-                  strokeDasharray="2 4"
-                />
-              )}
-              {/* Flowing data dots along bezier — animate via CSS Motion Path */}
-              {/* Uses pixel-space path (pixelD) so CSS offset-path traces the rendered curve */}
-              {Array.from({ length: 3 }).map((_, di) => (
-                <motion.circle
-                  key={`dot-${di}`}
-                  r="0.6"
-                  className="fill-primary/50"
-                  initial={{ offsetDistance: "0%" }}
-                  animate={{
-                    offsetDistance: ["0%", "100%"],
-                    opacity: [0, 0.8, 0],
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    delay: -di * 1.0,
-                    ease: "linear",
-                  }}
-                  style={{
-                    offsetPath: `path("${pixelD}")`,
-                  }}
-                />
-              ))}
-              {/* Mouse-reactive glow on connection */}
-              <ClosestLine cx={cxVal} cy={cyVal} mouseX={mouseX} mouseY={mouseY} />
-            </g>
-          );
-        })}
-      </svg>
-
-      {/* Nodes */}
+      {/* Nodes wrapper — centered 90% container for badges + connections */}
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative w-[90%] h-[90%] max-w-5xl">
+
+          {/* SVG Connections with bezier curves — inside the same 90% container as badges
+              so viewBox 0-100 aligns with badge left/top percentage positions */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+            {CONNECTIONS.map(([from, to], i) => {
+              const a = NETWORK_NODES[from], b = NETWORK_NODES[to];
+              const ax = a.x, ay = a.y, bx = b.x, by = b.y;
+              const cpx1 = +(ax + (bx - ax) * 0.3), cpy1 = +(ay + (by - ay) * 0.1 - 3);
+              const cpx2 = +(ax + (bx - ax) * 0.7), cpy2 = +(by + (ay - by) * 0.1 + 3);
+              const cxVal = +((ax + bx) / 2), cyVal = +((ay + by) / 2);
+              const isPulsing = activePulse === i;
+              const d = `M${ax} ${ay} C${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${bx} ${by}`;
+              // Compute CSS pixel-space path for offset-path (CSS Motion Path interprets
+              // path coordinates in CSS pixels, not SVG viewBox units)
+              const pA = vbToPx(ax, ay);
+              const pB = vbToPx(bx, by);
+              const pC1 = vbToPx(cpx1, cpy1);
+              const pC2 = vbToPx(cpx2, cpy2);
+              const pixelD = `M${pA.x} ${pA.y} C${pC1.x} ${pC1.y}, ${pC2.x} ${pC2.y}, ${pB.x} ${pB.y}`;
+              return (
+                <g key={i}>
+                  {/* Bezier curve — plain numbers match viewBox coordinate space */}
+                  <path
+                    d={d}
+                    className="stroke-foreground/[0.06]"
+                    fill="none"
+                    strokeWidth="0.5"
+                  />
+                  {isPulsing && (
+                    <path
+                      d={d}
+                      className="stroke-primary/15"
+                      fill="none"
+                      strokeWidth="1"
+                      strokeDasharray="2 4"
+                    />
+                  )}
+                  {/* Flowing data dots along bezier — animate via CSS Motion Path */}
+                  {Array.from({ length: 3 }).map((_, di) => (
+                    <motion.circle
+                      key={`dot-${di}`}
+                      r="0.6"
+                      className="fill-primary/50"
+                      initial={{ offsetDistance: "0%" }}
+                      animate={{
+                        offsetDistance: ["0%", "100%"],
+                        opacity: [0, 0.8, 0],
+                      }}
+                      transition={{
+                        duration: 3,
+                        repeat: Infinity,
+                        delay: -di * 1.0,
+                        ease: "linear",
+                      }}
+                      style={{
+                        offsetPath: `path("${pixelD}")`,
+                      }}
+                    />
+                  ))}
+                  {/* Mouse-reactive glow on connection */}
+                  <ClosestLine cx={cxVal} cy={cyVal} mouseX={mouseX} mouseY={mouseY} />
+                </g>
+              );
+            })}
+          </svg>
+
           {/* Orbital trail ellipses — drawn behind badges */}
           {/* viewBox="0 0 100 100" matches the coordinate system used by badges */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
