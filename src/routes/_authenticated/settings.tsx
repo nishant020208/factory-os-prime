@@ -214,35 +214,108 @@ function SettingsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Email</Label>
-                <Input value={profileForm.email} disabled className="h-10 opacity-70" />
-                <div className="text-[10px] text-muted-foreground">Email changes require Company Admin approval</div>
+                {canEditDirectly ? (
+                  <Input value={profileForm.email} disabled className="h-10 opacity-70" />
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <Input value={profileForm.email} disabled className="h-10 opacity-70" />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-10 shrink-0"
+                        onClick={() => submitChangeRequestMutation.mutate({ field: "email", value: profileForm.email })}
+                      >
+                        <Send className="h-3 w-3 mr-1" />Request
+                      </Button>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">Email changes require Company Admin approval</div>
+                  </>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Phone</Label>
-                <Input
-                  value={profileForm.phone}
-                  onChange={(e) => setProfileForm(f => ({ ...f, phone: e.target.value }))}
-                  placeholder="+1 555-0123"
-                  className="h-10"
-                />
+                {canEditDirectly ? (
+                  <Input
+                    value={profileForm.phone}
+                    onChange={(e) => setProfileForm(f => ({ ...f, phone: e.target.value }))}
+                    placeholder="+1 555-0123"
+                    className="h-10"
+                  />
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      value={profileForm.phone}
+                      onChange={(e) => setProfileForm(f => ({ ...f, phone: e.target.value }))}
+                      placeholder="+1 555-0123"
+                      className="h-10"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-10 shrink-0"
+                      onClick={() => submitChangeRequestMutation.mutate({ field: "phone", value: profileForm.phone })}
+                    >
+                      <Send className="h-3 w-3 mr-1" />Request
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Job Title</Label>
-                <Input
-                  value={profileForm.job_title}
-                  onChange={(e) => setProfileForm(f => ({ ...f, job_title: e.target.value }))}
-                  placeholder="e.g. CNC Operator"
-                  className="h-10"
-                />
+                {canEditDirectly ? (
+                  <Input
+                    value={profileForm.job_title}
+                    onChange={(e) => setProfileForm(f => ({ ...f, job_title: e.target.value }))}
+                    placeholder="e.g. CNC Operator"
+                    className="h-10"
+                  />
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      value={profileForm.job_title}
+                      onChange={(e) => setProfileForm(f => ({ ...f, job_title: e.target.value }))}
+                      placeholder="e.g. CNC Operator"
+                      className="h-10"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-10 shrink-0"
+                      onClick={() => submitChangeRequestMutation.mutate({ field: "job_title", value: profileForm.job_title })}
+                    >
+                      <Send className="h-3 w-3 mr-1" />Request
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label className="text-xs text-muted-foreground">Avatar URL</Label>
-                <Input
-                  value={profileForm.avatar_url}
-                  onChange={(e) => setProfileForm(f => ({ ...f, avatar_url: e.target.value }))}
-                  placeholder="https://example.com/avatar.jpg"
-                  className="h-10"
-                />
+                {canEditDirectly ? (
+                  <Input
+                    value={profileForm.avatar_url}
+                    onChange={(e) => setProfileForm(f => ({ ...f, avatar_url: e.target.value }))}
+                    placeholder="https://example.com/avatar.jpg"
+                    className="h-10"
+                  />
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      value={profileForm.avatar_url}
+                      onChange={(e) => setProfileForm(f => ({ ...f, avatar_url: e.target.value }))}
+                      placeholder="https://example.com/avatar.jpg"
+                      className="h-10"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-10 shrink-0"
+                      onClick={() => submitChangeRequestMutation.mutate({ field: "avatar_url", value: profileForm.avatar_url })}
+                    >
+                      <Send className="h-3 w-3 mr-1" />Request
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
             {canEditDirectly && (
