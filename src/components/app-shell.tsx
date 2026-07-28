@@ -59,6 +59,7 @@ function FactorySidebar() {
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { roles } = useAuth();
+  const { t } = useI18n();
   const role = useMemo(() => primaryRole(roles), [roles]);
   const sections = useMemo(() => navForRole(role), [role]);
   const home = homeForRole(role);
@@ -66,6 +67,7 @@ function FactorySidebar() {
   function closeMobile() {
     setOpenMobile(false);
   }
+
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
