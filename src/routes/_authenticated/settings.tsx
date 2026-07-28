@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+import { useI18n, LOCALES, type Locale } from "@/lib/i18n";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [
