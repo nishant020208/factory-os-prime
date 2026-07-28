@@ -31,6 +31,7 @@ const APPROVAL_FIELDS = ["email", "role", "department"];
 function SettingsPage() {
   const queryClient = useQueryClient();
   const { profile, user, roles, companyId } = useAuth();
+  const { locale, setLocale, t } = useI18n();
   const [tab, setTab] = useState("profile");
   const [profileForm, setProfileForm] = useState({
     full_name: "",
