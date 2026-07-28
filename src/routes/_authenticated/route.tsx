@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
 import { canAccess, homeForRole, primaryRole } from "@/lib/route-access";
 import type { AppRole } from "@/lib/roles";
+import { I18nProvider } from "@/lib/i18n";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -11,7 +12,6 @@ export const Route = createFileRoute("/_authenticated")({
     if (error || !data.user) {
       throw redirect({ to: "/auth", search: { redirect: location.href } });
     }
-    // Load roles to enforce role-based routing.
     const { data: rolesData } = await supabase
       .from("user_roles")
       .select("role")
@@ -19,15 +19,12 @@ export const Route = createFileRoute("/_authenticated")({
     const roles = (rolesData ?? []).map(r => r.role as AppRole);
     const role = primaryRole(roles);
 
-    // Root Super Admin is platform-only — force redirect off ERP paths.
     if (role === "root_super_admin" && !location.pathname.startsWith("/platform")) {
       throw redirect({ to: "/platform" });
     }
-    // Non-root trying to access /platform → send to their dashboard.
     if (role !== "root_super_admin" && location.pathname.startsWith("/platform")) {
       throw redirect({ to: homeForRole(role) });
     }
-    // General role-gate for other paths.
     if (!canAccess(location.pathname, roles)) {
       throw redirect({ to: homeForRole(role) });
     }
@@ -37,9 +34,15 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function Layout() {
+  const { role } = Route.useRouteContext();
+  // Root Super Admin is locked to English — language switch cannot affect
+  // other companies or the platform console.
+  const forceLocale = role === "root_super_admin" ? ("en" as const) : undefined;
   return (
-    <AppShell>
-      <Outlet />
-    </AppShell>
+    <I18nProvider forceLocale={forceLocale}>
+      <AppShell>
+        <Outlet />
+      </AppShell>
+    </I18nProvider>
   );
 }

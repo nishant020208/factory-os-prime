@@ -28,8 +28,12 @@ import { useNotifications, setNavigateHandler } from "@/hooks/use-notifications"
 import { ROLE_MAP } from "@/lib/roles";
 import { navForRole } from "@/components/nav-config";
 import { primaryRole, homeForRole } from "@/lib/route-access";
+import { useI18n } from "@/lib/i18n";
+import { LoadingScreen } from "@/components/loading-screen";
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { loading } = useAuth();
+  if (loading) return <LoadingScreen />;
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full aurora-bg">
@@ -52,11 +56,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
+
 function FactorySidebar() {
   const { state, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { roles } = useAuth();
+  const { t } = useI18n();
   const role = useMemo(() => primaryRole(roles), [roles]);
   const sections = useMemo(() => navForRole(role), [role]);
   const home = homeForRole(role);
@@ -64,6 +70,7 @@ function FactorySidebar() {
   function closeMobile() {
     setOpenMobile(false);
   }
+
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
@@ -85,17 +92,19 @@ function FactorySidebar() {
       <SidebarContent className="scrollbar-thin">
         {sections.map((section) => (
           <SidebarGroup key={section.label}>
-            {!collapsed && <SidebarGroupLabel>{section.label}</SidebarGroupLabel>}
+            {!collapsed && <SidebarGroupLabel>{t(section.label)}</SidebarGroupLabel>}
             <SidebarGroupContent>
               <SidebarMenu>
                 {section.items.map((it) => {
                   const active = pathname === it.to || (it.to !== home && pathname.startsWith(it.to + "/"));
+                  const label = t(it.label);
                   return (
                     <SidebarMenuItem key={it.to}>
-                      <SidebarMenuButton asChild isActive={active} tooltip={it.label}>
+                      <SidebarMenuButton asChild isActive={active} tooltip={label}>
                         <Link to={it.to} onClick={closeMobile} className="flex items-center gap-2">
                           <it.icon className="h-4 w-4" />
-                          {!collapsed && <span className="truncate">{it.label}</span>}
+                          {!collapsed && <span className="truncate">{label}</span>}
+
                           {!collapsed && it.badge && (
                             <Badge variant="secondary" className="ml-auto text-[10px] py-0 h-4">{it.badge}</Badge>
                           )}
@@ -139,6 +148,7 @@ function TopBar() {
   const router = useRouter();
   const { profile, roles, companyId } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
   const { unreadCount } = useNotifications();
   // Register TanStack Router navigate handler for in-app navigation (no full page reloads)
   useEffect(() => {
@@ -166,7 +176,7 @@ function TopBar() {
   }
 
   const roleLabel = role ? ROLE_MAP[role]?.label : "";
-  const tenantLabel = role === "root_super_admin" ? "Platform" : (companyId ? "Your Company" : "—");
+  const tenantLabel = role === "root_super_admin" ? t("Platform") : (companyId ? t("Your Company") : "—");
 
   return (
     <>
@@ -183,11 +193,12 @@ function TopBar() {
           className="ml-auto flex items-center gap-2 text-xs text-muted-foreground bg-card/60 border border-white/5 rounded-lg px-2 sm:px-3 h-9 hover:border-primary/30 transition min-w-[40px] sm:min-w-[220px]"
         >
           <Search className="h-3.5 w-3.5 shrink-0" />
-          <span className="hidden sm:inline flex-1 text-left">Search…</span>
+          <span className="hidden sm:inline flex-1 text-left">{t("Search…")}</span>
           <kbd className="hidden sm:flex text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 items-center gap-0.5">
             <Command className="h-2.5 w-2.5" />K
           </kbd>
         </button>
+
 
         {/* 3-way theme switcher - visible as segmented control on wide screens */}
         <div className="hidden lg:flex items-center bg-card/60 border border-white/5 rounded-lg p-0.5 gap-0">
@@ -286,13 +297,14 @@ function TopBar() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {role !== "root_super_admin" && (
-              <DropdownMenuItem asChild><Link to="/settings"><Settings className="h-3.5 w-3.5 mr-2" />Settings</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/settings"><Settings className="h-3.5 w-3.5 mr-2" />{t("Settings")}</Link></DropdownMenuItem>
             )}
             {role === "root_super_admin" && (
               <DropdownMenuItem asChild><Link to="/platform/settings"><Settings className="h-3.5 w-3.5 mr-2" />Platform Settings</Link></DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={signOut} className="text-destructive"><LogOut className="h-3.5 w-3.5 mr-2" />Sign out</DropdownMenuItem>
+            <DropdownMenuItem onClick={signOut} className="text-destructive"><LogOut className="h-3.5 w-3.5 mr-2" />{t("Sign out")}</DropdownMenuItem>
+
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

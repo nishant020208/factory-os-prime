@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+import { useI18n, LOCALES, type Locale } from "@/lib/i18n";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [
@@ -30,6 +31,7 @@ const APPROVAL_FIELDS = ["email", "role", "department"];
 function SettingsPage() {
   const queryClient = useQueryClient();
   const { profile, user, roles, companyId } = useAuth();
+  const { locale, setLocale, t } = useI18n();
   const [tab, setTab] = useState("profile");
   const [profileForm, setProfileForm] = useState({
     full_name: "",
@@ -347,19 +349,22 @@ function SettingsPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Language</Label>
-                <Select defaultValue="en">
+                <Label className="text-xs text-muted-foreground">{t("Language")}</Label>
+                <Select value={locale} onValueChange={(v) => { setLocale(v as Locale); toast.success("Language updated"); }}>
                   <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="es">Spanish</SelectItem>
-                    <SelectItem value="de">German</SelectItem>
-                    <SelectItem value="ja">Japanese</SelectItem>
+                    {LOCALES.map(l => (
+                      <SelectItem key={l.code} value={l.code}>
+                        <span className="mr-2">{l.flag}</span>{l.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                <div className="text-[10px] text-muted-foreground">Affects navigation, menus and shared UI labels for your account.</div>
               </div>
+
             </div>
           </Panel>
         </TabsContent>
