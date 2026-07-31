@@ -2595,7 +2595,7 @@ function TopNav() {
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-        scrolled ? "bg-background/85 backdrop-blur-xl border-b border-border shadow-sm" : "bg-transparent"
+        scrolled ? "bg-background border-b border-border shadow-sm" : "bg-transparent"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-6">
@@ -2700,7 +2700,7 @@ function TopNav() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="lg:hidden fixed inset-0 z-50 bg-background/98 backdrop-blur-xl"
+            className="lg:hidden fixed inset-0 z-50 bg-background"
           >
             <div className="flex items-center justify-between h-14 px-4 border-b border-border">
               <span className="text-sm font-medium text-foreground">Menu</span>
