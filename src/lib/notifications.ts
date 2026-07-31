@@ -238,7 +238,7 @@ export const NOTIFICATION_COUNTS_BY_ROLE: Record<string, number> = {
  *   violating the "no broadcast" rule.
  */
 export async function fireNotification(
-  companyId: string,
+  companyId: string | null,
   toRole: string | null,
   toUser: string | null,
   title: string,
@@ -271,10 +271,13 @@ export async function fireNotification(
 
 /** Trigger 1+2: Company registration request / Root approves */
 export async function notifyCompanyRegistrationRequest(companyId: string, businessName: string) {
-  await fireNotification(companyId, "root_super_admin", null,
+  // The pending registration's id is NOT a companies(id) yet (the company
+  // only exists after Root approves), so company_id must be null here to
+  // avoid a foreign-key violation. Root sees it via to_role.
+  await fireNotification(null, "root_super_admin", null,
     "🏢 New Company Registration",
     `"${businessName}" has submitted a registration request. Review in Pending Requests.`,
-    "info", "companies", companyId);
+    "info", "company_registrations", companyId);
 }
 
 export async function notifyCompanyRegistrationApproved(companyId: string, adminUserId: string) {
