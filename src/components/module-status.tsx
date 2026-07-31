@@ -105,7 +105,7 @@ export function ModuleCopilot({ moduleName }: { moduleName: string }) {
                   : "bg-primary/10 border border-primary/20 rounded-xl p-3 ml-8"
                 }`}
               >
-                {msg.text}
+            {msg.text.replace(/\*\*/g, "")}
               </motion.div>
             ))}
             {loading && (

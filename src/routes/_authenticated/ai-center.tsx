@@ -96,7 +96,7 @@ function AICenter() {
                     {m.role === "user" ? <MessageCircle className="h-3 w-3" /> : <BrainCircuit className="h-3 w-3" />}
                     {m.role === "user" ? "You" : `Copilot${m.conf ? ` · ${m.conf}% conf.` : ""}`}
                   </div>
-                  <div className="whitespace-pre-wrap leading-relaxed">{m.text}</div>
+                  <div className="whitespace-pre-wrap leading-relaxed">{m.text.replace(/\*\*/g, "")}</div>
                 </div>
               </motion.div>
             ))}

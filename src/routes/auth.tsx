@@ -361,7 +361,7 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
             <FloatingLabelField icon={Building2} label="Company Name *" value={form.company_name} onChange={(v) => setForm(f => ({ ...f, company_name: v }))} />
             <FloatingLabelField icon={Mail} label="Your Email *" value={form.email} onChange={(v) => setForm(f => ({ ...f, email: v }))} type="email" />
             <FloatingLabelField icon={UserPlus} label="Your Full Name *" value={form.full_name} onChange={(v) => setForm(f => ({ ...f, full_name: v }))} />
-            <FloatingLabelField icon={Globe} label="Phone" value={form.phone} onChange={(v) => setForm(f => ({ ...f, phone: v }))} />
+            <PhoneField value={form.phone} onChange={(v) => setForm(f => ({ ...f, phone: v }))} />
             <FloatingSelectField
               icon={Globe}
               label="Country"
@@ -508,13 +508,13 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
           <FloatingLabelField icon={Building2} label="Business Name *" value={form.business_name} onChange={(v) => setForm(f => ({ ...f, business_name: v }))} />
           <FloatingLabelField icon={UserPlus} label="Contact Person *" value={form.contact_person} onChange={(v) => setForm(f => ({ ...f, contact_person: v }))} />
           <FloatingLabelField icon={Mail} label="Contact Email *" value={form.email} onChange={(v) => setForm(f => ({ ...f, email: v }))} type="email" />
-          <FloatingLabelField icon={Globe} label="Phone" value={form.phone} onChange={(v) => setForm(f => ({ ...f, phone: v }))} />
+          <PhoneField value={form.phone} onChange={(v) => setForm(f => ({ ...f, phone: v }))} />
           <FloatingLabelField icon={ShieldCheck} label="GST / Business Reg. No." value={form.gst_number} onChange={(v) => setForm(f => ({ ...f, gst_number: v }))} />
           <FloatingLabelField icon={Building2} label="Billing Address" value={form.address} onChange={(v) => setForm(f => ({ ...f, address: v }))} />
 
           <RippleButton
             type="submit"
-            disabled={busy || !form.company_id || !form.business_name || !form.contact_person || !form.email}
+            disabled={busy || !form.company_id || !form.business_name || !form.contact_person || !form.email || form.phone.length > 0 && form.phone.length !== 10}
             className="w-full h-11 rounded-lg bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-600 text-white font-medium shadow-glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit Access Request"}
@@ -1141,6 +1141,82 @@ function PasswordStrengthField({ value, onChange }: { value: string; onChange: (
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────── */
+/*  PHONE FIELD — 10-digit validation                  */
+/* ───────────────────────────────────────────────────── */
+function PhoneField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [focused, setFocused] = useState(false);
+  const digits = value.replace(/\D/g, "");
+  const isValid = digits.length === 0 || digits.length === 10;
+  const error = value.length > 0 && !isValid ? "Phone must be exactly 10 digits" : "";
+
+  const labelY = useMotionValue((focused || digits.length > 0) ? -18 : 0);
+  const labelS = useMotionValue((focused || digits.length > 0) ? 0.78 : 1);
+  const springY = useSpring(labelY, { stiffness: 280, damping: 28 });
+  const springS = useSpring(labelS, { stiffness: 280, damping: 28 });
+
+  useEffect(() => {
+    const isUp = focused || digits.length > 0;
+    labelY.set(isUp ? -18 : 0);
+    labelS.set(isUp ? 0.78 : 1);
+  }, [focused, digits.length, labelY, labelS]);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value;
+    const cleaned = raw.replace(/\D/g, "").slice(0, 10);
+    onChange(cleaned);
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="relative group">
+        {focused && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-primary/40 via-accent/30 to-primary/40 blur-[2px] z-0"
+            style={{ backgroundSize: "200% 100%", animation: "shimmer 3s linear infinite" }}
+          />
+        )}
+        <div className="relative z-10">
+          <Globe className={`h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 z-20 ${
+            focused ? "text-primary" : "text-muted-foreground"
+          }`} />
+          <motion.label
+            style={{ y: springY, scale: springS, transformOrigin: "left center" }}
+            className={`absolute left-9 top-3.5 text-sm pointer-events-none z-20 ${
+              focused ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            Phone (10 digits)
+          </motion.label>
+          <Input
+            value={digits}
+            type="tel"
+            onChange={handleChange}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            className={`pl-9 pt-4 pb-1.5 h-11 bg-background/40 border-border/60 focus:ring-1 transition-all duration-200 relative z-10 ${
+              error ? "border-red-500/50 focus:border-red-500/50 focus:ring-red-500/20" : "focus:border-primary/50 focus:ring-primary/20"
+            }`}
+            placeholder=""
+          />
+        </div>
+      </div>
+      {error && (
+        <motion.p
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-[11px] px-1 text-red-400"
+        >
+          {error}
+        </motion.p>
+      )}
     </div>
   );
 }
