@@ -15,6 +15,11 @@ import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { safeDate } from "@/lib/utils";
 import { useI18n, LOCALES, type Locale } from "@/lib/i18n";
+import {
+  notifyChangeRequest,
+  notifyChangeRequestApproved,
+  notifyChangeRequestRejected,
+} from "@/lib/notifications";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [
@@ -78,6 +83,22 @@ function SettingsPage() {
     enabled: !!companyId && isRootOrCompanyAdmin,
   });
 
+  // My own change requests (visible to any role for tracking their request status)
+  const { data: myRequests } = useQuery({
+    queryKey: ["my-change-requests", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data } = await supabase
+        .from("profile_change_requests")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      return data ?? [];
+    },
+    enabled: !!user && !isRootOrCompanyAdmin,
+  });
+
   // Direct profile update (for root/company admin)
   const updateProfileMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -101,19 +122,26 @@ function SettingsPage() {
   const submitChangeRequestMutation = useMutation({
     mutationFn: async ({ field, value }: { field: string; value: string }) => {
       if (!user || !companyId) throw new Error("Not authenticated");
-      const { error } = await supabase.from("profile_change_requests").insert({
-        company_id: companyId,
-        user_id: user.id,
-        field_name: field,
-        current_value: profile?.[field as keyof typeof profile] ?? "",
-        requested_value: value,
-        status: "pending",
-      });
+      const { data: inserted, error } = await supabase
+        .from("profile_change_requests")
+        .insert({
+          company_id: companyId,
+          user_id: user.id,
+          field_name: field,
+          current_value: profile?.[field as keyof typeof profile] ?? "",
+          requested_value: value,
+          status: "pending",
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+
+      // Notify Company Admin that a new change request is awaiting review
+      await notifyChangeRequest(companyId, profile?.full_name ?? user.email ?? "A user", inserted?.id ?? "");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["change-requests"] });
-      toast.success("Change request submitted for approval");
+      toast.success("Change request submitted — your Company Admin has been notified");
       setChangeRequestForm({ field: "", requested_value: "" });
     },
     onError: (err: any) => toast.error(err.message),
@@ -139,6 +167,13 @@ function SettingsPage() {
         approver_id: user?.id,
         resolved_at: new Date().toISOString(),
       }).eq("id", requestId);
+
+      // Notify the requester of the decision (targeted to them only — no broadcast)
+      if (action === "approved") {
+        await notifyChangeRequestApproved(companyId ?? "", req.user_id, req.field_name?.replace(/_/g, " ") ?? "");
+      } else {
+        await notifyChangeRequestRejected(companyId ?? "", req.user_id, req.field_name?.replace(/_/g, " ") ?? "", "Not approved by Company Admin");
+      }
 
       queryClient.invalidateQueries({ queryKey: ["change-requests"] });
       toast.success(action === "approved" ? "Change approved" : "Change rejected");
@@ -334,7 +369,7 @@ function SettingsPage() {
 
           {/* Change Request Form (for non-admin roles) */}
           {!canEditDirectly && (
-            <div className="mt-4">
+            <div className="mt-4 space-y-4">
             <Panel title="Request a Change">
               <div className="text-sm text-muted-foreground mb-4">
                 Need to update your role, email, or department? Submit a change request and your Company Admin will review it.
@@ -376,6 +411,31 @@ function SettingsPage() {
                 </div>
               </div>
             </Panel>
+            </div>
+          )}
+
+          {/* My Pending Requests (requester visibility into their own request status) */}
+          {!canEditDirectly && (myRequests?.length ?? 0) > 0 && (
+            <div className="mt-4">
+              <Panel title="My Requests">
+                <div className="space-y-2">
+                  {(myRequests ?? []).map((req: any) => (
+                    <div key={req.id} className="flex items-center justify-between gap-3 rounded-lg bg-card/60 border border-white/5 px-3 py-2.5">
+                      <div className="min-w-0">
+                        <div className="text-sm">
+                          <span className="capitalize">{req.field_name?.replace(/_/g, " ")}</span>
+                          <span className="text-muted-foreground"> → </span>
+                          <span className="font-medium">{req.requested_value}</span>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          {safeDate(req.created_at, true)} · {req.status === "pending" ? "Awaiting Company Admin approval" : `Resolved`}
+                        </div>
+                      </div>
+                      <StatusBadge status={req.status} />
+                    </div>
+                  ))}
+                </div>
+              </Panel>
             </div>
           )}
         </TabsContent>

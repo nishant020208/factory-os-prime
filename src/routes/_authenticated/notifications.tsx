@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Bell, CheckCheck, Info, AlertTriangle, CheckCircle2, XCircle,
   Clock, ExternalLink, Loader2, Inbox, ChevronRight, HelpCircle,
-  Send, ShieldAlert,
+  Send, ShieldAlert, Building2,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated/notifications")({
   head: () => ({ meta: [
@@ -126,7 +128,7 @@ function TriggerReferencePanel({ role }: { role: string | null }) {
   );
 }
 
-function SendNotificationForm({ companyId, senderRole }: { companyId: string | null; senderRole: string | null }) {
+function SendNotificationForm({ companyId, senderRole, isMainAdmin }: { companyId: string | null; senderRole: string | null; isMainAdmin: boolean }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -134,7 +136,9 @@ function SendNotificationForm({ companyId, senderRole }: { companyId: string | n
   const [severity, setSeverity] = useState<NotificationSeverity>("info");
   const [sending, setSending] = useState(false);
 
-  const availableRoles = ROLES.filter((r) => r.id !== senderRole);
+  // Only the designated MAIN-ADMIN may send a manual message to Root Super Admin.
+  // Enforced in the UI here AND at the RLS layer (notifications_insert_main_admin_only).
+  const availableRoles = ROLES.filter((r) => r.id !== senderRole && (r.id !== "root_super_admin" || isMainAdmin));
 
   function toggleRole(roleId: string) {
     setSelectedRoles((prev) =>
@@ -279,9 +283,67 @@ function SendNotificationForm({ companyId, senderRole }: { companyId: string | n
   );
 }
 
+function RootNotificationsFeed() {
+  const { data: registrations } = useQuery({
+    queryKey: ["root-notif-registrations"],
+    queryFn: async () => {
+      try {
+        const { data } = await supabase
+          .from("company_registrations")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(25);
+        return data ?? [];
+      } catch { return []; }
+    },
+  });
+  const pending = (registrations ?? []).filter((r: any) => r.status === "pending").length;
+
+  return (
+    <Panel title="Company Registration Requests" right={
+      <span className="text-[10px] text-primary flex items-center gap-1"><Building2 className="h-3 w-3" />{pending} pending</span>
+    }>
+      {!registrations?.length ? (
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <Inbox className="h-12 w-12 mb-3 opacity-30" />
+          <div className="text-sm">No company registration requests yet</div>
+          <div className="text-xs mt-1">New registrations will appear here in real time.</div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {(registrations ?? []).map((reg: any) => {
+            const sev: NotificationSeverity =
+              reg.status === "pending" ? "warning" :
+              reg.status === "approved" ? "success" : "error";
+            return (
+              <div key={reg.id} className="rounded-xl border border-white/5 bg-card/60 p-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <div className={cn("h-8 w-8 rounded-lg grid place-items-center shrink-0", sev === "warning" ? "bg-amber-500/10" : sev === "success" ? "bg-emerald-500/10" : "bg-rose-500/10")}>
+                    {severityIcon(sev)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium truncate">🏢 {reg.company_name}</span>
+                      <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{timeAgo(reg.created_at)}</span>
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      {reg.email}{reg.industry ? ` · ${reg.industry}` : ""} · status: <span className="capitalize">{reg.status}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 function NotificationsPage() {
-  const { companyId, roles } = useAuth();
+  const { companyId, roles, isMainAdmin } = useAuth();
   const role = primaryRole(roles);
+  const isRoot = role === "root_super_admin";
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications();
   const roleLabel = role ? ROLE_MAP[role]?.label : "";
 
@@ -324,9 +386,13 @@ function NotificationsPage() {
 
       <TriggerReferencePanel role={role} />
 
-      <SendNotificationForm companyId={companyId} senderRole={role} />
+      {isRoot ? (
+        <RootNotificationsFeed />
+      ) : (
+        <SendNotificationForm companyId={companyId} senderRole={role} isMainAdmin={isMainAdmin} />
+      )}
 
-      {loading ? (
+      {isRoot ? null : loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>

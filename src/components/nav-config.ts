@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import type { AppRole } from "@/lib/roles";
 
-export interface NavItem { to: string; label: string; icon: LucideIcon; badge?: string }
+export interface NavItem { to: string; label: string; icon: LucideIcon; badge?: string; bold?: boolean }
 export interface NavSection { label: string; items: NavItem[] }
 
 const commonSettings: NavItem[] = [
@@ -46,7 +46,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
       { to: "/orders",       label: "Order Approvals",icon: ShoppingCart, badge: "!" },
     ]},
     { label: "Customers", items: [
-      { to: "/customer-requests", label: "Customer Requests", icon: UserPlus, badge: "!" },
+      { to: "/customer-requests", label: "Customer Requests", icon: UserPlus, badge: "!", bold: true },
       { to: "/customers",         label: "Customers",         icon: UserRound },
       { to: "/materials",         label: "Materials",         icon: Database },
     ]},

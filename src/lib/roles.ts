@@ -81,4 +81,4 @@ export const ROLES: RoleMeta[] = [
 ];
 
 export const ROLE_MAP = Object.fromEntries(ROLES.map(r => [r.id, r])) as Record<AppRole, RoleMeta>;
-export const DEMO_PASSWORD = "Factory2026!";
+export const DEMO_PASSWORD = "Factory@2026";

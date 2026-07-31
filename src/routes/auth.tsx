@@ -2,13 +2,17 @@ import { createFileRoute, useNavigate, useSearch, Link } from "@tanstack/react-r
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
-import { ArrowLeft, Factory, Loader2, Lock, Mail, ShieldCheck, Sparkles, Zap, Building2, Globe, UserPlus, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Factory, Loader2, Lock, Mail, ShieldCheck, Sparkles, Zap, Building2, Globe, UserPlus, CheckCircle2, Eye, EyeOff, Store } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ROLES, ROLE_MAP, DEMO_PASSWORD, type AppRole } from "@/lib/roles";
+import {
+  notifyCompanyRegistrationRequest,
+  notifyCustomerAccessRequest,
+} from "@/lib/notifications";
 
 const searchSchema = z.object({ role: z.string().optional(), redirect: z.string().optional() });
 
@@ -202,6 +206,7 @@ function AuthPage() {
   const navigate = useNavigate();
   const selected = role && role in ROLE_MAP ? ROLE_MAP[role as AppRole] : null;
   const [showRegisterCompany, setShowRegisterCompany] = useState(false);
+  const [showRegisterCustomer, setShowRegisterCustomer] = useState(false);
 
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
@@ -243,8 +248,15 @@ function AuthPage() {
         <AnimatePresence mode="wait">
           {showRegisterCompany ? (
             <RegisterCompany key="register" onBack={() => setShowRegisterCompany(false)} />
+          ) : showRegisterCustomer ? (
+            <RegisterCustomer key="register-customer" onBack={() => setShowRegisterCustomer(false)} />
           ) : !selected ? (
-            <RoleGrid key="grid" onPick={(r) => navigate({ to: "/auth", search: { role: r, redirect } })} onRegisterCompany={() => setShowRegisterCompany(true)} />
+            <RoleGrid
+              key="grid"
+              onPick={(r) => navigate({ to: "/auth", search: { role: r, redirect } })}
+              onRegisterCompany={() => setShowRegisterCompany(true)}
+              onRegisterCustomer={() => setShowRegisterCustomer(true)}
+            />
           ) : (
             <LoginPanel key={selected.id} role={selected.id} redirect={redirect} />
           )}
@@ -283,16 +295,24 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
     e.preventDefault();
     setBusy(true);
     try {
-      const { error } = await supabase.from("company_registrations").insert({
-        company_name: form.company_name,
-        email: form.email,
-        phone: form.phone || null,
-        country: form.country,
-        industry: form.industry || null,
-        registration_data: { full_name: form.full_name },
-        status: "pending",
-      });
+      const { data: inserted, error } = await supabase
+        .from("company_registrations")
+        .insert({
+          company_name: form.company_name,
+          email: form.email,
+          phone: form.phone || null,
+          country: form.country,
+          industry: form.industry || null,
+          registration_data: { full_name: form.full_name },
+          status: "pending",
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+      // Notify Root Super Admin that a new company registration is pending review
+      if (inserted?.id) {
+        await notifyCompanyRegistrationRequest(inserted.id, form.company_name);
+      }
       toast.success("Registration submitted! A Root Admin will review and activate your company.");
       setBusy(false);
       onBack();
@@ -381,9 +401,137 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
 }
 
 /* ───────────────────────────────────────────────────── */
+/*  REGISTER AS A CUSTOMER — company-specific          */
+/* ───────────────────────────────────────────────────── */
+function RegisterCustomer({ onBack }: { onBack: () => void }) {
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string; industry: string | null }>>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [form, setForm] = useState({
+    company_id: "",
+    business_name: "",
+    contact_person: "",
+    email: "",
+    phone: "",
+    gst_number: "",
+    address: "",
+  });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        // Prefer the RPC; fall back to direct table read for existing auth users
+        const { data: rpc, error: rpcError } = await supabase.rpc("get_active_companies");
+        if (!rpcError && Array.isArray(rpc)) {
+          if (mounted) { setCompanies(rpc as Array<{ id: string; name: string; industry: string | null }>); setLoadingCompanies(false); }
+          return;
+        }
+        const { data, error } = await supabase.from("companies").select("id,name,industry").eq("status", "active").order("name");
+        if (!error && data) { if (mounted) setCompanies(data); }
+      } catch {
+        // ignore — dropdown stays empty if RLS blocks
+      }
+      if (mounted) setLoadingCompanies(false);
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.company_id) { toast.error("Please select the company you want to order from"); return; }
+    setBusy(true);
+    try {
+      const { data: inserted, error } = await supabase
+        .from("customer_requests")
+        .insert({
+          company_id: form.company_id,
+          business_name: form.business_name,
+          contact_person: form.contact_person,
+          email: form.email,
+          phone: form.phone || null,
+          gst_number: form.gst_number || null,
+          address: form.address || null,
+          status: "pending",
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      if (inserted?.id) {
+        await notifyCustomerAccessRequest(form.company_id, form.business_name, inserted.id);
+      }
+      toast.success("Request submitted! The company's admin will approve your access.");
+      setBusy(false);
+      onBack();
+    } catch (err: any) {
+      toast.error(err.message || "Submission failed. Please try again.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mt-6 max-w-md mx-auto">
+      <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">
+        <ArrowLeft className="h-4 w-4 mr-1" /> Back to roles
+      </Button>
+      <div className="glass-strong rounded-3xl p-8 shadow-elegant relative overflow-hidden">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-teal-400 via-cyan-500 to-blue-600 grid place-items-center shadow-glow">
+            <Store className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <div className="font-semibold">Register as a Customer</div>
+            <div className="text-xs text-muted-foreground">Order from a specific company on FactoryOS</div>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">Company you want to order from *</label>
+            {loadingCompanies ? (
+              <div className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Loading companies…</div>
+            ) : companies.length === 0 ? (
+              <div className="text-xs text-amber-500">No active companies available yet. Please check back later.</div>
+            ) : (
+              <select
+                value={form.company_id}
+                onChange={(e) => setForm(f => ({ ...f, company_id: e.target.value }))}
+                className="flex w-full rounded-md border border-input bg-background/40 px-3 py-2 text-sm h-11 appearance-none cursor-pointer focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
+              >
+                <option value="">Select a company…</option>
+                {companies.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}{c.industry ? ` · ${c.industry}` : ""}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          <FloatingLabelField icon={Building2} label="Business Name *" value={form.business_name} onChange={(v) => setForm(f => ({ ...f, business_name: v }))} />
+          <FloatingLabelField icon={UserPlus} label="Contact Person *" value={form.contact_person} onChange={(v) => setForm(f => ({ ...f, contact_person: v }))} />
+          <FloatingLabelField icon={Mail} label="Contact Email *" value={form.email} onChange={(v) => setForm(f => ({ ...f, email: v }))} type="email" />
+          <FloatingLabelField icon={Globe} label="Phone" value={form.phone} onChange={(v) => setForm(f => ({ ...f, phone: v }))} />
+          <FloatingLabelField icon={ShieldCheck} label="GST / Business Reg. No." value={form.gst_number} onChange={(v) => setForm(f => ({ ...f, gst_number: v }))} />
+          <FloatingLabelField icon={Building2} label="Billing Address" value={form.address} onChange={(v) => setForm(f => ({ ...f, address: v }))} />
+
+          <RippleButton
+            type="submit"
+            disabled={busy || !form.company_id || !form.business_name || !form.contact_person || !form.email}
+            className="w-full h-11 rounded-lg bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-600 text-white font-medium shadow-glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit Access Request"}
+          </RippleButton>
+          <p className="text-xs text-muted-foreground">
+            The selected company's admin will review your request before you can place orders.
+          </p>
+        </form>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ───────────────────────────────────────────────────── */
 /*  ROLE GRID — Premium 3D Tilt Cards                   */
 /* ───────────────────────────────────────────────────── */
-function RoleGrid({ onPick, onRegisterCompany }: { onPick: (r: AppRole) => void; onRegisterCompany: () => void }) {
+function RoleGrid({ onPick, onRegisterCompany, onRegisterCustomer }: { onPick: (r: AppRole) => void; onRegisterCompany: () => void; onRegisterCustomer: () => void }) {
   const groups: Array<[string, string, typeof ROLES]> = [
     ["Platform", "Root-level control", ROLES.filter(r => r.group === "platform")],
     ["Company", "Tenant administration", ROLES.filter(r => r.group === "company")],
@@ -422,14 +570,23 @@ function RoleGrid({ onPick, onRegisterCompany }: { onPick: (r: AppRole) => void;
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
+          className="mt-4 flex flex-wrap items-center justify-center gap-3"
         >
           <Button
             variant="outline"
             onClick={onRegisterCompany}
-            className="mt-4 border-primary/30 text-primary hover:bg-primary/10"
+            className="border-primary/30 text-primary hover:bg-primary/10"
           >
             <Building2 className="h-4 w-4 mr-1.5" />
             Register your company
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onRegisterCustomer}
+            className="border-teal-500/40 text-teal-500 hover:bg-teal-500/10"
+          >
+            <Store className="h-4 w-4 mr-1.5" />
+            Register as a Customer
           </Button>
         </motion.div>
       </div>
@@ -843,6 +1000,10 @@ function PasswordStrengthField({ value, onChange }: { value: string; onChange: (
   }, [value]);
 
   const barWidth = useSpring(0, { stiffness: 200, damping: 20 });
+  // Hoisted to top level — never call hooks inside conditional JSX.
+  // (This was the cause of the manual-login crash: when the user typed in
+  // the password field, this hook mounted for the first time → React #310.)
+  const barWidthPct = useTransform(barWidth, [0, 100], ["0%", "100%"]);
   useEffect(() => {
     barWidth.set(strength.level === 0 ? 0 : (strength.level / 3) * 100);
   }, [strength.level, barWidth]);
@@ -922,7 +1083,7 @@ function PasswordStrengthField({ value, onChange }: { value: string; onChange: (
               <motion.div
                 className="h-full rounded-full"
                 style={{
-                  width: useTransform(barWidth, [0, 100], ["0%", "100%"]),
+                  width: barWidthPct,
                   backgroundColor: strength.color,
                 }}
               />

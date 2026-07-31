@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { ROLES } from "@/lib/roles";
 import { useTheme, type ThemeMode } from "@/hooks/use-theme";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -838,7 +839,7 @@ function Hero() {
           </button>
         </motion.div>
 
-        {/* Layer 4 — Metrics row with spring count-up (moves 3px, closest) */}
+        {/* Layer 4 — Metrics row with live DB counts (moves 3px, closest) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -846,14 +847,7 @@ function Hero() {
           style={{ x: layer4X, y: layer4Y }}
           className="mt-10 flex items-center gap-6 sm:gap-10 text-[12px]"
         >
-          {[
-            { label: "Plants", target: 128, suffix: "" },
-            { label: "Machines", target: 9.4, suffix: "k" },
-            { label: "Users", target: 2.1, suffix: "k" },
-            { label: "Uptime", target: 99.9, suffix: "%" },
-          ].map(m => (
-            <MetricCounter key={m.label} label={m.label} target={m.target} suffix={m.suffix} />
-          ))}
+          <LiveMetrics />
         </motion.div>
       </div>
     </motion.section>
@@ -861,7 +855,7 @@ function Hero() {
 }
 
 /* — spring count-up metric counter — */
-function MetricCounter({ label, target, suffix }: { label: string; target: number; suffix: string }) {
+function MetricCounter({ label, target, suffix, live = true }: { label: string; target: number; suffix: string; live?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const count = useMotionValue(0);
   const rounded = useTransform(count, (v) => {
@@ -893,9 +887,13 @@ function MetricCounter({ label, target, suffix }: { label: string; target: numbe
   return (
     <div ref={ref}>
       <div className="text-muted-foreground">{label}</div>
-      <motion.div className="text-foreground font-semibold text-sm mt-0.5 tabular-nums">
-        <motion.span>{rounded}</motion.span>{suffix}
-      </motion.div>
+      {!live ? (
+        <div className="text-foreground/40 font-semibold text-sm mt-0.5 tabular-nums">…</div>
+      ) : (
+        <motion.div className="text-foreground font-semibold text-sm mt-0.5 tabular-nums">
+          <motion.span>{rounded}</motion.span>{suffix}
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -905,6 +903,50 @@ function PlayIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" className={className}>
       <path d="M8 5v14l11-7L8 5z" fill="currentColor" />
     </svg>
+  );
+}
+
+/* — live platform metrics pulled from the database (no fake numbers) — */
+function LiveMetrics() {
+  const [stats, setStats] = useState<{ companies: number; machines: number; users: number; uptime: number } | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase.rpc("get_platform_stats");
+        if (mounted && data) {
+          const s = typeof data === "string" ? JSON.parse(data) : data;
+          setStats({
+            companies: Number(s.companies ?? 0),
+            machines: Number(s.machines ?? 0),
+            users: Number(s.users ?? 0),
+            uptime: Number(s.uptime ?? 0),
+          });
+        }
+      } catch {
+        // Leave stats null → fall back to honest placeholders
+      }
+      if (mounted) {
+        setStats(prev => prev); // keep whatever we got
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const metrics = [
+    { label: "Plants", target: stats?.companies ?? 0, suffix: "", live: !!stats },
+    { label: "Machines", target: stats ? stats.machines / 1000 : 0, suffix: stats && stats.machines >= 1000 ? "k" : "", live: !!stats },
+    { label: "Users", target: stats ? stats.users / 1000 : 0, suffix: stats && stats.users >= 1000 ? "k" : "", live: !!stats },
+    { label: "Uptime", target: stats?.uptime ?? 0, suffix: "%", live: !!stats },
+  ];
+
+  return (
+    <>
+      {metrics.map(m => (
+        <MetricCounter key={m.label} label={m.label} target={m.target} suffix={m.suffix} live={m.live} />
+      ))}
+    </>
   );
 }
 

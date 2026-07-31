@@ -545,7 +545,7 @@ BEGIN
   -- SUPPLIERS (N-08)
   -- =============================================================
   IF NOT EXISTS (SELECT 1 FROM public.suppliers WHERE company_id = _company AND name = 'N-08 MetalWorks Supply Co') THEN
-  INSERT INTO public.suppliers (company_id, name, email, phone, status) VALUES
+  INSERT INTO public.suppliers (company_id, name, contact_email, contact_phone, status) VALUES
     (_company, 'N-08 MetalWorks Supply Co', 'metalworks@n08-supplier.com', '+1 312-555-1001', 'active'),
     (_company, 'N-08 Precision Components Ltd', 'precision@n08-supplier.com', '+1 847-555-2002', 'active'),
     (_company, 'N-08 Raw Material Masters', 'rawmats@n08-supplier.com', '+1 313-555-3003', 'active'),
@@ -555,19 +555,19 @@ END IF;
   -- =============================================================
   -- PURCHASE ORDERS (N-08)
   -- =============================================================
-  INSERT INTO public.purchase_orders (company_id, po_number, supplier_id, status, total_amount, order_date, expected_date) VALUES
+  INSERT INTO public.purchase_orders (company_id, po_number, supplier_id, status, total_amount, expected_date, created_at) VALUES
     (_company, 'N-08-PO-001',
       (SELECT id FROM public.suppliers WHERE company_id = _company AND name = 'N-08 MetalWorks Supply Co' LIMIT 1),
-      'sent', 17500.00, now() - interval '8 days', now() + interval '7 days'),
+      'sent', 17500.00, now() + interval '7 days', now() - interval '8 days'),
     (_company, 'N-08-PO-002',
       (SELECT id FROM public.suppliers WHERE company_id = _company AND name = 'N-08 Precision Components Ltd' LIMIT 1),
-      'accepted', 22500.00, now() - interval '5 days', now() + interval '12 days'),
+      'accepted', 22500.00, now() + interval '12 days', now() - interval '5 days'),
     (_company, 'N-08-PO-003',
       (SELECT id FROM public.suppliers WHERE company_id = _company AND name = 'N-08 Electronics & Sensors Inc' LIMIT 1),
-      'fulfilled', 9600.00, now() - interval '14 days', now() - interval '2 days'),
+      'fulfilled', 9600.00, now() - interval '2 days', now() - interval '14 days'),
     (_company, 'N-08-PO-004',
       (SELECT id FROM public.suppliers WHERE company_id = _company AND name = 'N-08 Raw Material Masters' LIMIT 1),
-      'modified', 8200.00, now() - interval '3 days', now() + interval '21 days')
+      'modified', 8200.00, now() + interval '21 days', now() - interval '3 days')
   ON CONFLICT DO NOTHING;
 
   -- =============================================================
@@ -602,7 +602,7 @@ END IF;
   -- =============================================================
   -- PAYROLL (N-08)
   -- =============================================================
-  INSERT INTO public.payroll (company_id, employee_id, period, base_salary, overtime_hours, overtime_rate, deductions, net_amount, status, paid_at)
+  INSERT INTO public.payroll (company_id, employee_id, period, gross_amount, deductions, net_amount, status, paid_at)
   SELECT _company, e.id, to_char(now(), 'YYYY-MM'),
     CASE e.job_title
       WHEN 'Plant Manager' THEN 8500.00
@@ -616,16 +616,6 @@ END IF;
       WHEN 'Procurement Specialist' THEN 6000.00
       WHEN 'Assembly Technician' THEN 4800.00
       ELSE 5000.00
-    END,
-    CASE e.job_title
-      WHEN 'CNC Operator' THEN 10
-      WHEN 'Assembly Technician' THEN 14
-      ELSE 4
-    END,
-    CASE e.job_title
-      WHEN 'CNC Operator' THEN 30
-      WHEN 'Assembly Technician' THEN 28
-      ELSE 38
     END,
     CASE e.job_title
       WHEN 'Plant Manager' THEN 1275.00
@@ -678,7 +668,7 @@ END IF;
   -- =============================================================
   -- KNOWLEDGE ARTICLES (N-08)
   -- =============================================================
-  INSERT INTO public.knowledge_articles (company_id, title, category, content, views, status) VALUES
+  INSERT INTO public.knowledge_articles (company_id, title, category, body, views, status) VALUES
     (_company, 'N-08 CNC Mill Alpha-1 Setup Guide', 'machines', 'Complete setup guide for 5-axis CNC Mill Alpha-1 including tool calibration and first-article inspection.', 156, 'published'),
     (_company, 'N-08 Titanium Bracket TB-500 Assembly', 'products', 'Step-by-step assembly for TB-500 titanium bracket including torque specs and quality checkpoints.', 89, 'published'),
     (_company, 'N-08 Quality Inspection — Aerospace', 'quality', 'Incoming and final inspection standards for aerospace-grade components per AS9100D.', 234, 'published'),

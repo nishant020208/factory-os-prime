@@ -62,6 +62,137 @@ const trend = (n: number, base = 800, jitter = 60) =>
     b: 6 + Math.round(Math.random() * 10),
   }));
 
+/* ─────────── LIVE STATS HOOK (real numbers, never fabricated) ─────────── */
+interface LiveStats {
+  employees: number;
+  departments: number;
+  machines: number;
+  machinesUp: number;
+  machinesDown: number;
+  products: number;
+  customers: number;
+  salesOrders: number;
+  salesOrdersOpen: number;
+  salesOrdersDelivered: number;
+  salesOrdersPending: number;
+  salesOrdersRevenue: number;
+  productionOrders: number;
+  productionInProgress: number;
+  workOrders: number;
+  invoices: number;
+  invoicesOutstanding: number;
+  payments: number;
+  shipments: number;
+  shipmentsToday: number;
+  purchaseOrders: number;
+  purchaseOrdersOpen: number;
+  suppliers: number;
+  inspections: number;
+  inspectionsPassed: number;
+  supportTickets: number;
+  supportTicketsOpen: number;
+  auditEvents: number;
+  inventorySku: number;
+  lowStock: number;
+}
+
+const EMPTY_STATS: LiveStats = {
+  employees: 0, departments: 0, machines: 0, machinesUp: 0, machinesDown: 0,
+  products: 0, customers: 0, salesOrders: 0, salesOrdersOpen: 0, salesOrdersDelivered: 0,
+  salesOrdersPending: 0, salesOrdersRevenue: 0, productionOrders: 0, productionInProgress: 0,
+  workOrders: 0, invoices: 0, invoicesOutstanding: 0, payments: 0, shipments: 0,
+  shipmentsToday: 0, purchaseOrders: 0, purchaseOrdersOpen: 0, suppliers: 0,
+  inspections: 0, inspectionsPassed: 0, supportTickets: 0, supportTicketsOpen: 0,
+  auditEvents: 0, inventorySku: 0, lowStock: 0,
+};
+
+function useLiveStats(companyId: string | null) {
+  const safe = async (fn: () => Promise<any>) => { try { return await fn(); } catch { return null; } };
+  return useQuery({
+    queryKey: ["live-stats", companyId],
+    queryFn: async (): Promise<LiveStats> => {
+      if (!companyId) return EMPTY_STATS;
+      const today = new Date().toISOString().slice(0, 10);
+      const [
+        employees, departments, machines, products, customers,
+        salesOrders, productionOrders, workOrders, invoices, payments,
+        shipments, purchaseOrders, suppliers, inspections, supportTickets,
+        auditLogs, inventory, inventoryAll,
+      ] = await Promise.all([
+        safe(() => supabase.from("employees").select("id", { count: "exact", head: true }).eq("company_id", companyId)),
+        safe(() => supabase.from("departments").select("id", { count: "exact", head: true }).eq("company_id", companyId)),
+        safe(() => supabase.from("machines").select("*").eq("company_id", companyId)),
+        safe(() => supabase.from("products").select("id", { count: "exact", head: true }).eq("company_id", companyId)),
+        safe(() => supabase.from("customers").select("id", { count: "exact", head: true }).eq("company_id", companyId)),
+        safe(() => supabase.from("sales_orders").select("status,total_amount").eq("company_id", companyId)),
+        safe(() => supabase.from("production_orders").select("status").eq("company_id", companyId)),
+        safe(() => supabase.from("work_orders").select("id", { count: "exact", head: true }).eq("company_id", companyId)),
+        safe(() => supabase.from("invoices").select("status,total_amount").eq("company_id", companyId)),
+        safe(() => supabase.from("payments").select("id", { count: "exact", head: true }).eq("company_id", companyId)),
+        safe(() => supabase.from("shipments").select("status,created_at").eq("company_id", companyId)),
+        safe(() => supabase.from("purchase_orders").select("status").eq("company_id", companyId)),
+        safe(() => supabase.from("suppliers").select("id", { count: "exact", head: true }).eq("company_id", companyId)),
+        safe(() => supabase.from("quality_inspections").select("result").eq("company_id", companyId)),
+        safe(() => supabase.from("support_tickets").select("status").eq("company_id", companyId)),
+        safe(() => supabase.from("audit_logs").select("id", { count: "exact", head: true }).eq("company_id", companyId)),
+        safe(() => supabase.from("inventory").select("quantity,products(reorder_level)").eq("company_id", companyId)),
+        safe(() => supabase.from("inventory").select("id", { count: "exact", head: true }).eq("company_id", companyId)),
+      ]);
+
+      const so = salesOrders?.data ?? [];
+      const po = productionOrders?.data ?? [];
+      const inv = invoices?.data ?? [];
+      const shp = shipments?.data ?? [];
+      const pur = purchaseOrders?.data ?? [];
+      const qi = inspections?.data ?? [];
+      const tkt = supportTickets?.data ?? [];
+      const mach = machines?.data ?? [];
+      const invRows = inventory?.data ?? [];
+      const low = invRows.filter((i: any) => Number(i.quantity ?? 0) <= Number(i.products?.reorder_level ?? 0)).length;
+      const openStatuses = ["pending_approval", "approved", "in_production", "quality_pending", "dispatch_ready", "out_for_delivery", "pending"];
+
+      return {
+        employees: employees?.count ?? 0,
+        departments: departments?.count ?? 0,
+        machines: mach.length,
+        machinesUp: mach.filter((m: any) => m.status === "operational").length,
+        machinesDown: mach.filter((m: any) => m.status === "down" || m.status === "maintenance").length,
+        products: products?.count ?? 0,
+        customers: customers?.count ?? 0,
+        salesOrders: so.length,
+        salesOrdersOpen: so.filter((s: any) => openStatuses.includes(s.status)).length,
+        salesOrdersDelivered: so.filter((s: any) => s.status === "delivered" || s.status === "completed").length,
+        salesOrdersPending: so.filter((s: any) => s.status === "pending_approval").length,
+        salesOrdersRevenue: so.reduce((sum: number, s: any) => sum + Number(s.total_amount ?? 0), 0),
+        productionOrders: po.length,
+        productionInProgress: po.filter((p: any) => p.status === "in_progress" || p.status === "in-production").length,
+        workOrders: workOrders?.count ?? 0,
+        invoices: inv.length,
+        invoicesOutstanding: inv.filter((i: any) => i.status === "pending" || i.status === "partial" || i.status === "unpaid").length,
+        payments: payments?.count ?? 0,
+        shipments: shp.length,
+        shipmentsToday: shp.filter((s: any) => (s.created_at ?? "").slice(0, 10) === today).length,
+        purchaseOrders: pur.length,
+        purchaseOrdersOpen: pur.filter((p: any) => p.status !== "received" && p.status !== "fulfilled").length,
+        suppliers: suppliers?.count ?? 0,
+        inspections: qi.length,
+        inspectionsPassed: qi.filter((q: any) => q.result === "pass" || q.result === "passed").length,
+        supportTickets: tkt.length,
+        supportTicketsOpen: tkt.filter((t: any) => t.status === "open" || t.status === "pending").length,
+        auditEvents: auditLogs?.count ?? 0,
+        inventorySku: inventoryAll?.count ?? 0,
+        lowStock: low,
+      };
+    },
+    enabled: !!companyId,
+  });
+}
+
+/** Honest fallback when a metric has no real data source yet */
+function na(): string {
+  return "N/A";
+}
+
 function Shell({ title, sub, eyebrow, children }: { title: string; sub: string; eyebrow: string; children: React.ReactNode }) {
   return (
     <div className="max-w-[1600px] mx-auto">
@@ -418,38 +549,45 @@ function CompanyAdminDashboard() {
 
 /* ─────────── PLANT ADMIN / MANAGER ─────────── */
 function PlantAdminDashboard() {
+  const { companyId } = useAuth();
+  const s = useLiveStats(companyId).data;
+  const uptime = s && s.machines > 0 ? Math.round((s.machinesUp / s.machines) * 1000) / 10 : 0;
   return (
     <Shell eyebrow="Plant" title="Plant Overview" sub="Everything happening inside your plant right now.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Departments" value="12" icon={Users} tone="primary" />
-        <Kpi label="Employees" value="248" delta="+6" icon={Users} tone="info" />
-        <Kpi label="Active Machines" value="34/38" icon={Cog} tone="success" />
-        <Kpi label="Open Issues" value="3" icon={ShieldCheck} tone="warning" />
+        <Kpi label="Departments" value={String(s?.departments ?? 0)} icon={Users} tone="primary" />
+        <Kpi label="Employees" value={String(s?.employees ?? 0)} icon={Users} tone="info" />
+        <Kpi label="Active Machines" value={`${s?.machinesUp ?? 0}/${s?.machines ?? 0}`} icon={Cog} tone="success" />
+        <Kpi label="Machine Uptime" value={s ? `${uptime}%` : "…"} icon={ShieldCheck} tone="warning" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2"><Panel title="Plant output · last 14 days"><OutputChart data={trend(14)} /></Panel></div>
         <AIInsights dashboardType="plant_admin" items={[
-          { t: "Line B utilization down 8% vs last week", c: 82 },
-          { t: "Shift 2 productivity best of the quarter", c: 91 },
+          { t: `${s?.machinesDown ?? 0} machine(s) currently down or in maintenance`, c: 82 },
+          { t: `${s?.salesOrdersOpen ?? 0} open customer orders across the plant`, c: 91 },
         ]} />
       </div>
     </Shell>
   );
 }
 function PlantManagerDashboard() {
+  const { companyId } = useAuth();
+  const s = useLiveStats(companyId).data;
+  const uptime = s && s.machines > 0 ? Math.round((s.machinesUp / s.machines) * 1000) / 10 : 0;
+  const fpy = s && s.inspections > 0 ? Math.round((s.inspectionsPassed / s.inspections) * 1000) / 10 : 0;
   return (
     <Shell eyebrow="Plant" title="Plant Performance" sub="Live KPIs across production, maintenance and quality.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="OEE" value="86.2%" delta="+2.1%" icon={TrendingUp} tone="primary" />
-        <Kpi label="Throughput" value="1,842" delta="+140" icon={Factory} tone="success" />
-        <Kpi label="Machine Uptime" value="92.7%" icon={Cog} tone="info" />
-        <Kpi label="First Pass Yield" value="97.4%" icon={ShieldCheck} tone="warning" />
+        <Kpi label="Production Orders" value={String(s?.productionOrders ?? 0)} icon={TrendingUp} tone="primary" />
+        <Kpi label="In Progress" value={String(s?.productionInProgress ?? 0)} icon={Factory} tone="success" />
+        <Kpi label="Machine Uptime" value={s ? `${uptime}%` : "…"} icon={Cog} tone="info" />
+        <Kpi label="First Pass Yield" value={s && s.inspections ? `${fpy}%` : na()} icon={ShieldCheck} tone="warning" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2"><Panel title="Throughput trend"><OutputChart data={trend(14, 1600)} /></Panel></div>
         <AIInsights dashboardType="plant_manager" items={[
-          { t: "CNC-A3 vibration anomaly — schedule inspection", c: 87 },
-          { t: "Optimize batching on line C for +6% throughput", c: 79 },
+          { t: `${s?.workOrders ?? 0} work orders currently on the floor`, c: 87 },
+          { t: `${s?.lowStock ?? 0} SKUs at or below reorder level`, c: 79 },
         ]} />
       </div>
     </Shell>
@@ -458,6 +596,8 @@ function PlantManagerDashboard() {
 
 /* ─────────── PRODUCTION MANAGER ─────────── */
 function ProductionManagerDashboard() {
+  const { companyId } = useAuth();
+  const s = useLiveStats(companyId).data;
   const orders = useQuery({ queryKey: ["prod-orders"], queryFn: async () => { try { return (await supabase.from("production_orders").select("*").order("due_date").limit(8)).data ?? []; } catch { return []; } } });
   const { data: approvedOrders } = useQuery({
     queryKey: ["approved-sales-orders"],
@@ -466,10 +606,10 @@ function ProductionManagerDashboard() {
   return (
     <Shell eyebrow="Production" title="Production Planning" sub="Schedule, work orders and capacity for the next 14 days.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Planned Orders" value={String(orders.data?.length ?? 0)} icon={ClipboardList} tone="primary" />
-        <Kpi label="In Progress" value={String(orders.data?.filter(o => o.status === "in_progress").length ?? 0)} icon={Factory} tone="info" />
-        <Kpi label="Capacity Used" value="78%" icon={TrendingUp} tone="warning" />
-        <Kpi label="On-Time %" value="94.2%" delta="+1.1%" icon={Timer} tone="success" />
+        <Kpi label="Production Orders" value={String(s?.productionOrders ?? 0)} icon={ClipboardList} tone="primary" />
+        <Kpi label="In Progress" value={String(s?.productionInProgress ?? 0)} icon={Factory} tone="info" />
+        <Kpi label="Work Orders" value={String(s?.workOrders ?? 0)} icon={TrendingUp} tone="warning" />
+        <Kpi label="Open Customer Orders" value={String(s?.salesOrdersOpen ?? 0)} icon={Timer} tone="success" />
       </div>
       {/* Approved orders needing production orders */}
       {approvedOrders && approvedOrders.length > 0 && (
@@ -511,21 +651,21 @@ function ProductionManagerDashboard() {
 
 /* ─────────── WAREHOUSE MANAGER ─────────── */
 function WarehouseDashboard() {
-  const inv = useQuery({ queryKey: ["inv"], queryFn: async () => { try { return (await supabase.from("inventory").select("*, products!inner(name,reorder_level)").limit(200)).data ?? []; } catch { return []; } } });
-  const low = inv.data?.filter((i: any) => Number(i.quantity ?? 0) <= Number(i.products?.reorder_level ?? 0)).length ?? 0;
+  const { companyId } = useAuth();
+  const s = useLiveStats(companyId).data;
   return (
     <Shell eyebrow="Logistics" title="Warehouse Control" sub="Stock movements, receiving, dispatch and cycle counts.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="SKUs in Stock" value={String(inv.data?.length ?? 0)} icon={Boxes} tone="primary" />
-        <Kpi label="Low Stock" value={String(low)} icon={Warehouse} tone="warning" />
-        <Kpi label="Received Today" value="18" icon={Package} tone="success" />
-        <Kpi label="Dispatched Today" value="24" icon={Truck} tone="info" />
+        <Kpi label="SKUs in Stock" value={String(s?.inventorySku ?? 0)} icon={Boxes} tone="primary" />
+        <Kpi label="Low Stock" value={String(s?.lowStock ?? 0)} icon={Warehouse} tone="warning" />
+        <Kpi label="Shipments" value={String(s?.shipments ?? 0)} icon={Package} tone="success" />
+        <Kpi label="Shipped Today" value={String(s?.shipmentsToday ?? 0)} icon={Truck} tone="info" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2"><Panel title="Warehouse throughput"><OutputChart data={trend(14, 240, 20)} /></Panel></div>
         <AIInsights dashboardType="warehouse_manager" items={[
-          { t: `${low} SKUs are at or below reorder level`, c: 100 },
-          { t: "Suggest bin re-slotting for A-class items", c: 84 },
+          { t: `${s?.lowStock ?? 0} SKUs are at or below reorder level`, c: 100 },
+          { t: `${s?.shipments ?? 0} total shipments, ${s?.shipmentsToday ?? 0} dispatched today`, c: 84 },
         ]} />
       </div>
     </Shell>
@@ -534,14 +674,16 @@ function WarehouseDashboard() {
 
 /* ─────────── PROCUREMENT MANAGER ─────────── */
 function ProcurementDashboard() {
+  const { companyId } = useAuth();
+  const s = useLiveStats(companyId).data;
   const pos = useQuery({ queryKey: ["pos"], queryFn: async () => { try { return (await supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }).limit(10)).data ?? []; } catch { return []; } } });
   return (
     <Shell eyebrow="Procurement" title="Procurement Center" sub="Suppliers, POs, RFQs and goods receipt live view.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Open POs" value={String(pos.data?.filter(p => p.status !== "received").length ?? 0)} icon={ShoppingCart} tone="primary" />
-        <Kpi label="Approved" value={String(pos.data?.filter(p => p.status === "approved").length ?? 0)} icon={ShieldCheck} tone="success" />
-        <Kpi label="Pending" value={String(pos.data?.filter(p => p.status === "pending").length ?? 0)} icon={Timer} tone="warning" />
-        <Kpi label="Supplier OTIF" value="94%" delta="+2%" icon={Truck} tone="info" />
+        <Kpi label="Total POs" value={String(s?.purchaseOrders ?? 0)} icon={ShoppingCart} tone="primary" />
+        <Kpi label="Open POs" value={String(s?.purchaseOrdersOpen ?? 0)} icon={ShieldCheck} tone="success" />
+        <Kpi label="Suppliers" value={String(s?.suppliers ?? 0)} icon={Truck} tone="info" />
+        <Kpi label="Low Stock Alerts" value={String(s?.lowStock ?? 0)} icon={Timer} tone="warning" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2">
@@ -558,8 +700,8 @@ function ProcurementDashboard() {
           </Panel>
         </div>
         <AIInsights dashboardType="procurement_manager" items={[
-          { t: "Consolidate SKU-A1003 orders → save 8%", c: 89 },
-          { t: "Alt supplier available for critical Ti stock", c: 76 },
+          { t: `${s?.purchaseOrdersOpen ?? 0} purchase orders awaiting supplier action`, c: 89 },
+          { t: `${s?.suppliers ?? 0} suppliers on file with ${s?.purchaseOrders ?? 0} total POs`, c: 76 },
         ]} />
       </div>
     </Shell>
@@ -568,19 +710,23 @@ function ProcurementDashboard() {
 
 /* ─────────── QUALITY INSPECTOR ─────────── */
 function QualityDashboard() {
+  const { companyId } = useAuth();
+  const s = useLiveStats(companyId).data;
+  const fpy = s && s.inspections > 0 ? Math.round((s.inspectionsPassed / s.inspections) * 1000) / 10 : 0;
+  const defect = s && s.inspections > 0 ? Math.round(((s.inspections - s.inspectionsPassed) / s.inspections) * 10000) / 100 : 0;
   return (
     <Shell eyebrow="Quality" title="Quality Control" sub="Incoming, in-process and final inspection at a glance.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="First-Pass Yield" value="97.8%" delta="+0.4%" icon={ShieldCheck} tone="success" />
-        <Kpi label="Defect Rate" value="0.82%" delta="-0.3%" icon={ShieldCheck} tone="warning" />
-        <Kpi label="Open NCRs" value="7" icon={ClipboardList} tone="info" />
-        <Kpi label="CAPA On Track" value="94%" icon={ShieldCheck} tone="primary" />
+        <Kpi label="Inspections" value={String(s?.inspections ?? 0)} icon={ShieldCheck} tone="primary" />
+        <Kpi label="Passed" value={String(s?.inspectionsPassed ?? 0)} icon={CheckCircle2} tone="success" />
+        <Kpi label="First-Pass Yield" value={s && s.inspections ? `${fpy}%` : na()} icon={ShieldCheck} tone="info" />
+        <Kpi label="Defect Rate" value={s && s.inspections ? `${defect}%` : na()} icon={ClipboardList} tone="warning" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2"><Panel title="Yield trend"><OutputChart data={trend(14, 940, 30)} /></Panel></div>
         <AIInsights dashboardType="quality_inspector" items={[
-          { t: "Predicted micro-crack on batch B-2287", c: 88 },
-          { t: "Housing dimensional drift approaching limit", c: 76 },
+          { t: `${s?.inspections ?? 0} total inspections, ${s?.inspectionsPassed ?? 0} passed (${s && s.inspections ? fpy + "%" : "N/A"} first-pass)`, c: 88 },
+          { t: "Inspection records update live as batches are checked", c: 76 },
         ]} />
       </div>
     </Shell>
@@ -589,15 +735,18 @@ function QualityDashboard() {
 
 /* ─────────── MAINTENANCE ENGINEER ─────────── */
 function MaintenanceDashboard() {
+  const { companyId } = useAuth();
+  const s = useLiveStats(companyId).data;
   const machines = useQuery({ queryKey: ["m-machines"], queryFn: async () => { try { return (await supabase.from("machines").select("*").order("name")).data ?? []; } catch { return []; } } });
   const down = machines.data?.filter(m => m.status === "down" || m.status === "maintenance").length ?? 0;
+  const uptime = s && s.machines > 0 ? Math.round((s.machinesUp / s.machines) * 1000) / 10 : 0;
   return (
     <Shell eyebrow="Maintenance" title="Reliability & Uptime" sub="Predictive maintenance, breakdowns and spare parts.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="MTBF" value="184h" delta="+12h" icon={Timer} tone="success" />
-        <Kpi label="MTTR" value="2.4h" delta="-0.3h" icon={Wrench} tone="info" />
-        <Kpi label="Down / Maint" value={String(down)} icon={Cog} tone="warning" />
-        <Kpi label="PM Compliance" value="96%" icon={ShieldCheck} tone="primary" />
+        <Kpi label="Machines" value={String(s?.machines ?? 0)} icon={Cog} tone="primary" />
+        <Kpi label="Operational" value={String(s?.machinesUp ?? 0)} icon={CheckCircle2} tone="success" />
+        <Kpi label="Down / Maint" value={String(down)} icon={Wrench} tone="warning" />
+        <Kpi label="Uptime" value={s ? `${uptime}%` : "…"} icon={ShieldCheck} tone="info" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2">
@@ -613,8 +762,8 @@ function MaintenanceDashboard() {
           </Panel>
         </div>
         <AIInsights dashboardType="maintenance_engineer" items={[
-          { t: "Bearing wear on CNC-A1 — 72h", c: 94 },
-          { t: "Coolant pump inlet blockage risk on Line B", c: 81 },
+          { t: `${down} machine(s) currently down or in maintenance`, c: 94 },
+          { t: `${s?.machines ?? 0} machines tracked with live status`, c: 81 },
         ]} />
       </div>
     </Shell>
@@ -623,20 +772,24 @@ function MaintenanceDashboard() {
 
 /* ─────────── FINANCE MANAGER ─────────── */
 function FinanceDashboard() {
+  const { companyId } = useAuth();
+  const s = useLiveStats(companyId).data;
   const cash = trend(14, 120000, 4000);
+  const revenue = (s?.salesOrdersRevenue ?? 0) / 1_000_000;
+  const outInv = (s?.invoicesOutstanding ?? 0) / 1000;
   return (
-    <Shell eyebrow="Finance" title="Finance Center" sub="Cash, revenue, AP/AR and budgets in real time.">
+    <Shell eyebrow="Finance" title="Finance Center" sub="Invoices, payments and outstanding balances in real time.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Revenue MTD" value="$1.42M" delta="+7.4%" icon={TrendingUp} tone="success" />
-        <Kpi label="Cash Position" value="$4.82M" delta="+2.1%" icon={Landmark} tone="primary" />
-        <Kpi label="AP Outstanding" value="$318k" icon={ClipboardList} tone="warning" />
-        <Kpi label="AR Outstanding" value="$612k" icon={ClipboardList} tone="info" />
+        <Kpi label="Order Revenue" value={s ? `$${revenue.toFixed(2)}M` : "…"} icon={TrendingUp} tone="success" />
+        <Kpi label="Invoices" value={String(s?.invoices ?? 0)} icon={Landmark} tone="primary" />
+        <Kpi label="Outstanding Invoices" value={s ? `$${outInv.toFixed(0)}k` : "…"} icon={ClipboardList} tone="warning" />
+        <Kpi label="Payments" value={String(s?.payments ?? 0)} icon={ClipboardList} tone="info" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2"><Panel title="Cash flow"><OutputChart data={cash} /></Panel></div>
         <AIInsights dashboardType="finance_manager" items={[
-          { t: "Late-paying customer detected — 42 DSO", c: 84 },
-          { t: "Reallocate $60k opex to CAPEX for +ROI", c: 71 },
+          { t: `${s?.invoicesOutstanding ?? 0} invoice(s) awaiting payment`, c: 84 },
+          { t: `${s?.salesOrders ?? 0} customer orders worth $${(s?.salesOrdersRevenue ?? 0).toLocaleString()}`, c: 71 },
         ]} />
       </div>
     </Shell>
@@ -645,19 +798,21 @@ function FinanceDashboard() {
 
 /* ─────────── HR MANAGER ─────────── */
 function HRDashboard() {
+  const { companyId } = useAuth();
+  const s = useLiveStats(companyId).data;
   return (
-    <Shell eyebrow="People" title="HR Command" sub="Headcount, attendance and workforce analytics.">
+    <Shell eyebrow="People" title="HR Command" sub="Headcount, departments and workforce analytics.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Headcount" value="248" delta="+6" icon={Users} tone="primary" />
-        <Kpi label="Attendance" value="96.4%" icon={Timer} tone="success" />
-        <Kpi label="Open Reqs" value="8" icon={ClipboardList} tone="info" />
-        <Kpi label="Training %" value="88%" icon={ShieldCheck} tone="warning" />
+        <Kpi label="Headcount" value={String(s?.employees ?? 0)} icon={Users} tone="primary" />
+        <Kpi label="Departments" value={String(s?.departments ?? 0)} icon={Factory} tone="success" />
+        <Kpi label="Open Support Tickets" value={String(s?.supportTicketsOpen ?? 0)} icon={ClipboardList} tone="info" />
+        <Kpi label="Customers" value={String(s?.customers ?? 0)} icon={UserRound} tone="warning" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2"><Panel title="Headcount trend"><OutputChart data={trend(14, 240, 3)} /></Panel></div>
         <AIInsights dashboardType="hr_manager" items={[
-          { t: "Attrition risk: 3 employees in Line B", c: 74 },
-          { t: "Overtime spike on Shift 2 — 14% above target", c: 82 },
+          { t: `${s?.employees ?? 0} employees across ${s?.departments ?? 0} departments`, c: 74 },
+          { t: `${s?.supportTicketsOpen ?? 0} open support tickets need attention`, c: 82 },
         ]} />
       </div>
     </Shell>
@@ -666,20 +821,36 @@ function HRDashboard() {
 
 /* ─────────── OPERATOR ─────────── */
 function OperatorDashboard() {
+  const { companyId, user } = useAuth();
+  const s = useLiveStats(companyId).data;
+  const { data: myWorkOrders } = useQuery({
+    queryKey: ["my-wos", user?.id],
+    queryFn: async () => {
+      try {
+        const { data } = await supabase
+          .from("work_orders")
+          .select("id,status")
+          .eq("assigned_user_id", user?.id)
+          .limit(50);
+        return data ?? [];
+      } catch { return []; }
+    },
+    enabled: !!user,
+  });
   return (
     <Shell eyebrow="My Shift" title="Today's Work" sub="Your assigned work orders, machines and tasks.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="My Work Orders" value="4" icon={ClipboardList} tone="primary" />
-        <Kpi label="Assigned Machines" value="2" icon={Cog} tone="info" />
-        <Kpi label="Completed Today" value="12" delta="+2" icon={ShieldCheck} tone="success" />
-        <Kpi label="Open Issues" value="1" icon={ShieldCheck} tone="warning" />
+        <Kpi label="My Work Orders" value={String(myWorkOrders?.length ?? 0)} icon={ClipboardList} tone="primary" />
+        <Kpi label="Company WOs" value={String(s?.workOrders ?? 0)} icon={Cog} tone="info" />
+        <Kpi label="Machines Up" value={`${s?.machinesUp ?? 0}/${s?.machines ?? 0}`} icon={ShieldCheck} tone="success" />
+        <Kpi label="Open Tickets" value={String(s?.supportTicketsOpen ?? 0)} icon={ShieldCheck} tone="warning" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <Panel title="Your work orders">
-          <div className="text-sm text-muted-foreground">Assigned work orders will appear here in real time as your manager releases them.</div>
+          <div className="text-sm text-muted-foreground">Assigned work orders ({myWorkOrders?.length ?? 0}) will appear here in real time as your manager releases them.</div>
         </Panel>
         <Panel title="Machine status">
-          <div className="text-sm text-muted-foreground">Live status and utilization of your assigned machines.</div>
+          <div className="text-sm text-muted-foreground">{s?.machinesUp ?? 0} of {s?.machines ?? 0} machines operational right now.</div>
         </Panel>
       </div>
     </Shell>
@@ -688,13 +859,37 @@ function OperatorDashboard() {
 
 /* ─────────── CUSTOMER ─────────── */
 function CustomerDashboard() {
+  const { companyId, user } = useAuth();
+  const s = useLiveStats(companyId).data;
+  const { data: myOrders } = useQuery({
+    queryKey: ["my-so", user?.id],
+    queryFn: async () => {
+      try {
+        // Customers only see their own orders (scoped via customer_id on their profile)
+        const { data: profile } = await supabase.from("profiles").select("customer_id").eq("id", user?.id).maybeSingle();
+        if (!profile?.customer_id) return [];
+        const { data } = await supabase.from("sales_orders").select("status,total_amount").eq("customer_id", profile.customer_id);
+        return data ?? [];
+      } catch { return []; }
+    },
+    enabled: !!user,
+  });
+  const open = (myOrders ?? []).filter((o: any) => ["pending_approval", "approved", "in_production", "quality_pending", "dispatch_ready", "out_for_delivery"].includes(o.status)).length;
+  const delivered = (myOrders ?? []).filter((o: any) => o.status === "delivered" || o.status === "completed").length;
+  const outstanding = (myOrders ?? []).filter((o: any) => o.status !== "delivered" && o.status !== "completed" && o.status !== "cancelled").reduce((sum: number, o: any) => sum + Number(o.total_amount ?? 0), 0);
   return (
     <Shell eyebrow="Customer" title="Your Orders" sub="Track orders, shipments and invoices.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Open Orders" value="3" icon={ShoppingCart} tone="primary" />
-        <Kpi label="In Transit" value="1" icon={Truck} tone="info" />
-        <Kpi label="Delivered YTD" value="18" icon={ShieldCheck} tone="success" />
-        <Kpi label="Outstanding Invoices" value="$14k" icon={Landmark} tone="warning" />
+        <Kpi label="My Orders" value={String(myOrders?.length ?? 0)} icon={ShoppingCart} tone="primary" />
+        <Kpi label="Open" value={String(open)} icon={Truck} tone="info" />
+        <Kpi label="Delivered" value={String(delivered)} icon={ShieldCheck} tone="success" />
+        <Kpi label="Outstanding Value" value={`$${(outstanding / 1000).toFixed(0)}k`} icon={Landmark} tone="warning" />
+      </div>
+      <div className="mt-4">
+        <AIInsights dashboardType="customer_portal" items={[
+          { t: `${open} order(s) currently in progress — track them in Orders → Order Tracking`, c: 96 },
+          { t: delivered > 0 ? `${delivered} order(s) delivered. Download invoices & certificates in Documents.` : "No delivered orders yet.", c: 90 },
+        ]} />
       </div>
     </Shell>
   );
@@ -702,13 +897,15 @@ function CustomerDashboard() {
 
 /* ─────────── SUPPLIER ─────────── */
 function SupplierDashboard() {
+  const { companyId } = useAuth();
+  const s = useLiveStats(companyId).data;
   return (
     <Shell eyebrow="Supplier" title="Supplier Portal" sub="Purchase orders, deliveries and payments.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Open POs" value="4" icon={ShoppingCart} tone="primary" />
-        <Kpi label="Delivered YTD" value="42" icon={Truck} tone="success" />
-        <Kpi label="OTIF" value="94%" delta="+2%" icon={Timer} tone="info" />
-        <Kpi label="Awaiting Payment" value="$28k" icon={Landmark} tone="warning" />
+        <Kpi label="Open POs" value={String(s?.purchaseOrdersOpen ?? 0)} icon={ShoppingCart} tone="primary" />
+        <Kpi label="Total POs" value={String(s?.purchaseOrders ?? 0)} icon={Truck} tone="success" />
+        <Kpi label="Deliveries" value={String(s?.shipments ?? 0)} icon={Timer} tone="info" />
+        <Kpi label="Payments" value={String(s?.payments ?? 0)} icon={Landmark} tone="warning" />
       </div>
     </Shell>
   );
@@ -716,14 +913,16 @@ function SupplierDashboard() {
 
 /* ─────────── AUDITOR ─────────── */
 function AuditorDashboard() {
+  const { companyId } = useAuth();
+  const s = useLiveStats(companyId).data;
   const logs = useQuery({ queryKey: ["audit-recent"], queryFn: async () => { try { return (await supabase.from("audit_logs").select("*, profiles(full_name)").order("created_at", { ascending: false }).limit(20)).data ?? []; } catch { return []; } } });
   return (
     <Shell eyebrow="Audit" title="Compliance Overview" sub="Read-only view of activity and compliance across the company.">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Events (24h)" value={String(logs.data?.length ?? 0)} icon={ScrollText} tone="primary" />
-        <Kpi label="Critical" value="0" icon={ShieldCheck} tone="success" />
-        <Kpi label="Warnings" value="3" icon={ShieldCheck} tone="warning" />
-        <Kpi label="Docs Pending" value="2" icon={ClipboardList} tone="info" />
+        <Kpi label="Audit Events" value={String(s?.auditEvents ?? 0)} icon={ScrollText} tone="primary" />
+        <Kpi label="Orders" value={String(s?.salesOrders ?? 0)} icon={ShoppingCart} tone="info" />
+        <Kpi label="Production" value={String(s?.productionOrders ?? 0)} icon={Factory} tone="success" />
+        <Kpi label="Machines" value={String(s?.machines ?? 0)} icon={Cog} tone="warning" />
       </div>
       <div className="mt-4">
         <Panel title="Recent audit events">
