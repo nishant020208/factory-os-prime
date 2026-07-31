@@ -151,10 +151,20 @@ function SendNotificationForm({ companyId, senderRole, isMainAdmin }: { companyI
     setSending(true);
     try {
       const notificationTitle = title.trim() || `📨 Manual message from ${roleLabel(senderRole ?? "unknown")}`;
+      let sent = 0;
       for (const toRole of selectedRoles) {
-        await fireNotification(companyId, toRole, null, notificationTitle, body.trim(), severity);
+        const ok = await fireNotification(companyId, toRole, null, notificationTitle, body.trim(), severity);
+        if (ok) sent += 1;
       }
-      toast.success(`Notification sent to ${selectedRoles.length} role${selectedRoles.length > 1 ? "s" : ""}`);
+      if (sent === 0) {
+        toast.error("Notification delivery failed. Check the console or your permissions.");
+        return;
+      }
+      toast.success(
+        sent === selectedRoles.length
+          ? `Notification sent to ${sent} role${sent > 1 ? "s" : ""}`
+          : `Sent to ${sent} of ${selectedRoles.length} role${selectedRoles.length > 1 ? "s" : ""} (${selectedRoles.length - sent} failed)`,
+      );
       setTitle("");
       setBody("");
       setSelectedRoles([]);

@@ -246,9 +246,11 @@ export async function fireNotification(
   severity: NotificationSeverity = "info",
   entityType?: string | null,
   entityId?: string | null,
-) {
+): Promise<boolean> {
   try {
-    await supabase.from("notifications").insert({
+    // Supabase returns errors as { error } objects — it does NOT throw.
+    // Check the result so a failed notification is never silently swallowed.
+    const { error } = await supabase.from("notifications").insert({
       company_id: companyId,
       to_role: toRole,
       to_user: toUser,
@@ -258,8 +260,14 @@ export async function fireNotification(
       related_entity_type: entityType ?? null,
       related_entity_id: entityId ?? null,
     });
+    if (error) {
+      console.error("Failed to fire notification:", error.message);
+      return false;
+    }
+    return true;
   } catch (err) {
     console.error("Failed to fire notification:", err);
+    return false;
   }
 }
 
