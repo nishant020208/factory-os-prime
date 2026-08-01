@@ -15,6 +15,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { PageHeader, Panel, Kpi, StatusBadge, EmptyState } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import type { ColumnDef, ModuleConfig } from "@/lib/module-registry";
+import type { FieldDef } from "@/lib/module-fields";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 type Row = Record<string, unknown> & { id: string; company_id?: string };
 
@@ -70,6 +73,9 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
   const [q, setQ] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [formData, setFormData] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
 
   const queryKey = useMemo(
     () => [table, companyId, filter ?? null, orderBy ?? null] as const,
@@ -153,59 +159,86 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
     return { total, top };
   }, [rows]);
 
-  // Auto-generate form fields from columns
-  const formFields = useMemo(() => {
-    const fields: { key: string; label: string; type: string; placeholder: string }[] = [];
-    // Use titleField as primary field
+  // Explicit per-module schema wins; otherwise fall back to a minimal
+  // title/status/priority form derived from the visible columns.
+  const formFields: FieldDef[] = useMemo(() => {
+    if (config.fields?.length) return config.fields;
+    const fields: FieldDef[] = [];
     if (titleField) {
-      fields.push({ key: titleField, label: titleField.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), type: "text", placeholder: `Enter ${titleField.replace(/_/g, " ")}` });
+      fields.push({
+        key: titleField,
+        label: titleField.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        type: "text",
+        required: true,
+        placeholder: `Enter ${titleField.replace(/_/g, " ")}`,
+      });
     }
-    // Add status if it exists in columns
     if (columns.some(c => c.key === "status")) {
-      fields.push({ key: "status", label: "Status", type: "select", placeholder: "Select status" });
+      fields.push({ key: "status", label: "Status", type: "select", required: true, defaultValue: "pending",
+        options: ["pending","draft","active","in_progress","completed","approved","rejected"]
+          .map(v => ({ value: v, label: v.replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase()) })) });
     }
-    // Add priority if it exists
     if (columns.some(c => c.key === "priority")) {
-      fields.push({ key: "priority", label: "Priority", type: "select", placeholder: "Select priority" });
+      fields.push({ key: "priority", label: "Priority", type: "select", required: true, defaultValue: "medium",
+        options: ["low","medium","high","critical"].map(v => ({ value: v, label: v.replace(/\b\w/g, c => c.toUpperCase()) })) });
     }
     return fields;
-  }, [columns, titleField]);
+  }, [config.fields, columns, titleField]);
 
   function openNew() {
     const defaults: Record<string, string> = {};
-    if (titleField) defaults[titleField] = "";
-    if (columns.some(c => c.key === "status")) defaults.status = "pending";
-    if (columns.some(c => c.key === "priority")) defaults.priority = "medium";
+    for (const f of formFields) defaults[f.key] = f.defaultValue ?? "";
     setFormData(defaults);
+    setFormError(null);
     setShowNew(true);
   }
 
   async function handleCreate() {
-    if (!companyId) return;
+    if (!companyId) { toast.error("No company context — cannot save."); return; }
+
+    // Client-side required validation (DB not-null + RLS enforce it server-side too)
+    const missing = formFields
+      .filter(f => f.required && !String(formData[f.key] ?? "").trim())
+      .map(f => f.label);
+    if (missing.length) {
+      setFormError(`Required: ${missing.join(", ")}`);
+      return;
+    }
+    setFormError(null);
+    setSaving(true);
+
     const nowNum = Date.now().toString().slice(-6);
     const row: Record<string, unknown> = { company_id: companyId, ...(createDefaults ?? {}) };
 
-    // Apply form data
-    for (const [k, v] of Object.entries(formData)) {
-      if (v !== "") row[k] = v;
+    for (const f of formFields) {
+      const raw = String(formData[f.key] ?? "").trim();
+      if (raw === "") continue;
+      row[f.key] = f.type === "number" ? Number(raw) : raw;
     }
 
-    // Auto-fill title/subject if needed
     const label = titleField ? String(row[titleField] ?? "") : "";
     if (columns.some(c => c.key === "title") && !row["title"]) row["title"] = label || `${singular} ${nowNum}`;
     if (columns.some(c => c.key === "subject") && !row["subject"]) row["subject"] = label || `${singular} ${nowNum}`;
 
-    // Auto-fill common number fields for uniqueness
-    for (const k of ["so_number","po_number","wo_number","invoice_number","payment_number","shipment_number","ticket_number","order_number","inspection_number","employee_code","count_number"]) {
-      if (columns.some(c => c.key === k) && !(k in row)) row[k] = `${k.split("_")[0].toUpperCase()}-${nowNum}`;
+    // Auto-fill document reference numbers where the table carries one
+    const refCols: Record<string, string> = {
+      so_number: "SO", po_number: "PO", wo_number: "WO", invoice_number: "INV",
+      payment_number: "PAY", shipment_number: "SHP", ticket_number: "TKT",
+      order_number: "ORD", inspection_number: "QC", employee_code: "EMP",
+      pr_number: "PR", rfq_number: "RFQ", grn_number: "GRN", certificate_number: "QCERT",
+    };
+    for (const [k, prefix] of Object.entries(refCols)) {
+      if (columns.some(c => c.key === k) && !(k in row)) row[k] = `${prefix}-${nowNum}`;
     }
 
     const { error } = await supabase.from(table as never).insert(row as never);
-    if (error) { toast.error(error.message); return; }
+    setSaving(false);
+    if (error) { setFormError(error.message); toast.error(error.message); return; }
     toast.success(`${singular} created`);
     setShowNew(false);
     void refetch();
   }
+
 
   async function handleDelete(id: string) {
     if (!confirm(`Delete this ${singular.toLowerCase()}?`)) return;
@@ -265,71 +298,47 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
 
       {/* New Record Dialog */}
       <Dialog open={showNew} onOpenChange={setShowNew}>
-        <DialogContent className="sm:max-w-[480px] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New {singular}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {formFields.map(field => (
-              <div key={field.key} className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">{field.label}</Label>
-                {field.type === "select" ? (
-                  <select
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={formData[field.key] ?? ""}
-                    onChange={e => setFormData(d => ({ ...d, [field.key]: e.target.value }))}
-                  >
-                    {field.key === "status" && (
-                      <>
-                        <option value="pending">Pending</option>
-                        <option value="draft">Draft</option>
-                        <option value="active">Active</option>
-                        <option value="completed">Completed</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                      </>
-                    )}
-                    {field.key === "priority" && (
-                      <>
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="critical">Critical</option>
-                      </>
-                    )}
-                  </select>
-                ) : (
-                  <Input
-                    type={field.type}
-                    value={formData[field.key] ?? ""}
-                    onChange={e => setFormData(d => ({ ...d, [field.key]: e.target.value }))}
-                    placeholder={field.placeholder}
-                    className="h-9"
-                  />
-                )}
-              </div>
+              <FieldControl
+                key={field.key}
+                field={field}
+                value={formData[field.key] ?? ""}
+                companyId={companyId ?? null}
+                onChange={(v) => setFormData(d => ({ ...d, [field.key]: v }))}
+              />
             ))}
             {formFields.length === 0 && (
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Name / Reference</Label>
                 <Input
-                  value={formData._name ?? ""}
+                  value={formData["_name"] ?? ""}
                   onChange={e => setFormData(d => ({ ...d, _name: e.target.value }))}
                   placeholder={`Enter ${singular.toLowerCase()} name`}
                   className="h-9"
                 />
               </div>
             )}
+            {formError && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {formError}
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
-            <Button className="bg-[image:var(--gradient-primary)]" onClick={handleCreate}>
-              <Plus className="h-4 w-4 mr-1.5" />Create {singular}
+            <Button variant="outline" onClick={() => setShowNew(false)} disabled={saving}>Cancel</Button>
+            <Button className="bg-[image:var(--gradient-primary)]" onClick={handleCreate} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plus className="h-4 w-4 mr-1.5" />}
+              Create {singular}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
         <Kpi label={`Total ${title.toLowerCase()}`} value={kpis.total.toLocaleString()} />
@@ -406,6 +415,115 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
           </div>
         )}
       </Panel>
+    </div>
+  );
+}
+
+/* ── Schema-driven form control ──────────────────────────────────────────
+   `ref` fields resolve their options LIVE from the referenced Supabase
+   table, scoped to the caller's company_id (RLS enforces this server-side
+   as well). No hardcoded entity lists.                                    */
+function FieldControl({
+  field, value, onChange, companyId,
+}: {
+  field: FieldDef;
+  value: string;
+  onChange: (v: string) => void;
+  companyId: string | null;
+}) {
+  const ref = field.ref;
+
+  const { data: refOptions, isLoading: refLoading } = useQuery({
+    queryKey: ["ref-options", ref?.table, ref?.labelColumn, companyId, ref?.filter, ref?.filterIn],
+    enabled: field.type === "ref" && !!ref && !!companyId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      if (!ref) return [];
+      const valueCol = ref.valueColumn ?? "id";
+      let query = supabase
+        .from(ref.table as never)
+        .select(`${valueCol}, ${ref.labelColumn}`)
+        .eq("company_id", companyId as string)
+        .limit(500);
+      for (const [k, v] of Object.entries(ref.filter ?? {})) query = query.eq(k, v);
+      if (ref.filterIn) query = query.in(ref.filterIn.column, ref.filterIn.values);
+      const { data, error } = await query.order(ref.labelColumn, { ascending: true });
+      if (error) return [];
+      return ((data ?? []) as Record<string, unknown>[]).map(r => ({
+        value: String(r[valueCol] ?? ""),
+        label: String(r[ref.labelColumn] ?? "Untitled"),
+      }));
+    },
+  });
+
+  const label = (
+    <Label className="text-xs text-muted-foreground">
+      {field.label}{field.required && <span className="text-destructive ml-0.5">*</span>}
+    </Label>
+  );
+
+  if (field.type === "select" || field.type === "ref") {
+    const options = field.type === "ref" ? (refOptions ?? []) : (field.options ?? []);
+    const empty = field.type === "ref" && !refLoading && options.length === 0;
+    return (
+      <div className="space-y-1.5">
+        {label}
+        <Select value={value} onValueChange={onChange} disabled={empty || refLoading}>
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder={
+              refLoading ? "Loading…"
+                : empty ? `No ${field.label.toLowerCase()} records yet`
+                : `Select ${field.label.toLowerCase()}`
+            } />
+          </SelectTrigger>
+          <SelectContent className="max-h-64">
+            {options.map(o => (
+              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  }
+
+  if (field.type === "textarea") {
+    return (
+      <div className="space-y-1.5">
+        {label}
+        <Textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={field.placeholder}
+          rows={3}
+        />
+      </div>
+    );
+  }
+
+  if (field.type === "checkbox") {
+    return (
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={value === "true"}
+          onChange={(e) => onChange(e.target.checked ? "true" : "false")}
+          className="h-4 w-4 rounded border-input"
+        />
+        {field.label}
+      </label>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {label}
+      <Input
+        type={field.type === "datetime" ? "datetime-local" : field.type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={field.placeholder}
+        className="h-9"
+      />
     </div>
   );
 }
