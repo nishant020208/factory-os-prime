@@ -867,8 +867,10 @@ function MetricCounter({ label, target, suffix, live = true }: { label: string; 
     const el = ref.current;
     if (!el) return;
     count.set(0);
-    const observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting) return;
+    let started = false;
+    const run = () => {
+      if (started) return;
+      started = true;
       const duration = 1500;
       const start = performance.now();
       function raf(now: number) {
@@ -878,10 +880,24 @@ function MetricCounter({ label, target, suffix, live = true }: { label: string; 
         if (pct < 1) requestAnimationFrame(raf);
       }
       requestAnimationFrame(raf);
-      observer.disconnect();
+    };
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        run();
+        observer.disconnect();
+      }
     }, { threshold: 0.3 });
     observer.observe(el);
-    return () => observer.disconnect();
+    // Fallback so the number always renders even if the observer never
+    // fires (hidden tab, headless, or reduced-motion contexts).
+    const fallback = setTimeout(() => {
+      run();
+      observer.disconnect();
+    }, 2000);
+    return () => {
+      observer.disconnect();
+      clearTimeout(fallback);
+    };
   }, [target]);
 
   return (
@@ -936,8 +952,8 @@ function LiveMetrics() {
 
   const metrics = [
     { label: "Plants", target: stats?.companies ?? 0, suffix: "", live: !!stats },
-    { label: "Machines", target: stats ? stats.machines / 1000 : 0, suffix: stats && stats.machines >= 1000 ? "k" : "", live: !!stats },
-    { label: "Users", target: stats ? stats.users / 1000 : 0, suffix: stats && stats.users >= 1000 ? "k" : "", live: !!stats },
+    { label: "Machines", target: stats ? (stats.machines >= 1000 ? stats.machines / 1000 : stats.machines) : 0, suffix: stats && stats.machines >= 1000 ? "k" : "", live: !!stats },
+    { label: "Users", target: stats ? (stats.users >= 1000 ? stats.users / 1000 : stats.users) : 0, suffix: stats && stats.users >= 1000 ? "k" : "", live: !!stats },
     { label: "Uptime", target: stats?.uptime ?? 0, suffix: "%", live: !!stats },
   ];
 
@@ -1481,20 +1497,43 @@ function BentoModuleTile({ m, index, onHover }: { m: BentoModule; index: number;
     const target = parseInt(m.hint.replace(/[^0-9.]/g, "")) || 100;
     const isPct = m.hint.includes("%");
     const duration = 1500;
-    const startPerf = performance.now();
+    let started = false;
     const rafCb = () => {
-      const elapsed = performance.now() - startPerf;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const val = isPct ? Math.round(eased * target * 10) / 10 : Math.round(eased * target);
-      setCount(val);
-      if (progress < 1) requestAnimationFrame(rafCb);
-    };              const observer = new IntersectionObserver(([entry]) => {
-                      if (entry.isIntersecting) { requestAnimationFrame(rafCb); observer.disconnect(); }
-                    }, { threshold: 0.3 });
-                    if (countRef.current) observer.observe(countRef.current);
-                    return () => observer.disconnect();
-                  }, []);
+      if (started) return;
+      started = true;
+      const startPerf = performance.now();
+      const step = () => {
+        const elapsed = performance.now() - startPerf;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const val = isPct ? Math.round(eased * target * 10) / 10 : Math.round(eased * target);
+        setCount(val);
+        if (progress < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        rafCb();
+        observer.disconnect();
+      }
+    }, { threshold: 0.3 });
+    if (countRef.current) observer.observe(countRef.current);
+    // Fallback so the value always renders even if the observer never fires
+    // (hidden tab, headless, reduced-motion). Snap to the final value instead
+    // of animating so the scroll-triggered count-up reveal is preserved for
+    // real users on below-the-fold cards.
+    const fallback = setTimeout(() => {
+      if (!started) {
+        setCount(target);
+        observer.disconnect();
+      }
+    }, 2000);
+    return () => {
+      observer.disconnect();
+      clearTimeout(fallback);
+    };
+  }, [m.hint]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (reducedMotion) return;
@@ -1972,6 +2011,9 @@ function EnterpriseModules() {
         title="Every function, one platform"
         desc="Consistent primitives across every module — with role-scoped access."
       />
+      <p className="mt-2 text-[11px] text-muted-foreground/60">
+        Sample module metrics shown for illustration — every dashboard in the app displays live, role-scoped data.
+      </p>
       <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {BENTO_MODULES.map((m, i) => (
           <BentoModuleTile key={m.id} m={m} index={i} onHover={setHoveredModule} />
@@ -2448,16 +2490,16 @@ function Footer() {
         </div>
 
         {[
-          { h: "Product", l: ["Modules", "AI Platform", "Security", "Roadmap"] },
-          { h: "Resources", l: ["Documentation", "API Reference", "Status", "Support"] },
-          { h: "Company", l: ["About", "Careers", "Privacy", "Terms"] },
+          { h: "Product", l: [{ label: "Modules", href: "#modules" }, { label: "AI Platform", href: "#ai" }, { label: "Security", href: "#security" }, { label: "Workflow", href: "#flow" }] },
+          { h: "Resources", l: [{ label: "Sign in", href: "/auth" }, { label: "Register a company", href: "/auth" }, { label: "Customer access", href: "/auth" }] },
+          { h: "Company", l: [{ label: "Get started", href: "/auth" }, { label: "Analytics", href: "#analytics" }] },
         ].map(group => (
           <div key={group.h}>
             <div className="text-xs font-medium text-muted-foreground mb-3">{group.h}</div>
             <ul className="space-y-2">
               {group.l.map(x => (
-                <li key={x}>
-                  <a href="#" className="text-xs text-muted-foreground hover:text-muted-foreground transition-colors duration-150">{x}</a>
+                <li key={x.label}>
+                  <a href={x.href} className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-150">{x.label}</a>
                 </li>
               ))}
             </ul>
@@ -2468,9 +2510,8 @@ function Footer() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-2 text-[11px] text-foreground/30">
           <span>© {new Date().getFullYear()} FactoryOS AI. All rights reserved.</span>
           <div className="flex items-center gap-4">
-            <a href="https://github.com" className="hover:text-muted-foreground transition-colors">GitHub</a>
-            <a href="#" className="hover:text-muted-foreground transition-colors">Privacy</a>
-            <a href="#" className="hover:text-muted-foreground transition-colors">Terms</a>
+            <a href="https://github.com/nishant020208/factory-os-prime" target="_blank" rel="noreferrer" className="hover:text-foreground transition-colors">GitHub</a>
+            <a href="/auth" className="hover:text-foreground transition-colors">Sign in</a>
           </div>
         </div>
       </div>
