@@ -298,71 +298,47 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
 
       {/* New Record Dialog */}
       <Dialog open={showNew} onOpenChange={setShowNew}>
-        <DialogContent className="sm:max-w-[480px] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New {singular}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {formFields.map(field => (
-              <div key={field.key} className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">{field.label}</Label>
-                {field.type === "select" ? (
-                  <select
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={formData[field.key] ?? ""}
-                    onChange={e => setFormData(d => ({ ...d, [field.key]: e.target.value }))}
-                  >
-                    {field.key === "status" && (
-                      <>
-                        <option value="pending">Pending</option>
-                        <option value="draft">Draft</option>
-                        <option value="active">Active</option>
-                        <option value="completed">Completed</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                      </>
-                    )}
-                    {field.key === "priority" && (
-                      <>
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="critical">Critical</option>
-                      </>
-                    )}
-                  </select>
-                ) : (
-                  <Input
-                    type={field.type}
-                    value={formData[field.key] ?? ""}
-                    onChange={e => setFormData(d => ({ ...d, [field.key]: e.target.value }))}
-                    placeholder={field.placeholder}
-                    className="h-9"
-                  />
-                )}
-              </div>
+              <FieldControl
+                key={field.key}
+                field={field}
+                value={formData[field.key] ?? ""}
+                companyId={companyId ?? null}
+                onChange={(v) => setFormData(d => ({ ...d, [field.key]: v }))}
+              />
             ))}
             {formFields.length === 0 && (
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Name / Reference</Label>
                 <Input
-                  value={formData._name ?? ""}
+                  value={formData["_name"] ?? ""}
                   onChange={e => setFormData(d => ({ ...d, _name: e.target.value }))}
                   placeholder={`Enter ${singular.toLowerCase()} name`}
                   className="h-9"
                 />
               </div>
             )}
+            {formError && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {formError}
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
-            <Button className="bg-[image:var(--gradient-primary)]" onClick={handleCreate}>
-              <Plus className="h-4 w-4 mr-1.5" />Create {singular}
+            <Button variant="outline" onClick={() => setShowNew(false)} disabled={saving}>Cancel</Button>
+            <Button className="bg-[image:var(--gradient-primary)]" onClick={handleCreate} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plus className="h-4 w-4 mr-1.5" />}
+              Create {singular}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
         <Kpi label={`Total ${title.toLowerCase()}`} value={kpis.total.toLocaleString()} />
