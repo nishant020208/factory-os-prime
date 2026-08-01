@@ -492,41 +492,44 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
 
   // ── Maintenance / spares ────────────────────────────────────
   "/breakdowns": {
-    table: "machines", title: "Breakdowns", eyebrow: "Maintenance",
-    sub: "Machines currently in a down or maintenance state.",
-    singular: "Machine",
+    table: "machine_breakdowns", title: "Breakdowns", eyebrow: "Maintenance",
+    sub: "Logged machine breakdowns and downtime.",
+    singular: "Breakdown",
     columns: [
-      { key: "name", label: "Machine" },
-      { key: "code", label: "Code" }, COL.status,
-      { key: "last_maintenance", label: "Last PM", kind: "date" },
+      { key: "machine_id", label: "Machine" },
+      { key: "cause", label: "Cause" },
+      { key: "downtime_start", label: "Down From", kind: "datetime" },
+      { key: "downtime_end", label: "Restored", kind: "datetime" },
     ],
-    orderBy: { column: "status", ascending: true },
+    orderBy: { column: "downtime_start", ascending: false },
   },
   "/machine-history": {
-    table: "work_orders", title: "Machine History", eyebrow: "Maintenance",
-    sub: "History of operations by machine.",
+    table: "machine_status_log", title: "Machine History", eyebrow: "Maintenance",
+    sub: "Chronological status history per machine.",
     singular: "Entry",
     columns: [
-      { key: "wo_number", label: "WO #" },
-      { key: "operation", label: "Operation" }, COL.status,
-      { key: "start_time", label: "Start", kind: "datetime" },
-      { key: "end_time", label: "End", kind: "datetime" },
+      { key: "machine_id", label: "Machine" },
+      { key: "from_status", label: "From" },
+      { key: "to_status", label: "To", kind: "status" },
+      { key: "reason", label: "Reason" },
+      { key: "created_at", label: "Changed", kind: "datetime" },
     ],
-    orderBy: { column: "start_time", ascending: false },
+    orderBy: { column: "created_at", ascending: false },
   },
   "/spare-parts": {
-    table: "products", title: "Spare Parts", eyebrow: "Maintenance",
+    table: "spare_parts", title: "Spare Parts", eyebrow: "Maintenance",
     sub: "Spare parts inventory tied to machines.",
-    singular: "Part",
+    singular: "Part", titleField: "name",
     columns: [
-      { key: "sku", label: "SKU" },
+      { key: "part_code", label: "Code" },
       { key: "name", label: "Name" },
+      { key: "quantity", label: "In Stock", kind: "number" },
+      { key: "reorder_threshold", label: "Reorder At", kind: "number" },
       { key: "unit_cost", label: "Cost", kind: "currency" },
-      { key: "reorder_level", label: "Reorder", kind: "number" },
-      COL.status,
     ],
     orderBy: { column: "name", ascending: true },
   },
+
 
   // ── Warehouse ops ───────────────────────────────────────────
   "/cycle-count": {
