@@ -230,28 +230,32 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { status: "todo", priority: "medium" },
   },
   "/schedules": {
-    table: "tasks", title: "Schedules", eyebrow: "Maintenance",
-    sub: "Scheduled maintenance and inspection tasks.",
-    singular: "Scheduled Task", titleField: "title",
+    table: "maintenance_schedules", title: "PM Schedules", eyebrow: "Maintenance",
+    sub: "Preventive maintenance schedules per machine.",
+    singular: "PM Schedule",
     columns: [
-      { key: "title", label: "Task" }, COL.status,
-      { key: "due_date", label: "Scheduled", kind: "datetime" },
+      { key: "machine_id", label: "Machine" },
+      { key: "recurrence", label: "Recurrence" }, COL.status,
+      { key: "next_due", label: "Next Due", kind: "date" },
+      { key: "last_done", label: "Last Done", kind: "date" },
     ],
-    orderBy: { column: "due_date", ascending: true },
-    createDefaults: { status: "todo", priority: "medium", entity: "machines" },
+    orderBy: { column: "next_due", ascending: true },
+    createDefaults: { status: "scheduled", recurrence: "monthly" },
   },
   "/leaves": {
-    table: "tasks", title: "Leaves", eyebrow: "HR",
+    table: "leaves", title: "Leaves", eyebrow: "HR",
     sub: "Employee leave requests and approvals.",
-    singular: "Leave Request", titleField: "title",
-    filter: { entity: "leaves" },
+    singular: "Leave Request",
     columns: [
-      { key: "title", label: "Employee" }, COL.status,
-      { key: "due_date", label: "From", kind: "date" },
+      { key: "employee_id", label: "Employee" },
+      { key: "leave_type", label: "Type" }, COL.status,
+      { key: "start_date", label: "From", kind: "date" },
+      { key: "end_date", label: "To", kind: "date" },
     ],
     orderBy: { column: "created_at", ascending: false },
-    createDefaults: { status: "pending", priority: "medium", entity: "leaves" },
+    createDefaults: { status: "pending", leave_type: "casual" },
   },
+
 
   // ── HR ──────────────────────────────────────────────────────
   "/attendance": {
