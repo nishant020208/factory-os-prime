@@ -70,6 +70,9 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
   const [q, setQ] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [formData, setFormData] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
 
   const queryKey = useMemo(
     () => [table, companyId, filter ?? null, orderBy ?? null] as const,
