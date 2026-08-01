@@ -107,7 +107,7 @@ const EMPTY_STATS: LiveStats = {
 };
 
 function useLiveStats(companyId: string | null) {
-  const safe = async (fn: () => Promise<any>) => { try { return await fn(); } catch { return null; } };
+  const safe = async (fn: () => PromiseLike<any>): Promise<any> => { try { return await fn(); } catch { return null; } };
   return useQuery({
     queryKey: ["live-stats", companyId],
     queryFn: async (): Promise<LiveStats> => {
@@ -830,7 +830,7 @@ function OperatorDashboard() {
         const { data } = await supabase
           .from("work_orders")
           .select("id,status")
-          .eq("assigned_user_id", user?.id)
+          .eq("operator_id", user?.id ?? "")
           .limit(50);
         return data ?? [];
       } catch { return []; }
@@ -865,10 +865,10 @@ function CustomerDashboard() {
     queryKey: ["my-so", user?.id],
     queryFn: async () => {
       try {
-        // Customers only see their own orders (scoped via customer_id on their profile)
-        const { data: profile } = await supabase.from("profiles").select("customer_id").eq("id", user?.id).maybeSingle();
-        if (!profile?.customer_id) return [];
-        const { data } = await supabase.from("sales_orders").select("status,total_amount").eq("customer_id", profile.customer_id);
+        // Customers only see their own orders (scoped via customers.user_id)
+        const { data: customer } = await supabase.from("customers").select("id").eq("user_id", user?.id ?? "").maybeSingle();
+        if (!customer?.id) return [];
+        const { data } = await supabase.from("sales_orders").select("status,total_amount").eq("customer_id", customer.id);
         return data ?? [];
       } catch { return []; }
     },
