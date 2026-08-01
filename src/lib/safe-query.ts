@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 export function safeFrom(table: string) {
   const original = supabase.from(table as never);
   return {
+    ...original,
     select: (columns = "*", options?: { count?: "exact" | "planned" | "estimated"; head?: boolean }) => {
       try {
         return original.select(columns as never, options as never);
@@ -22,7 +23,6 @@ export function safeFrom(table: string) {
         return { data: [], error: null } as never;
       }
     },
-    ...original,
   };
 }
 
