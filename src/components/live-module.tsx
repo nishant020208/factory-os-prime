@@ -15,6 +15,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { PageHeader, Panel, Kpi, StatusBadge, EmptyState } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import type { ColumnDef, ModuleConfig } from "@/lib/module-registry";
+import type { FieldDef } from "@/lib/module-fields";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 type Row = Record<string, unknown> & { id: string; company_id?: string };
 
