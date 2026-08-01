@@ -558,16 +558,20 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "updated_at", ascending: false },
   },
   "/transfers": {
-    table: "inventory", title: "Transfers", eyebrow: "Warehouse",
-    sub: "Inter-warehouse and inter-plant transfers.",
+    table: "stock_transfers", title: "Transfers", eyebrow: "Warehouse",
+    sub: "Inter-warehouse stock transfers — atomic decrement/increment.",
     singular: "Transfer",
     columns: [
-      { key: "product_id", label: "Product" },
-      { key: "warehouse_id", label: "Warehouse" },
-      { key: "quantity", label: "Qty", kind: "number" },
+      { key: "from_warehouse_id", label: "From" },
+      { key: "to_warehouse_id", label: "To" },
+      { key: "material_id", label: "Material" },
+      { key: "quantity", label: "Qty", kind: "number" }, COL.status,
+      { key: "created_at", label: "Moved", kind: "datetime" },
     ],
-    orderBy: { column: "updated_at", ascending: false },
+    orderBy: { column: "created_at", ascending: false },
+    createDefaults: { status: "completed" },
   },
+
   "/receiving": {
     table: "purchase_orders", title: "Receiving", eyebrow: "Warehouse",
     sub: "Receive inbound goods against purchase orders.",
