@@ -237,6 +237,16 @@ export const NOTIFICATION_COUNTS_BY_ROLE: Record<string, number> = {
  *   the notification to appear for the entire role AND the specific user,
  *   violating the "no broadcast" rule.
  */
+/**
+ * Resolve (toRole, toUser) for a one-person notification.
+ * - If the specific user's id is known → target ONLY them (toRole = null).
+ * - If it can't be resolved → fall back to the role-wide target so the
+ *   notification is never silently dropped (never sets BOTH).
+ */
+function resolveTarget(role: string, userId: string | null | undefined): [string | null, string | null] {
+  return userId ? [null, userId] : [role, null];
+}
+
 export async function fireNotification(
   companyId: string | null,
   toRole: string | null,
@@ -461,7 +471,8 @@ export async function notifyWorkOrderCompleted(companyId: string, woNumber: stri
 
 /** Trigger 18: Work Order assigned to operator */
 export async function notifyWorkOrderAssigned(companyId: string, woNumber: string, operatorUserId: string, workOrderId: string) {
-  await fireNotification(companyId, "production_operator", operatorUserId,
+  const [ntRole, ntUser] = resolveTarget("production_operator", operatorUserId);
+  await fireNotification(companyId, ntRole, ntUser,
     "📋 New Work Order Assigned",
     `Work Order ${woNumber} has been assigned to you.`,
     "info", "work_orders", workOrderId);
@@ -469,7 +480,8 @@ export async function notifyWorkOrderAssigned(companyId: string, woNumber: strin
 
 /** Trigger 19: Maintenance ticket resolved → Operator + Production Manager */
 export async function notifyMaintenanceResolved(companyId: string, machineName: string, operatorUserId: string, ticketId: string) {
-  await fireNotification(companyId, "production_operator", operatorUserId,
+  const [ntRole, ntUser] = resolveTarget("production_operator", operatorUserId);
+  await fireNotification(companyId, ntRole, ntUser,
     "✅ Machine Back Online",
     `${machineName} is back online. You can resume work.`,
     "success", "maintenance_tickets", ticketId);
@@ -592,14 +604,16 @@ export async function notifySupportTicket(companyId: string, ticketNumber: strin
 
 /** Trigger 29: Invoice generated / payment status → Customer */
 export async function notifyInvoiceGenerated(companyId: string, invoiceNumber: string, customerUserId: string, invoiceId: string) {
-  await fireNotification(companyId, "customer_portal", customerUserId,
+  const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
+  await fireNotification(companyId, ntRole, ntUser,
     "📄 Invoice Generated",
     `Invoice ${invoiceNumber} is ready. View in your Invoices tab.`,
     "info", "invoices", invoiceId);
 }
 
 export async function notifyPaymentStatusChanged(companyId: string, invoiceNumber: string, customerUserId: string, status: string, invoiceId: string) {
-  await fireNotification(companyId, "customer_portal", customerUserId,
+  const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
+  await fireNotification(companyId, ntRole, ntUser,
     "💰 Payment Status Updated",
     `Invoice ${invoiceNumber} status: ${status}.`,
     "success", "invoices", invoiceId);
@@ -607,7 +621,8 @@ export async function notifyPaymentStatusChanged(companyId: string, invoiceNumbe
 
 /** Trigger 30: Supplier payment released → Supplier */
 export async function notifySupplierPaymentReleased(companyId: string, poNumber: string, supplierUserId: string, amount: number) {
-  await fireNotification(companyId, "supplier_portal", supplierUserId,
+  const [ntRole, ntUser] = resolveTarget("supplier_portal", supplierUserId);
+  await fireNotification(companyId, ntRole, ntUser,
     "💰 Payment Released",
     `Payment of $${amount.toLocaleString()} for PO ${poNumber} has been released.`,
     "success", "purchase_orders", null);
@@ -615,7 +630,8 @@ export async function notifySupplierPaymentReleased(companyId: string, poNumber:
 
 /** Trigger 31: New PO sent to Supplier */
 export async function notifyNewPOToSupplier(companyId: string, poNumber: string, supplierUserId: string, poId: string) {
-  await fireNotification(companyId, "supplier_portal", supplierUserId,
+  const [ntRole, ntUser] = resolveTarget("supplier_portal", supplierUserId);
+  await fireNotification(companyId, ntRole, ntUser,
     "📋 New Purchase Order",
     `Purchase Order ${poNumber} has been issued to you. Review in your portal.`,
     "info", "purchase_orders", poId);
@@ -623,7 +639,8 @@ export async function notifyNewPOToSupplier(companyId: string, poNumber: string,
 
 /** Advance payment QR generated → Customer */
 export async function notifyAdvancePaymentQRGenerated(companyId: string, orderNumber: string, customerUserId: string, amount: number) {
-  await fireNotification(companyId, "customer_portal", customerUserId,
+  const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
+  await fireNotification(companyId, ntRole, ntUser,
     "📱 Advance Payment Required",
     `An advance payment of $${amount.toLocaleString()} is required for order ${orderNumber}. Scan the QR code to pay.`,
     "info", "sales_orders", null);
@@ -631,7 +648,8 @@ export async function notifyAdvancePaymentQRGenerated(companyId: string, orderNu
 
 /** Support ticket status updated → Customer */
 export async function notifySupportTicketUpdate(companyId: string, ticketNumber: string, customerUserId: string, status: string, ticketId: string) {
-  await fireNotification(companyId, "customer_portal", customerUserId,
+  const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
+  await fireNotification(companyId, ntRole, ntUser,
     "🎫 Support Ticket Updated",
     `Your ticket ${ticketNumber} status: ${status}.`,
     "info", "support_tickets", ticketId);
@@ -639,7 +657,8 @@ export async function notifySupportTicketUpdate(companyId: string, ticketNumber:
 
 /** Work Order progress update → Customer (live tracking notification) */
 export async function notifyProgressUpdate(companyId: string, orderNumber: string, customerUserId: string, progress: number, workOrderId: string) {
-  await fireNotification(companyId, "customer_portal", customerUserId,
+  const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
+  await fireNotification(companyId, ntRole, ntUser,
     "📈 Order Progress Update",
     `Your order ${orderNumber} is ${progress}% complete.`,
     "info", "work_orders", workOrderId);
@@ -647,7 +666,8 @@ export async function notifyProgressUpdate(companyId: string, orderNumber: strin
 
 /** Quality inspection passed/failed → Customer (status update, no raw QC detail) */
 export async function notifyQualityStatusUpdate(companyId: string, orderNumber: string, customerUserId: string, passed: boolean) {
-  await fireNotification(companyId, "customer_portal", customerUserId,
+  const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
+  await fireNotification(companyId, ntRole, ntUser,
     passed ? "✅ Quality Inspection Passed" : "❌ Quality Inspection Ongoing",
     passed
       ? `Your order ${orderNumber} has passed quality inspection and is moving to dispatch.`
@@ -663,7 +683,8 @@ export async function notifyShipmentUpdate(companyId: string, orderNumber: strin
     delivered: "✅ Order Delivered",
   };
   const title = labels[status] ?? "🚚 Shipment Update";
-  await fireNotification(companyId, "customer_portal", customerUserId,
+  const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
+  await fireNotification(companyId, ntRole, ntUser,
     title,
     `Your order ${orderNumber} shipment status: ${status.replace(/_/g, " ")}.`,
     status === "delivered" ? "success" : "info", "shipments", shipmentId);
@@ -671,7 +692,8 @@ export async function notifyShipmentUpdate(companyId: string, orderNumber: strin
 
 /** Trigger 33: Production paused for maintenance → Customer */
 export async function notifyProductionPaused(companyId: string, orderNumber: string, customerUserId: string, reason: string) {
-  await fireNotification(companyId, "customer_portal", customerUserId,
+  const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
+  await fireNotification(companyId, ntRole, ntUser,
     "⏸️ Production Paused",
     `Your order ${orderNumber} is paused due to maintenance. We'll update you when it resumes.`,
     "warning", "sales_orders", null);
