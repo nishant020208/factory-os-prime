@@ -2,6 +2,8 @@
  * Registry mapping every "stub" route to a real Supabase table + column config
  * so the LiveModule renders real data instead of a placeholder.
  */
+import { fieldsForPath, type FieldDef } from "./module-fields";
+
 export interface ColumnDef {
   key: string;
   label: string;
@@ -24,7 +26,12 @@ export interface ModuleConfig {
   titleField?: string;
   /** friendly singular name */
   singular?: string;
+  /** route path this config was resolved for */
+  path?: string;
+  /** explicit create-form schema (live dropdowns + validation) */
+  fields?: FieldDef[];
 }
+
 
 const COL = {
   id:        { key: "id",              label: "ID",           kind: "text" as const },
