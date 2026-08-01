@@ -811,20 +811,23 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
 
   // ── Compliance ──────────────────────────────────────────────
   "/compliance": {
-    table: "documents", title: "Compliance", eyebrow: "Auditor",
-    sub: "Compliance documents and ISO evidence.",
-    singular: "Document",
-    filter: { category: "iso" },
+    table: "compliance_records", title: "Compliance", eyebrow: "Auditor",
+    sub: "Certification status, validity windows and compliance evidence.",
+    singular: "Compliance Record", titleField: "title",
     columns: [
-      { key: "title", label: "Document" },
-      { key: "category", label: "Category" },
-      { key: "version", label: "Version" }, COL.status,
-      { key: "created_at", label: "Filed", kind: "date" },
+      { key: "title", label: "Record" },
+      { key: "standard", label: "Standard" }, COL.status,
+      { key: "valid_from", label: "Valid From", kind: "date" },
+      { key: "expires_at", label: "Expires", kind: "date" },
     ],
-    orderBy: { column: "created_at", ascending: false },
+    orderBy: { column: "expires_at", ascending: true },
+    createDefaults: { status: "compliant" },
   },
 };
 
 export function moduleForPath(path: string): ModuleConfig | null {
-  return MODULE_REGISTRY[path] ?? null;
+  const cfg = MODULE_REGISTRY[path];
+  if (!cfg) return null;
+  return { ...cfg, path, fields: fieldsForPath(path) };
 }
+
