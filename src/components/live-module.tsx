@@ -418,3 +418,112 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
     </div>
   );
 }
+
+/* ── Schema-driven form control ──────────────────────────────────────────
+   `ref` fields resolve their options LIVE from the referenced Supabase
+   table, scoped to the caller's company_id (RLS enforces this server-side
+   as well). No hardcoded entity lists.                                    */
+function FieldControl({
+  field, value, onChange, companyId,
+}: {
+  field: FieldDef;
+  value: string;
+  onChange: (v: string) => void;
+  companyId: string | null;
+}) {
+  const ref = field.ref;
+
+  const { data: refOptions, isLoading: refLoading } = useQuery({
+    queryKey: ["ref-options", ref?.table, ref?.labelColumn, companyId, ref?.filter, ref?.filterIn],
+    enabled: field.type === "ref" && !!ref && !!companyId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      if (!ref) return [];
+      const valueCol = ref.valueColumn ?? "id";
+      let query = supabase
+        .from(ref.table as never)
+        .select(`${valueCol}, ${ref.labelColumn}`)
+        .eq("company_id", companyId as string)
+        .limit(500);
+      for (const [k, v] of Object.entries(ref.filter ?? {})) query = query.eq(k, v);
+      if (ref.filterIn) query = query.in(ref.filterIn.column, ref.filterIn.values);
+      const { data, error } = await query.order(ref.labelColumn, { ascending: true });
+      if (error) return [];
+      return ((data ?? []) as Record<string, unknown>[]).map(r => ({
+        value: String(r[valueCol] ?? ""),
+        label: String(r[ref.labelColumn] ?? "Untitled"),
+      }));
+    },
+  });
+
+  const label = (
+    <Label className="text-xs text-muted-foreground">
+      {field.label}{field.required && <span className="text-destructive ml-0.5">*</span>}
+    </Label>
+  );
+
+  if (field.type === "select" || field.type === "ref") {
+    const options = field.type === "ref" ? (refOptions ?? []) : (field.options ?? []);
+    const empty = field.type === "ref" && !refLoading && options.length === 0;
+    return (
+      <div className="space-y-1.5">
+        {label}
+        <Select value={value} onValueChange={onChange} disabled={empty || refLoading}>
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder={
+              refLoading ? "Loading…"
+                : empty ? `No ${field.label.toLowerCase()} records yet`
+                : `Select ${field.label.toLowerCase()}`
+            } />
+          </SelectTrigger>
+          <SelectContent className="max-h-64">
+            {options.map(o => (
+              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  }
+
+  if (field.type === "textarea") {
+    return (
+      <div className="space-y-1.5">
+        {label}
+        <Textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={field.placeholder}
+          rows={3}
+        />
+      </div>
+    );
+  }
+
+  if (field.type === "checkbox") {
+    return (
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={value === "true"}
+          onChange={(e) => onChange(e.target.checked ? "true" : "false")}
+          className="h-4 w-4 rounded border-input"
+        />
+        {field.label}
+      </label>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {label}
+      <Input
+        type={field.type === "datetime" ? "datetime-local" : field.type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={field.placeholder}
+        className="h-9"
+      />
+    </div>
+  );
+}
