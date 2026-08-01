@@ -1776,6 +1776,7 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
+          is_main_admin: boolean
           job_title: string | null
           phone: string | null
           plant_id: string | null
@@ -1790,6 +1791,7 @@ export type Database = {
           email: string
           full_name?: string | null
           id: string
+          is_main_admin?: boolean
           job_title?: string | null
           phone?: string | null
           plant_id?: string | null
@@ -1804,6 +1806,7 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          is_main_admin?: boolean
           job_title?: string | null
           phone?: string | null
           plant_id?: string | null
@@ -2591,6 +2594,8 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_active_companies: { Args: never; Returns: Json }
+      get_platform_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2599,6 +2604,7 @@ export type Database = {
         Returns: boolean
       }
       is_auditor: { Args: never; Returns: boolean }
+      is_main_admin: { Args: never; Returns: boolean }
       is_root_admin: { Args: { _user_id?: string }; Returns: boolean }
       record_status_transition: {
         Args: {
