@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ROLES, ROLE_MAP, DEMO_PASSWORD, type AppRole } from "@/lib/roles";
+import { ROLES, ROLE_MAP, type AppRole } from "@/lib/roles";
 import {
   notifyCompanyRegistrationRequest,
   notifyCustomerAccessRequest,
@@ -711,9 +711,8 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
     await doSignIn(email, password);
   }
 
-  async function oneClickDemo() {
-    await doSignIn(meta.demoEmail, DEMO_PASSWORD);
-  }
+
+
 
   async function signUp(e: React.FormEvent) {
     e.preventDefault();
@@ -836,17 +835,6 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
                 exit={{ opacity: 0, x: 16 }}
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
               >
-                <RippleButton
-                  type="button"
-                  onClick={oneClickDemo}
-                  disabled={busy}
-                  className="w-full h-11 rounded-lg bg-gradient-to-r from-primary via-primary/90 to-accent text-white font-medium shadow-glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Zap className="h-4 w-4" /> One-click sign in as {meta.label}</>}
-                </RippleButton>
-                <div className="my-4 flex items-center gap-3 text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <div className="h-px flex-1 bg-border/60" /> or use credentials <div className="h-px flex-1 bg-border/60" />
-                </div>
                 <motion.form
                   onSubmit={signIn}
                   className="space-y-4"
