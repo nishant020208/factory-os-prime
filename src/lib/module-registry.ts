@@ -288,30 +288,32 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { status: "pending" },
   },
   "/recruitment": {
-    table: "employees", title: "Recruitment", eyebrow: "HR",
-    sub: "Candidates and open positions.",
-    singular: "Candidate", titleField: "full_name",
+    table: "job_openings", title: "Recruitment", eyebrow: "HR",
+    sub: "Open positions and hiring pipeline.",
+    singular: "Job Opening", titleField: "title",
     columns: [
-      { key: "employee_code", label: "Code" },
-      { key: "full_name", label: "Name" },
-      { key: "job_title", label: "Role" },
-      { key: "department", label: "Dept" }, COL.status,
-      { key: "hire_date", label: "Start", kind: "date" },
+      { key: "title", label: "Title" },
+      { key: "department_id", label: "Department" },
+      { key: "openings", label: "Openings", kind: "number" }, COL.status,
+      { key: "created_at", label: "Posted", kind: "date" },
     ],
-    orderBy: { column: "hire_date", ascending: false },
-    createDefaults: { status: "active" },
+    orderBy: { column: "created_at", ascending: false },
+    createDefaults: { status: "open", openings: 1 },
   },
   "/performance": {
-    table: "employees", title: "Performance", eyebrow: "HR",
+    table: "performance_reviews", title: "Performance", eyebrow: "HR",
     sub: "Performance reviews and ratings.",
     singular: "Review",
     columns: [
-      { key: "full_name", label: "Employee" },
-      { key: "job_title", label: "Role" },
-      { key: "department", label: "Dept" }, COL.status,
+      { key: "employee_id", label: "Employee" },
+      { key: "period", label: "Period" },
+      { key: "rating", label: "Rating", kind: "number" },
+      { key: "notes", label: "Notes" },
+      { key: "created_at", label: "Reviewed", kind: "date" },
     ],
-    orderBy: { column: "full_name", ascending: true },
+    orderBy: { column: "created_at", ascending: false },
   },
+
 
   // ── Production execution ────────────────────────────────────
   "/bom": {
