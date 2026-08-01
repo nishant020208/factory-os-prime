@@ -202,18 +202,19 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { category: "general", status: "published", views: 0 },
   },
   "/training": {
-    table: "knowledge_articles", title: "Training", eyebrow: "HR",
-    sub: "Training material and certifications for the workforce.",
-    singular: "Training Item", titleField: "title",
-    filter: { category: "training" },
+    table: "trainings", title: "Training", eyebrow: "HR",
+    sub: "Training records and certifications for the workforce.",
+    singular: "Training Record",
     columns: [
-      { key: "title", label: "Title" }, COL.status,
-      { key: "views", label: "Enrollments", kind: "number" },
+      { key: "course_name", label: "Course" },
+      { key: "employee_id", label: "Employee" }, COL.status,
+      { key: "completion_date", label: "Completed", kind: "date" },
       { key: "created_at", label: "Added", kind: "date" },
     ],
     orderBy: { column: "created_at", ascending: false },
-    createDefaults: { category: "training", status: "published", views: 0 },
+    createDefaults: { status: "assigned" },
   },
+
 
   // ── Tasks, approvals, calendar ──────────────────────────────
   "/tasks": {
