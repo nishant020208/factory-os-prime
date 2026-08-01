@@ -533,17 +533,18 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
 
   // ── Warehouse ops ───────────────────────────────────────────
   "/cycle-count": {
-    table: "inventory", title: "Cycle Count", eyebrow: "Warehouse",
-    sub: "Weekly cycle counts and variance.",
+    table: "cycle_counts", title: "Cycle Count", eyebrow: "Warehouse",
+    sub: "Physical stock counts and variance reconciliation.",
     singular: "Count",
     columns: [
-      { key: "product_id", label: "Product" },
       { key: "warehouse_id", label: "Warehouse" },
-      { key: "quantity", label: "Qty", kind: "number" },
-      { key: "updated_at", label: "Updated", kind: "datetime" },
+      { key: "count_date", label: "Count Date", kind: "date" }, COL.status,
+      { key: "created_at", label: "Created", kind: "datetime" },
     ],
-    orderBy: { column: "updated_at", ascending: false },
+    orderBy: { column: "count_date", ascending: false },
+    createDefaults: { status: "draft" },
   },
+
   "/stock-movement": {
     table: "inventory", title: "Stock Movement", eyebrow: "Warehouse",
     sub: "Realtime inventory levels by warehouse.",
