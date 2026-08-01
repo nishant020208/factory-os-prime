@@ -153,59 +153,86 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
     return { total, top };
   }, [rows]);
 
-  // Auto-generate form fields from columns
-  const formFields = useMemo(() => {
-    const fields: { key: string; label: string; type: string; placeholder: string }[] = [];
-    // Use titleField as primary field
+  // Explicit per-module schema wins; otherwise fall back to a minimal
+  // title/status/priority form derived from the visible columns.
+  const formFields: FieldDef[] = useMemo(() => {
+    if (config.fields?.length) return config.fields;
+    const fields: FieldDef[] = [];
     if (titleField) {
-      fields.push({ key: titleField, label: titleField.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), type: "text", placeholder: `Enter ${titleField.replace(/_/g, " ")}` });
+      fields.push({
+        key: titleField,
+        label: titleField.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        type: "text",
+        required: true,
+        placeholder: `Enter ${titleField.replace(/_/g, " ")}`,
+      });
     }
-    // Add status if it exists in columns
     if (columns.some(c => c.key === "status")) {
-      fields.push({ key: "status", label: "Status", type: "select", placeholder: "Select status" });
+      fields.push({ key: "status", label: "Status", type: "select", required: true, defaultValue: "pending",
+        options: ["pending","draft","active","in_progress","completed","approved","rejected"]
+          .map(v => ({ value: v, label: v.replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase()) })) });
     }
-    // Add priority if it exists
     if (columns.some(c => c.key === "priority")) {
-      fields.push({ key: "priority", label: "Priority", type: "select", placeholder: "Select priority" });
+      fields.push({ key: "priority", label: "Priority", type: "select", required: true, defaultValue: "medium",
+        options: ["low","medium","high","critical"].map(v => ({ value: v, label: v.replace(/\b\w/g, c => c.toUpperCase()) })) });
     }
     return fields;
-  }, [columns, titleField]);
+  }, [config.fields, columns, titleField]);
 
   function openNew() {
     const defaults: Record<string, string> = {};
-    if (titleField) defaults[titleField] = "";
-    if (columns.some(c => c.key === "status")) defaults.status = "pending";
-    if (columns.some(c => c.key === "priority")) defaults.priority = "medium";
+    for (const f of formFields) defaults[f.key] = f.defaultValue ?? "";
     setFormData(defaults);
+    setFormError(null);
     setShowNew(true);
   }
 
   async function handleCreate() {
-    if (!companyId) return;
+    if (!companyId) { toast.error("No company context — cannot save."); return; }
+
+    // Client-side required validation (DB not-null + RLS enforce it server-side too)
+    const missing = formFields
+      .filter(f => f.required && !String(formData[f.key] ?? "").trim())
+      .map(f => f.label);
+    if (missing.length) {
+      setFormError(`Required: ${missing.join(", ")}`);
+      return;
+    }
+    setFormError(null);
+    setSaving(true);
+
     const nowNum = Date.now().toString().slice(-6);
     const row: Record<string, unknown> = { company_id: companyId, ...(createDefaults ?? {}) };
 
-    // Apply form data
-    for (const [k, v] of Object.entries(formData)) {
-      if (v !== "") row[k] = v;
+    for (const f of formFields) {
+      const raw = String(formData[f.key] ?? "").trim();
+      if (raw === "") continue;
+      row[f.key] = f.type === "number" ? Number(raw) : raw;
     }
 
-    // Auto-fill title/subject if needed
     const label = titleField ? String(row[titleField] ?? "") : "";
     if (columns.some(c => c.key === "title") && !row["title"]) row["title"] = label || `${singular} ${nowNum}`;
     if (columns.some(c => c.key === "subject") && !row["subject"]) row["subject"] = label || `${singular} ${nowNum}`;
 
-    // Auto-fill common number fields for uniqueness
-    for (const k of ["so_number","po_number","wo_number","invoice_number","payment_number","shipment_number","ticket_number","order_number","inspection_number","employee_code","count_number"]) {
-      if (columns.some(c => c.key === k) && !(k in row)) row[k] = `${k.split("_")[0].toUpperCase()}-${nowNum}`;
+    // Auto-fill document reference numbers where the table carries one
+    const refCols: Record<string, string> = {
+      so_number: "SO", po_number: "PO", wo_number: "WO", invoice_number: "INV",
+      payment_number: "PAY", shipment_number: "SHP", ticket_number: "TKT",
+      order_number: "ORD", inspection_number: "QC", employee_code: "EMP",
+      pr_number: "PR", rfq_number: "RFQ", grn_number: "GRN", certificate_number: "QCERT",
+    };
+    for (const [k, prefix] of Object.entries(refCols)) {
+      if (columns.some(c => c.key === k) && !(k in row)) row[k] = `${prefix}-${nowNum}`;
     }
 
     const { error } = await supabase.from(table as never).insert(row as never);
-    if (error) { toast.error(error.message); return; }
+    setSaving(false);
+    if (error) { setFormError(error.message); toast.error(error.message); return; }
     toast.success(`${singular} created`);
     setShowNew(false);
     void refetch();
   }
+
 
   async function handleDelete(id: string) {
     if (!confirm(`Delete this ${singular.toLowerCase()}?`)) return;
