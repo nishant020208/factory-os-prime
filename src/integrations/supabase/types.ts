@@ -3808,6 +3808,7 @@ export type Database = {
         Returns: boolean
       }
       in_company: { Args: { _cid: string }; Returns: boolean }
+      in_company_ops: { Args: { _cid: string }; Returns: boolean }
       is_auditor: { Args: never; Returns: boolean }
       is_main_admin: { Args: never; Returns: boolean }
       is_root_admin: { Args: { _user_id?: string }; Returns: boolean }
