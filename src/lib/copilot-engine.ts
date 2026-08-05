@@ -247,32 +247,44 @@ function evaluateMath(raw: string): string | null {
 /*  ENTITY LOOKUP — a specific order / machine / PO            */
 /* ────────────────────────────────────────────────────────── */
 
-async function findEntity(ref: string, role: string | null): Promise<string | null> {
+async function findEntity(ref: string, role: string | null, userId: string | null): Promise<string | null> {
   const upper = ref.toUpperCase();
   const isCode = /^(SO|WO|PO|PR|INV|N-08|PUR|ORD|RFQ)[-\s]*[\w.-]+/i.test(upper) ||
     /\b(N-08|SO-|WO-|PO-|PUR-|INV-)\b/i.test(upper);
   if (!isCode) return null;
 
+  // External portals may only look up THEIR OWN records — fail closed.
+  const customerId = role === "customer_portal" ? await resolveCustomerId(userId) : null;
+  const supplierId = role === "supplier_portal" ? await resolveSupplierId(userId) : null;
+  if (role === "customer_portal" && !customerId) return UNLINKED_PORTAL_MSG("customer");
+  if (role === "supplier_portal" && !supplierId) return UNLINKED_PORTAL_MSG("supplier");
+
   // Which tables might hold this reference, based on the role's scope
   const allowed = new Set(ROLE_DOMAIN_MAP[role ?? ""] ?? []);
-  const probes: Array<{ table: string; columns: string[]; domain: string }> = [
-    { table: "sales_orders", columns: ["so_number", "order_number"], domain: "orders" },
+  const probes: Array<{ table: string; columns: string[]; domain: string; owner?: string }> = [
+    { table: "sales_orders", columns: ["so_number", "order_number"], domain: "orders", owner: "customer_id" },
     { table: "production_orders", columns: ["order_number", "po_number", "production_order_number"], domain: "production" },
-    { table: "purchase_orders", columns: ["po_number"], domain: "procurement" },
-    { table: "work_orders", columns: ["wo_number"], domain: "production" },
-    { table: "invoices", columns: ["invoice_number"], domain: "finance" },
+    { table: "purchase_orders", columns: ["po_number"], domain: "procurement", owner: "supplier_id" },
+    { table: "work_orders", columns: ["wo_number"], domain: "production", owner: "operator_id" },
+    { table: "invoices", columns: ["invoice_number"], domain: "finance", owner: "customer_id" },
     { table: "machines", columns: ["name", "machine_code", "code"], domain: "maintenance" },
   ];
 
   for (const probe of probes) {
     if (!allowed.has(probe.domain)) continue;
+    // A portal/operator can never probe a table it doesn't own rows in.
+    if (customerId && probe.owner !== "customer_id") continue;
+    if (supplierId && probe.owner !== "supplier_id") continue;
+    if (role === "production_operator" && probe.table === "work_orders" && !userId) continue;
     for (const col of probe.columns) {
       try {
-        const res: any = await supabase
-          .from(probe.table as never)
-          .select("*")
-          .ilike(col as never, `%${upper}%`)
-          .limit(1);
+        const q: any = scoped(
+          supabase.from(probe.table as never).select("*").ilike(col as never, `%${upper}%`).limit(1),
+        );
+        if (customerId) q.eq("customer_id", customerId);
+        if (supplierId) q.eq("supplier_id", supplierId);
+        if (role === "production_operator" && probe.table === "work_orders") q.eq("operator_id", userId);
+        const res: any = await q;
         const row = res?.data?.[0];
         if (row) {
           const status = label(row.status ?? row.state);
