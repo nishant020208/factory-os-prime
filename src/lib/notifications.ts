@@ -269,11 +269,20 @@ export async function fireNotification(
   entityId?: string | null,
 ): Promise<boolean> {
   try {
+    // No target at all → never insert. A row with both to_role and to_user
+    // null would be visible to the whole company (a broadcast), which the
+    // targeting rules forbid.
+    if (!toRole && !toUser) {
+      console.warn("Notification skipped — no resolvable recipient:", title);
+      return false;
+    }
+    // Never set BOTH: that would notify the whole role AND the person.
+    const role = toUser ? null : toRole;
     // Supabase returns errors as { error } objects — it does NOT throw.
     // Check the result so a failed notification is never silently swallowed.
     const { error } = await supabase.from("notifications").insert({
       company_id: companyId,
-      to_role: toRole,
+      to_role: role,
       to_user: toUser,
       title,
       body,
