@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authenticated")({
     }
     const role = primaryRole(roles);
 
-    if (role === "root_super_admin" && !location.pathname.startsWith("/platform")) {
+    if (role === "root_super_admin" && !location.pathname.startsWith("/platform") && !location.pathname.startsWith("/notifications")) {
       throw redirect({ to: "/platform" });
     }
     if (role !== "root_super_admin" && location.pathname.startsWith("/platform")) {

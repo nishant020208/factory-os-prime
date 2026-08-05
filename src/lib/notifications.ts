@@ -18,7 +18,9 @@ export type NotificationSeverity = "info" | "warning" | "success" | "error";
 
 export interface AppNotification {
   id: string;
-  company_id: string;
+  // Root-targeted notifications carry company_id = null (the registration
+  // isn't a companies(id) until Root approves), so this must be nullable.
+  company_id: string | null;
   from_user: string | null;
   to_role: string;
   to_user: string | null;
@@ -298,10 +300,14 @@ export async function notifyCompanyRegistrationRequest(companyId: string, busine
     "info", "company_registrations", companyId);
 }
 
-export async function notifyCompanyRegistrationApproved(companyId: string, adminUserId: string) {
-  await fireNotification(companyId, null, adminUserId,
+export async function notifyCompanyRegistrationApproved(companyId: string, companyName: string) {
+  // Role-wide targeting scoped to the NEW company_id: the registrant's auth
+  // user doesn't exist until they sign up with their whitelisted email, so we
+  // cannot (yet) target to_user. RLS scopes by company_id, so only admins of
+  // this new company see it — never other companies, never broadcast.
+  await fireNotification(companyId, "company_admin", null,
     "✅ Company Activated",
-    "Your company has been approved and activated. Welcome to FactoryOS!",
+    `"${companyName}" has been approved and activated. Welcome to FactoryOS! Sign in with your whitelisted email to set up your workspace.`,
     "success", "companies", companyId);
 }
 
@@ -711,12 +717,31 @@ export async function markNotificationRead(notificationId: string) {
   }
 }
 
+/**
+ * Root Super Admin notifications: root-targeted rows carry company_id = null
+ * (the registration's id is not a companies(id) until Root approves), so all
+ * root queries filter on to_role = 'root_super_admin' — never on company_id.
+ */
+function isRootRole(role: string | null | undefined): boolean {
+  return role === "root_super_admin";
+}
+
 export async function markAllNotificationsRead(
-  companyId: string,
+  companyId: string | null,
   role: string | null,
   userId: string | null,
 ) {
   try {
+    if (isRootRole(role)) {
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("to_role", "root_super_admin")
+        .eq("is_read", false);
+      return;
+    }
+    // Non-root roles always have a company — guard for type safety.
+    if (!companyId) return;
     const q = supabase
       .from("notifications")
       .update({ is_read: true })
@@ -735,11 +760,21 @@ export async function markAllNotificationsRead(
 }
 
 export async function getUnreadNotificationCount(
-  companyId: string,
+  companyId: string | null,
   role: string | null,
   userId: string | null,
 ): Promise<number> {
   try {
+    if (isRootRole(role)) {
+      const { count } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("to_role", "root_super_admin")
+        .eq("is_read", false);
+      return count ?? 0;
+    }
+    // Non-root roles always have a company — guard for type safety.
+    if (!companyId) return 0;
     const q = supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
@@ -759,12 +794,23 @@ export async function getUnreadNotificationCount(
 }
 
 export async function fetchNotifications(
-  companyId: string,
+  companyId: string | null,
   role: string | null,
   userId: string | null,
   limit = 50,
 ): Promise<AppNotification[]> {
   try {
+    if (isRootRole(role)) {
+      const { data } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("to_role", "root_super_admin")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      return (data ?? []) as AppNotification[];
+    }
+    // Non-root roles always have a company — guard for type safety.
+    if (!companyId) return [];
     const q = supabase
       .from("notifications")
       .select("*")

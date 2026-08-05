@@ -61,7 +61,10 @@ export function useNotifications() {
 
   const load = useCallback(async () => {
     try {
-      if (!companyId) {
+      // Root Super Admin has no company_id (root-targeted notifications are
+      // company-agnostic, to_role = 'root_super_admin'). Everyone else needs
+      // a company to exist before we can scope the query.
+      if (!companyId && role !== "root_super_admin") {
         if (mountedRef.current) setLoading(false);
         return;
       }
@@ -92,11 +95,17 @@ export function useNotifications() {
 
   // Real-time subscription (wrapped in try-catch to survive missing tables)
   useEffect(() => {
-    if (!companyId) return;
+    if (!companyId && role !== "root_super_admin") return;
 
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     try {
+      // Root subscribes to root-targeted rows (company_id = null); company
+      // roles subscribe to their own company's rows.
+      const isRoot = role === "root_super_admin";
+      const filter = isRoot
+        ? "to_role=eq.root_super_admin"
+        : `company_id=eq.${companyId}`;
       channel = supabase
         .channel("notifications-realtime")
         .on(
@@ -105,7 +114,7 @@ export function useNotifications() {
             event: "INSERT",
             schema: "public",
             table: "notifications",
-            filter: `company_id=eq.${companyId}`,
+            filter,
           },
           (payload: any) => {
             try {
@@ -167,7 +176,7 @@ export function useNotifications() {
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    if (!companyId) return;
+    if (!companyId && role !== "root_super_admin") return;
     try {
       await markAllNotificationsRead(companyId, role, user?.id ?? null);
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));

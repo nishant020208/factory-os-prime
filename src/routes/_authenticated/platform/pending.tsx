@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { notifyCompanyRegistrationApproved } from "@/lib/notifications";
 
 export const Route = createFileRoute("/_authenticated/platform/pending")({
   head: () => ({ meta: [{ title: "Pending Requests — FactoryOS AI" }] }),
@@ -80,6 +81,11 @@ function PendingPage() {
         });
       if (whitelistError) throw whitelistError;
 
+      // Notify the new Company Admin (role-wide, scoped to the new company_id)
+      // fireNotification is crash-proof (never throws), so a notification
+      // failure can never fail the approval itself.
+      await notifyCompanyRegistrationApproved(newCompany.id, newCompany.name);
+
       return newCompany;
     },
     onSuccess: (newCompany) => {
@@ -99,6 +105,8 @@ function PendingPage() {
         .update({ status: "rejected", reviewed_at: new Date().toISOString() })
         .eq("id", registration.id);
       if (error) throw error;
+      // Note: the registrant has no auth account yet (they sign up after being
+      // whitelisted on approval), so there is no in-app recipient on rejection.
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pending-registrations"] });

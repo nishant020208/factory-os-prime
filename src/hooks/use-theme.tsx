@@ -16,15 +16,18 @@ const ThemeContext = createContext<ThemeCtx>({
 
 const STORAGE_KEY = "factoryos-theme";
 
-function getInitial(): ThemeMode {
-  if (typeof window === "undefined") return "dark";
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "aesthetic" || stored === "dark") return stored;
-  return "dark";
-}
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeMode>(getInitial);
+  // Always start from "dark" on both server and client so the SSR HTML and the
+  // first client render are identical (no hydration mismatch on the theme pills).
+  const [theme, setThemeState] = useState<ThemeMode>("dark");
+
+  // After hydration, restore the user's persisted theme choice.
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === "light" || stored === "aesthetic" || stored === "dark") {
+      setThemeState(stored);
+    }
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
