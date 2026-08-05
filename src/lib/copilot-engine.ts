@@ -738,7 +738,7 @@ export async function answerCopilot(opts: {
   const entityMatch = question.match(/\b(?:N-08|SO|WO|PO|PR|INV|PUR|ORD|RFQ)[-\s]*[\w.\-]*\d[\w.\-]*\b/i);
   if (entityMatch && (intent === "data" || intent === "math" || /status|where|track|find|check|about|detail/.test(lower))) {
     const ref = entityMatch[0].trim();
-    const found = await findEntity(ref, role);
+    const found = await findEntity(ref, role, userId);
     if (found) return { text: found, conf: 90 };
   }
 
