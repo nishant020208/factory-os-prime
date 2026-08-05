@@ -295,7 +295,9 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
     e.preventDefault();
     setBusy(true);
     try {
-      const { data: inserted, error } = await supabase
+      // No .select() here on purpose: anonymous visitors may submit a
+      // registration but must never be able to read this table back.
+      const { error } = await supabase
         .from("company_registrations")
         .insert({
           company_name: form.company_name,
@@ -305,14 +307,10 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
           industry: form.industry || null,
           registration_data: { full_name: form.full_name },
           status: "pending",
-        })
-        .select("id")
-        .single();
+        });
       if (error) throw error;
       // Notify Root Super Admin that a new company registration is pending review
-      if (inserted?.id) {
-        await notifyCompanyRegistrationRequest(inserted.id, form.company_name);
-      }
+      await notifyCompanyRegistrationRequest(null, form.company_name);
       toast.success("Registration submitted! A Root Admin will review and activate your company.");
       setBusy(false);
       onBack();
@@ -442,7 +440,9 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
     if (!form.company_id) { toast.error("Please select the company you want to order from"); return; }
     setBusy(true);
     try {
-      const { data: inserted, error } = await supabase
+      // No .select() here on purpose: anonymous visitors may submit a request
+      // but must never be able to read customer_requests back.
+      const { error } = await supabase
         .from("customer_requests")
         .insert({
           company_id: form.company_id,
@@ -453,13 +453,9 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
           gst_number: form.gst_number || null,
           address: form.address || null,
           status: "pending",
-        })
-        .select("id")
-        .single();
+        });
       if (error) throw error;
-      if (inserted?.id) {
-        await notifyCustomerAccessRequest(form.company_id, form.business_name, inserted.id);
-      }
+      await notifyCustomerAccessRequest(form.company_id, form.business_name);
       toast.success("Request submitted! The company's admin will approve your access.");
       setBusy(false);
       onBack();
