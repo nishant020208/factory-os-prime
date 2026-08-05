@@ -719,9 +719,14 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
     });
     setBusy(false);
     if (error) {
-      toast.error(error.message.includes("whitelisted")
-        ? "Your email isn't whitelisted for this role. Ask your Company Admin for an invitation."
-        : error.message);
+      const msg = error.message ?? "";
+      if (msg.includes("whitelisted")) {
+        toast.error("Your email isn't whitelisted for this role. Ask your Company Admin for an invitation.");
+      } else if (msg.includes("rate limit") || msg.includes("429") || msg.includes("over_email_send")) {
+        toast.error("Too many sign-up attempts in a short window. Please wait a minute and try again.");
+      } else {
+        toast.error(msg);
+      }
       return;
     }
     toast.success("Account created. You're signed in.");

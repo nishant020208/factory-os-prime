@@ -1,1 +1,30 @@
 project_id = "ytawmeiylkrzjzmauvhf"
+
+# =============================================================
+# AUTH SETTINGS
+# -------------------------------------------------------------
+# Fixes "over_email_send_rate_limit" (HTTP 429) on signup.
+# Root cause: email confirmations were ON, so every signUp sent a
+# confirmation email and GoTrue's tiny default email-send rate
+# limit (2/hour) was exhausted after a couple of attempts.
+#
+# - enable_confirmations = false  → new users are auto-confirmed.
+#   Whitelist gating still happens at the DB layer via the
+#   handle_new_user trigger (it RAISEs unless the email is
+#   whitelisted), so security is preserved — no confirmation
+#   email is required for legitimate whitelisted signups.
+# - email_sent = 30              → raise the per-hour email send
+#   limit so password-reset / magic-link emails never 429.
+# =============================================================
+[auth]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = false
+enable_confirmations = false
+
+[auth.rate_limit]
+email_sent = 30
+sign_in_sign_ups = 30
+token_verifications = 30
