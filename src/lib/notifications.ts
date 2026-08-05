@@ -290,7 +290,7 @@ export async function fireNotification(
 // ═══════════════════════════════════════════════════════════════════
 
 /** Trigger 1+2: Company registration request / Root approves */
-export async function notifyCompanyRegistrationRequest(companyId: string, businessName: string) {
+export async function notifyCompanyRegistrationRequest(companyId: string | null, businessName: string) {
   // The pending registration's id is NOT a companies(id) yet (the company
   // only exists after Root approves), so company_id must be null here to
   // avoid a foreign-key violation. Root sees it via to_role.
@@ -312,11 +312,11 @@ export async function notifyCompanyRegistrationApproved(companyId: string, compa
 }
 
 /** Trigger 3: Customer access request → Company Admin */
-export async function notifyCustomerAccessRequest(companyId: string, businessName: string, requestId: string) {
+export async function notifyCustomerAccessRequest(companyId: string, businessName: string, requestId?: string | null) {
   await fireNotification(companyId, "company_admin", null,
     "👤 New Customer Access Request",
     `"${businessName}" is requesting access to your company. Review in Customer Requests.`,
-    "info", "customer_requests", requestId);
+    "info", "customer_requests", requestId ?? null);
 }
 
 /** Trigger 4: Employee whitelist request → Company Admin */
