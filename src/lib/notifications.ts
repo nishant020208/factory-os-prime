@@ -244,9 +244,18 @@ export const NOTIFICATION_COUNTS_BY_ROLE: Record<string, number> = {
  * - If the specific user's id is known → target ONLY them (toRole = null).
  * - If it can't be resolved → fall back to the role-wide target so the
  *   notification is never silently dropped (never sets BOTH).
+ *
+ * ⚠️ EXTERNAL PORTALS ARE FAIL-CLOSED: customer_portal and supplier_portal
+ * rows are per-tenant-customer/supplier. A role-wide fallback would show one
+ * customer's order/invoice to EVERY customer of the company, so when the
+ * recipient can't be resolved we return no target and the send is skipped.
  */
+const EXTERNAL_ROLES = new Set(["customer_portal", "supplier_portal"]);
+
 function resolveTarget(role: string, userId: string | null | undefined): [string | null, string | null] {
-  return userId ? [null, userId] : [role, null];
+  if (userId) return [null, userId];
+  if (EXTERNAL_ROLES.has(role)) return [null, null];
+  return [role, null];
 }
 
 export async function fireNotification(
@@ -260,11 +269,20 @@ export async function fireNotification(
   entityId?: string | null,
 ): Promise<boolean> {
   try {
+    // No target at all → never insert. A row with both to_role and to_user
+    // null would be visible to the whole company (a broadcast), which the
+    // targeting rules forbid.
+    if (!toRole && !toUser) {
+      console.warn("Notification skipped — no resolvable recipient:", title);
+      return false;
+    }
+    // Never set BOTH: that would notify the whole role AND the person.
+    const role = toUser ? null : toRole;
     // Supabase returns errors as { error } objects — it does NOT throw.
     // Check the result so a failed notification is never silently swallowed.
     const { error } = await supabase.from("notifications").insert({
       company_id: companyId,
-      to_role: toRole,
+      to_role: role,
       to_user: toUser,
       title,
       body,

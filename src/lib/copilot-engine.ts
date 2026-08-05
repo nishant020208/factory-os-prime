@@ -22,6 +22,9 @@ import {
   checkRoleScope,
   getBlockMessage,
   getAllowedLabels,
+  getRoleIdentityCard,
+  isReadOnlyRole,
+  ROLE_LABELS,
   DOMAIN_LABELS,
   ROLE_DOMAIN_MAP,
 } from "@/lib/role-scope";
@@ -46,7 +49,7 @@ function pick<T>(arr: T[]): T {
 /* ────────────────────────────────────────────────────────── */
 
 type Intent =
-  | "greeting" | "thanks" | "farewell" | "whoami" | "help"
+  | "greeting" | "thanks" | "farewell" | "whoami" | "whichrole" | "action" | "help"
   | "howareyou" | "math" | "howto" | "followup" | "data" | "unknown";
 
 function detectIntent(raw: string): { intent: Intent; payload?: string } {
@@ -72,6 +75,17 @@ function detectIntent(raw: string): { intent: Intent; payload?: string } {
   // Farewell — whole message only (bare "later" must not swallow data questions)
   if (/^(bye|goodbye|cya|good\s*night|see\s*you|later|that'?s\s*all|no\s*more|done|okay?\s*bye|talk\s*soon)[!.,\s]*$/i.test(q))
     return { intent: "farewell" };
+
+  // Role identity — "you are copilot for which role?", "what's my role?",
+  // "what can I access?", "which company am I scoped to?". Checked BEFORE
+  // whoami so the answer always names the exact role.
+  if (/(which|what)\s*(role|roles)|copil?ot\s*for\s*(which|what)|for\s*which\s*role|my\s*role|am\s*i\s*scoped|role\s*am\s*i|what\s*(is|are)\s*my\s*(role|permission|access|scope)|who\s*do\s*you\s*work\s*for|whose\s*copil?ot/.test(q))
+    return { intent: "whichrole" };
+
+  // Write/action attempts — Copilot is advisory, never mutates data.
+  if (/^\s*(please\s*)?(create|add|insert|delete|remove|approve|reject|update|edit|change|cancel|assign|dispatch|pay|issue|generate)\b/.test(q) ||
+      /\b(for me|on my behalf|do it|go ahead and)\b/.test(q))
+    return { intent: "action" };
 
   if (/(who\s*are\s*you|what\s*are\s*you|your\s*name|about\s*you|introduce\s*yourself)/.test(q))
     return { intent: "whoami" };
@@ -100,15 +114,30 @@ function detectIntent(raw: string): { intent: Intent; payload?: string } {
 }
 
 /* ────────────────────────────────────────────────────────── */
-/*  QUERY HELPERS                                              */
+/*  QUERY HELPERS — every query is company-scoped (defence in   */
+/*  depth on top of RLS: the Copilot never reads another tenant) */
 /* ────────────────────────────────────────────────────────── */
+
+/**
+ * Active tenant scope for the current answer. Set once at the top of
+ * answerCopilot(). Null only for Root Super Admin, whose tables
+ * (companies / company_registrations) are platform-level and carry no
+ * company_id column.
+ */
+let _scopeCompanyId: string | null = null;
+
+function scoped(q: any): any {
+  return _scopeCompanyId ? q.eq("company_id", _scopeCompanyId) : q;
+}
 
 async function countWhere(table: string, column: string, value: string): Promise<number> {
   try {
-    const { count } = await supabase
-      .from(table as never)
-      .select("id", { count: "exact", head: true })
-      .eq(column as never, value);
+    const { count } = await scoped(
+      supabase
+        .from(table as never)
+        .select("id", { count: "exact", head: true })
+        .eq(column as never, value),
+    );
     return count ?? 0;
   } catch {
     return 0;
@@ -117,11 +146,13 @@ async function countWhere(table: string, column: string, value: string): Promise
 
 async function listRows(table: string, limit = 8): Promise<any[]> {
   try {
-    const { data } = await supabase
-      .from(table as never)
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(limit);
+    const { data } = await scoped(
+      supabase
+        .from(table as never)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit),
+    );
     return (data as any[]) ?? [];
   } catch {
     return [];
@@ -160,7 +191,7 @@ function socialReply(intent: Intent, role: string | null): string {
         `Goodbye! Have a productive shift. 🏭`,
       ]);
     case "whoami":
-      return `I'm **Copilot**, FactoryOS's conversational AI assistant. 🤖\n\nI'm connected to your live, role-scoped database — so when you ask about orders, machines, inventory, or quality, I query the **real records** (never canned demo numbers). If a question touches data outside your role's scope, I'll tell you honestly instead of guessing.`;
+      return `I'm **Copilot**, FactoryOS's conversational AI assistant — and I'm the Copilot for the **${ROLE_LABELS[role ?? ""] ?? "unassigned"}** role. 🤖\n\nI'm connected to your live, role-scoped database, so I query **real records** for your role and your company only (never canned numbers, never another tenant). If a question touches data outside your scope, I'll say so instead of guessing.\n\nAsk **"which role are you Copilot for?"** for the full scope breakdown.`;
     case "howareyou":
       return pick([
         `Running at full capacity! ⚡ All modules healthy, zero critical alerts right now. How can I help you keep it that way?`,
@@ -216,32 +247,44 @@ function evaluateMath(raw: string): string | null {
 /*  ENTITY LOOKUP — a specific order / machine / PO            */
 /* ────────────────────────────────────────────────────────── */
 
-async function findEntity(ref: string, role: string | null): Promise<string | null> {
+async function findEntity(ref: string, role: string | null, userId: string | null): Promise<string | null> {
   const upper = ref.toUpperCase();
   const isCode = /^(SO|WO|PO|PR|INV|N-08|PUR|ORD|RFQ)[-\s]*[\w.-]+/i.test(upper) ||
     /\b(N-08|SO-|WO-|PO-|PUR-|INV-)\b/i.test(upper);
   if (!isCode) return null;
 
+  // External portals may only look up THEIR OWN records — fail closed.
+  const customerId = role === "customer_portal" ? await resolveCustomerId(userId) : null;
+  const supplierId = role === "supplier_portal" ? await resolveSupplierId(userId) : null;
+  if (role === "customer_portal" && !customerId) return UNLINKED_PORTAL_MSG("customer");
+  if (role === "supplier_portal" && !supplierId) return UNLINKED_PORTAL_MSG("supplier");
+
   // Which tables might hold this reference, based on the role's scope
   const allowed = new Set(ROLE_DOMAIN_MAP[role ?? ""] ?? []);
-  const probes: Array<{ table: string; columns: string[]; domain: string }> = [
-    { table: "sales_orders", columns: ["so_number", "order_number"], domain: "orders" },
+  const probes: Array<{ table: string; columns: string[]; domain: string; owner?: string }> = [
+    { table: "sales_orders", columns: ["so_number", "order_number"], domain: "orders", owner: "customer_id" },
     { table: "production_orders", columns: ["order_number", "po_number", "production_order_number"], domain: "production" },
-    { table: "purchase_orders", columns: ["po_number"], domain: "procurement" },
-    { table: "work_orders", columns: ["wo_number"], domain: "production" },
-    { table: "invoices", columns: ["invoice_number"], domain: "finance" },
+    { table: "purchase_orders", columns: ["po_number"], domain: "procurement", owner: "supplier_id" },
+    { table: "work_orders", columns: ["wo_number"], domain: "production", owner: "operator_id" },
+    { table: "invoices", columns: ["invoice_number"], domain: "finance", owner: "customer_id" },
     { table: "machines", columns: ["name", "machine_code", "code"], domain: "maintenance" },
   ];
 
   for (const probe of probes) {
     if (!allowed.has(probe.domain)) continue;
+    // A portal/operator can never probe a table it doesn't own rows in.
+    if (customerId && probe.owner !== "customer_id") continue;
+    if (supplierId && probe.owner !== "supplier_id") continue;
+    if (role === "production_operator" && probe.table === "work_orders" && !userId) continue;
     for (const col of probe.columns) {
       try {
-        const res: any = await supabase
-          .from(probe.table as never)
-          .select("*")
-          .ilike(col as never, `%${upper}%`)
-          .limit(1);
+        const q: any = scoped(
+          supabase.from(probe.table as never).select("*").ilike(col as never, `%${upper}%`).limit(1),
+        );
+        if (customerId) q.eq("customer_id", customerId);
+        if (supplierId) q.eq("supplier_id", supplierId);
+        if (role === "production_operator" && probe.table === "work_orders") q.eq("operator_id", userId);
+        const res: any = await q;
         const row = res?.data?.[0];
         if (row) {
           const status = label(row.status ?? row.state);
@@ -327,6 +370,10 @@ async function resolveSupplierId(userId: string | null): Promise<string | null> 
   }
 }
 
+/** Fail-closed message when a portal account isn't linked to a record */
+const UNLINKED_PORTAL_MSG = (kind: "customer" | "supplier") =>
+  `🔒 I can't show any records yet — your login isn't linked to a ${kind} account in this company. Ask the Company Admin to link your ${kind} profile, then I'll show **only your own** ${kind === "customer" ? "orders, shipments and invoices" : "purchase orders, deliveries and payments"}.`;
+
 /** Focused, real-data answer for a single domain — powers follow-up questions */
 async function focusedDomainAnswer(
   domain: string,
@@ -337,9 +384,12 @@ async function focusedDomainAnswer(
   const allowed = new Set(ROLE_DOMAIN_MAP[role ?? ""] ?? []);
   if (!allowed.has(domain)) return null;
   try {
-    // External portals are scoped to THEIR OWN records only — never the whole table
+    // External portals are scoped to THEIR OWN records only — never the whole
+    // table. If we can't resolve who they are, we FAIL CLOSED (no data).
     const customerId = role === "customer_portal" ? await resolveCustomerId(userId) : null;
     const supplierId = role === "supplier_portal" ? await resolveSupplierId(userId) : null;
+    if (role === "customer_portal" && !customerId) return UNLINKED_PORTAL_MSG("customer");
+    if (role === "supplier_portal" && !supplierId) return UNLINKED_PORTAL_MSG("supplier");
 
     switch (domain) {
       case "production": {
@@ -368,17 +418,28 @@ async function focusedDomainAnswer(
         return `💰 **Finance** — ${rows.length} invoice(s), ${out.length} outstanding.\n\n${rows.slice(0, 3).map((i: any) => `- ${i.invoice_number ?? "INV"} · ${label(i.status)}`).join("\n")}`;
       }
       case "suppliers": {
-        const rows = await listRows("purchase_orders", 6);
+        const sq: any = scoped(
+          supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }).limit(6),
+        );
+        if (supplierId) sq.eq("supplier_id", supplierId);
+        const { data } = await sq;
+        const rows = (data as any[]) ?? [];
         return `📋 **Procurement** — ${rows.length} PO(s).\n\n${rows.slice(0, 3).map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`).join("\n")}`;
       }
       case "orders": {
-        const q: any = supabase
-          .from("sales_orders")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(6);
+        // Suppliers never see sales orders — their "orders" are purchase orders.
+        if (role === "supplier_portal") {
+          const pq: any = scoped(
+            supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }).limit(6),
+          ).eq("supplier_id", supplierId);
+          const { data } = await pq;
+          const rows = (data as any[]) ?? [];
+          return `📋 **Your Purchase Orders** — ${rows.length} on record.\n\n${rows.slice(0, 3).map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`).join("\n")}`;
+        }
+        const q: any = scoped(
+          supabase.from("sales_orders").select("*").order("created_at", { ascending: false }).limit(6),
+        );
         if (customerId) q.eq("customer_id", customerId);
-        if (supplierId) q.eq("supplier_id", supplierId);
         const { data } = await q;
         const rows = (data as any[]) ?? [];
         return `📋 **Orders** — ${rows.length} on record.\n\n${rows.slice(0, 3).map((o: any) => `- ${o.so_number ?? "SO"} · ${label(o.status)}`).join("\n")}`;
@@ -388,13 +449,10 @@ async function focusedDomainAnswer(
         return `👥 **People** — ${rows.length} employee(s) on record.`;
       }
       case "dispatch": {
-        const q: any = supabase
-          .from("shipments")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(5);
+        const q: any = scoped(
+          supabase.from("shipments").select("*").order("created_at", { ascending: false }).limit(5),
+        );
         if (customerId) q.eq("customer_id", customerId);
-        if (supplierId) q.eq("supplier_id", supplierId);
         const { data } = await q;
         const rows = (data as any[]) ?? [];
         return `🚚 **Dispatch** — ${rows.length} shipment(s).\n\n${rows.slice(0, 3).map((s: any) => `- ${s.tracking_number ?? s.id?.slice(0, 8)} · ${label(s.status)}`).join("\n")}`;
@@ -415,12 +473,11 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
   switch (role) {
     case "customer_portal": {
       const customerId = await resolveCustomerId(userId);
-      const q: any = supabase
-        .from("sales_orders")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(6);
-      if (customerId) q.eq("customer_id", customerId);
+      // Fail closed — never fall back to "all orders in the company".
+      if (!customerId) return { text: UNLINKED_PORTAL_MSG("customer"), conf: 100 };
+      const q: any = scoped(
+        supabase.from("sales_orders").select("*").order("created_at", { ascending: false }).limit(6),
+      ).eq("customer_id", customerId);
       const { data: orders } = await q;
       const myOrders = (orders as any[]) ?? [];
 
@@ -447,11 +504,16 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
     }
 
     case "supplier_portal": {
-      const pos = await listRows("purchase_orders", 6);
+      const supplierId = await resolveSupplierId(userId);
+      // Fail closed — a supplier must never see another supplier's POs.
+      if (!supplierId) return { text: UNLINKED_PORTAL_MSG("supplier"), conf: 100 };
+      const { data } = await scoped(
+        supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }).limit(6),
+      ).eq("supplier_id", supplierId);
+      const pos = (data as any[]) ?? [];
       const open = pos.filter((p: any) => !["received", "fulfilled"].includes(p.status)).length;
-      const payments = await countWhere("payments", "status", "completed");
       return {
-        text: `You have **${pos.length} purchase order(s)**, ${open} currently open.\n\n${pos.slice(0, 3).map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`).join("\n")}\n\n${payments} payment(s) completed. Accept or modify POs in the **Purchase Orders** tab.`,
+        text: `You have **${pos.length} purchase order(s)** from this company, ${open} currently open.\n\n${pos.slice(0, 3).map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`).join("\n")}\n\nAccept or modify POs in the **Purchase Orders** tab.`,
         conf: 94,
       };
     }
@@ -523,17 +585,23 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
     }
 
     case "production_operator": {
+      // Operators see ONLY their own work orders (work_orders.operator_id is
+      // the auth user id). No user id → no data, never the whole table.
       let wos: any[] = [];
       if (userId) {
-        const { data } = (await supabase
-          .from("work_orders")
-          .select("*")
-          .eq("assigned_user_id" as never, userId)
-          .limit(8)) as any;
+        const { data } = (await scoped(
+          supabase.from("work_orders").select("*").order("created_at", { ascending: false }).limit(8),
+        ).eq("operator_id" as never, userId)) as any;
         wos = (data as any[]) ?? [];
       }
+      if (!userId) {
+        return { text: "I can't identify your operator account right now, so I won't show any work orders. Try signing out and back in.", conf: 100 };
+      }
+      if (wos.length === 0) {
+        return { text: "🔧 You have **no work orders assigned** right now. Your Production Manager assigns them — they'll appear here and in **Assigned Work Orders** the moment they do.", conf: 96 };
+      }
       return {
-        text: `🔧 **Your Work Orders**\n\n- Assigned to you: **${wos.length}**\n\n${wos.slice(0, 4).map((w: any) => `- ${w.wo_number ?? "WO"} · ${label(w.status)} · ${w.progress ?? w.progress_percent ?? 0}%`).join("\n")}\n\nUpdate progress (25/50/75/100%) — it pushes live to the customer's tracking page.`,
+        text: `🔧 **Your Work Orders**\n\n- Assigned to you: **${wos.length}**\n\n${wos.slice(0, 4).map((w: any) => `- ${w.wo_number ?? "WO"} · ${label(w.status)} · ${w.progress_percent ?? w.progress ?? 0}%`).join("\n")}\n\nUpdate progress (25/50/75/100%) — it pushes live to the customer's tracking page.`,
         conf: 94,
       };
     }
@@ -603,8 +671,30 @@ export async function answerCopilot(opts: {
   const { question, role, companyId, userId = null, history = [] } = opts;
   const lower = question.toLowerCase();
 
+  // 0. Tenant scope for EVERY query in this answer. Root Super Admin reads
+  //    platform tables (no company_id column) so its scope stays null; every
+  //    other role is hard-filtered to its own company on top of RLS.
+  _scopeCompanyId = role === "root_super_admin" ? null : companyId;
+
   // 1. Social intents
   const { intent, payload } = detectIntent(question);
+
+  // Role identity — must be exact for all 15 roles.
+  if (intent === "whichrole") {
+    return { text: getRoleIdentityCard(role), conf: 100 };
+  }
+
+  // Write attempts — the Copilot is advisory and never mutates data.
+  if (intent === "action") {
+    const readOnly = isReadOnlyRole(role);
+    return {
+      text: readOnly
+        ? `🚫 Your **${ROLE_LABELS[role ?? ""] ?? "role"}** access is strictly read-only — no create, edit, approve or delete actions exist for you anywhere in FactoryOS, and I can't perform them either. I can show you the records and the audit trail instead.`
+        : `I'm advisory only — I read live data and guide you, but I never create, edit, approve or delete records on your behalf. That keeps the audit trail honest (every change is attributed to a real person).\n\nOpen the relevant module and use the action button there; ask me **"how do I ..."** and I'll walk you through the exact steps.`,
+      conf: 100,
+    };
+  }
+
   if (intent === "greeting" || intent === "thanks" || intent === "farewell" || intent === "whoami" || intent === "howareyou") {
     return { text: socialReply(intent, role), conf: 100 };
   }
@@ -621,7 +711,16 @@ export async function answerCopilot(opts: {
     };
   }
 
-  // 2. Permission gate — out-of-scope domains blocked before any data work.
+  // 2. Fail closed: a company role with no resolved company can't be scoped,
+  //    so no data question is answered.
+  if (role && role !== "root_super_admin" && !companyId) {
+    return {
+      text: "🔒 I can't determine which company your account belongs to, so I won't return any data. Ask your admin to complete your profile setup, then try again.",
+      conf: 100,
+    };
+  }
+
+  // 3. Permission gate — out-of-scope domains blocked before any data work.
   //    Entity lookups and follow-ups both re-check scope inside themselves.
   const blockedDomain = checkRoleScope(role, question);
   if (blockedDomain) {
@@ -639,7 +738,7 @@ export async function answerCopilot(opts: {
   const entityMatch = question.match(/\b(?:N-08|SO|WO|PO|PR|INV|PUR|ORD|RFQ)[-\s]*[\w.\-]*\d[\w.\-]*\b/i);
   if (entityMatch && (intent === "data" || intent === "math" || /status|where|track|find|check|about|detail/.test(lower))) {
     const ref = entityMatch[0].trim();
-    const found = await findEntity(ref, role);
+    const found = await findEntity(ref, role, userId);
     if (found) return { text: found, conf: 90 };
   }
 
