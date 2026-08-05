@@ -178,3 +178,94 @@ export function getAllowedLabels(role: string | null): string[] {
   const domains = ROLE_DOMAIN_MAP[role ?? ""] ?? [];
   return domains.map((d) => DOMAIN_LABELS[d] ?? d);
 }
+
+/* ────────────────────────────────────────────────────────── */
+/*  ROLE IDENTITY — "which role are you Copilot for?"          */
+/* ────────────────────────────────────────────────────────── */
+
+/** Human label for every app role */
+export const ROLE_LABELS: Record<string, string> = {
+  root_super_admin: "Root Super Admin",
+  company_admin: "Company Admin",
+  plant_admin: "Plant Admin",
+  plant_manager: "Plant Manager",
+  production_manager: "Production Manager",
+  production_operator: "Production Operator",
+  warehouse_manager: "Warehouse Manager",
+  procurement_manager: "Procurement Manager",
+  quality_inspector: "Quality Inspector",
+  maintenance_engineer: "Maintenance Engineer",
+  finance_manager: "Finance Manager",
+  hr_manager: "HR Manager",
+  customer_portal: "Customer (Portal)",
+  supplier_portal: "Supplier (Portal)",
+  auditor: "Auditor",
+};
+
+/** One-line description of what each role's Copilot is for */
+export const ROLE_SCOPE_SUMMARY: Record<string, string> = {
+  root_super_admin: "the platform console only — companies, registrations, whitelisting and platform audit. I never see any company's operational ERP data.",
+  company_admin: "your own company's full operational picture across every module — but only your company, never another tenant.",
+  plant_admin: "your plant's production, inventory, quality, maintenance and machines.",
+  plant_manager: "day-to-day plant operations: production, inventory, quality, maintenance and machines.",
+  production_manager: "production planning, work orders, machines, material availability, maintenance and quality feedback.",
+  production_operator: "the work orders assigned to you, the machines you run, and maintenance flags you raise.",
+  warehouse_manager: "inventory, stock movement, products and dispatch/shipments.",
+  procurement_manager: "purchase orders, requisitions, RFQs, suppliers and material stock levels.",
+  quality_inspector: "inspections, defects, CAPA and incoming/final inspection records.",
+  maintenance_engineer: "maintenance tickets, machine status, breakdowns and spare parts.",
+  finance_manager: "invoices, payments, expenses, budgets, taxes, P&L and supplier payments.",
+  hr_manager: "employees, leaves, training, performance, payroll, attendance and recruitment.",
+  customer_portal: "your own orders, shipments, invoices, payments, documents and support tickets — never another customer's.",
+  supplier_portal: "the purchase orders sent to you, your deliveries, invoices and payments — never another supplier's.",
+  auditor: "read-only visibility across every module in your company, plus the audit trail. I can never create, edit or delete anything.",
+};
+
+/** Domains a role explicitly cannot ask about (everything outside its map) */
+export function getBlockedLabels(role: string | null): string[] {
+  const allowed = new Set(ROLE_DOMAIN_MAP[role ?? ""] ?? []);
+  const core = [
+    "production", "inventory", "quality", "maintenance", "finance", "hr",
+    "suppliers", "procurement", "orders", "dispatch", "customers", "audit", "platform",
+  ];
+  return core.filter((d) => !allowed.has(d)).map((d) => DOMAIN_LABELS[d] ?? d);
+}
+
+/** Every role is read-only advisory in Copilot; auditor is read-only app-wide. */
+export function isReadOnlyRole(role: string | null): boolean {
+  return role === "auditor";
+}
+
+/**
+ * The exact answer to "you are copilot for which role?" — precise for all 15
+ * roles, with allowed scope, blocked scope and the no-God-mode guarantee.
+ */
+export function getRoleIdentityCard(role: string | null, companyName?: string | null): string {
+  const key = role ?? "";
+  const label = ROLE_LABELS[key];
+  if (!label) {
+    return `I'm the FactoryOS Copilot, but no role is currently assigned to your account, so I have **no data scope**. Ask your Company Admin to assign your role, then I can help.`;
+  }
+  const allowed = getAllowedLabels(role);
+  const blocked = getBlockedLabels(role);
+  const scope = ROLE_SCOPE_SUMMARY[key] ?? "your assigned modules.";
+  const tenant = key === "root_super_admin"
+    ? "Platform scope (no company ERP data)"
+    : companyName
+      ? `Company scope: ${companyName} only`
+      : "Company scope: your own company only";
+
+  return [
+    `🤖 I am the Copilot for exactly one role: **${label}**.`,
+    ``,
+    `I'm scoped to ${scope}`,
+    ``,
+    `- **Tenant isolation:** ${tenant}`,
+    `- **I can answer about:** ${allowed.join(", ") || "—"}`,
+    `- **I cannot answer about:** ${blocked.length ? blocked.join(", ") : "nothing outside your scope — you have full-module visibility for your company"}`,
+    `- **Actions:** ${isReadOnlyRole(role) ? "read-only — I never create, edit, approve or delete anything" : "advisory only — I read live data and guide you; you perform actions in the module UI"}`,
+    ``,
+    `No God-mode: I don't switch roles, and I can't read another role's or another company's records.`,
+  ].join("\n");
+}
+
