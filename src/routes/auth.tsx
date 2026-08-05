@@ -295,7 +295,9 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
     e.preventDefault();
     setBusy(true);
     try {
-      const { data: inserted, error } = await supabase
+      // No .select() here on purpose: anonymous visitors may submit a
+      // registration but must never be able to read this table back.
+      const { error } = await supabase
         .from("company_registrations")
         .insert({
           company_name: form.company_name,
@@ -305,14 +307,10 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
           industry: form.industry || null,
           registration_data: { full_name: form.full_name },
           status: "pending",
-        })
-        .select("id")
-        .single();
+        });
       if (error) throw error;
       // Notify Root Super Admin that a new company registration is pending review
-      if (inserted?.id) {
-        await notifyCompanyRegistrationRequest(inserted.id, form.company_name);
-      }
+      await notifyCompanyRegistrationRequest(null, form.company_name);
       toast.success("Registration submitted! A Root Admin will review and activate your company.");
       setBusy(false);
       onBack();
