@@ -699,7 +699,16 @@ export async function answerCopilot(opts: {
     };
   }
 
-  // 2. Permission gate — out-of-scope domains blocked before any data work.
+  // 2. Fail closed: a company role with no resolved company can't be scoped,
+  //    so no data question is answered.
+  if (role && role !== "root_super_admin" && !companyId) {
+    return {
+      text: "🔒 I can't determine which company your account belongs to, so I won't return any data. Ask your admin to complete your profile setup, then try again.",
+      conf: 100,
+    };
+  }
+
+  // 3. Permission gate — out-of-scope domains blocked before any data work.
   //    Entity lookups and follow-ups both re-check scope inside themselves.
   const blockedDomain = checkRoleScope(role, question);
   if (blockedDomain) {
