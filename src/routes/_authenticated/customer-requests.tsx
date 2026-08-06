@@ -51,18 +51,39 @@ function CustomerRequestsPage() {
         .eq("id", requestId);
       if (updateError) throw updateError;
 
-      // Create customer account
+      // Create customer account. `name` is NOT NULL in the customers schema,
+      // so we mirror business_name into it (this is the field every customers
+      // list/table renders). email is set on both `email` and `contact_email`
+      // so downstream lookups and the signup-linking trigger can find the row.
       const { error: custError } = await supabase.from("customers").insert({
         company_id: companyId,
+        name: request.business_name,
         business_name: request.business_name,
         contact_person: request.contact_person,
+        email: request.email,
         contact_email: request.email,
         phone: request.phone || null,
         gst_number: request.gst_number || null,
         billing_address: request.address || null,
         is_active: true,
-      } as any);
+      });
       if (custError) throw custError;
+
+      // Whitelist the customer's email so they can actually sign in once
+      // approved. Same pattern as every other role in the app: whitelist row
+      // → user signs up with that email → handle_new_user trigger creates
+      // profile + user_roles and links customers.user_id to their auth uid.
+      // Upsert on the UNIQUE (email, role) constraint so re-approval or an
+      // existing invite never errors.
+      const { error: wlError } = await supabase
+        .from("whitelist")
+        .upsert({
+          email: request.email,
+          role: "customer_portal",
+          company_id: companyId,
+          status: "pending",
+        }, { onConflict: "email,role", ignoreDuplicates: true });
+      if (wlError) throw wlError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customer-requests"] });
