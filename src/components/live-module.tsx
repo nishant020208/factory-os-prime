@@ -18,6 +18,7 @@ import type { ColumnDef, ModuleConfig } from "@/lib/module-registry";
 import type { FieldDef } from "@/lib/module-fields";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { notifyOnCreate } from "@/lib/module-notifications";
 
 type Row = Record<string, unknown> & { id: string; company_id?: string };
 
@@ -64,7 +65,7 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
     createDefaults, titleField, singular = "Record",
   } = config;
 
-  const { companyId, roles } = useAuth();
+  const { companyId, roles, profile } = useAuth();
   const userRole = primaryRole(roles);
   // canCreate can be overridden by the parent, otherwise derive from role
   const userCanCreate = canCreate ?? (userRole ? CREATE_ALLOWED_ROLES.includes(userRole) : false);
