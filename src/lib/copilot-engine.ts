@@ -620,7 +620,7 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
 
     case "company_admin": {
       const [pendingApproval, prodOrders, machines, lowStock, employees, customers, materialReq] = await Promise.all([
-        countWhere("sales_orders", "status", "pending_approval"),
+        countWhere("customer_orders", "status", "pending_approval"),
         countWhere("production_orders", "status", "in_progress"),
         countWhere("machines", "status", "operational"),
         countWhere("inventory", "status", "low_stock"),
