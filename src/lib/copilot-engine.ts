@@ -322,49 +322,58 @@ function detectFollowupDomain(q: string): string | null {
   return null;
 }
 
-/** Resolve the current customer's own customer_id (RLS may not fully scope it) */
+/** Resolve the current customer's own customer_id (customers.user_id is the link) */
 async function resolveCustomerId(userId: string | null): Promise<string | null> {
   if (!userId) return null;
   try {
+    const { data: byUser } = (await supabase
+      .from("customers")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle()) as any;
+    if (byUser?.id) return byUser.id;
+
+    // Fallback: match on the profile email (legacy rows created before linking)
     const { data: profile } = (await supabase
       .from("profiles")
-      .select("customer_id,email")
+      .select("email")
       .eq("id", userId)
       .maybeSingle()) as any;
-    if (profile?.customer_id) return profile.customer_id;
-    if (profile?.email) {
-      const { data: cust } = (await supabase
-        .from("customers")
-        .select("id")
-        .eq("contact_email", profile.email)
-        .maybeSingle()) as any;
-      return cust?.id ?? null;
-    }
-    return null;
+    if (!profile?.email) return null;
+    const { data: cust } = (await supabase
+      .from("customers")
+      .select("id")
+      .or(`email.eq.${profile.email},contact_email.eq.${profile.email}`)
+      .maybeSingle()) as any;
+    return cust?.id ?? null;
   } catch {
     return null;
   }
 }
 
-/** Resolve the current supplier's own id (RLS may not fully scope it) */
+/** Resolve the current supplier's own id (suppliers.user_id is the link) */
 async function resolveSupplierId(userId: string | null): Promise<string | null> {
   if (!userId) return null;
   try {
+    const { data: byUser } = (await supabase
+      .from("suppliers")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle()) as any;
+    if (byUser?.id) return byUser.id;
+
     const { data: profile } = (await supabase
       .from("profiles")
-      .select("supplier_id,email")
+      .select("email")
       .eq("id", userId)
       .maybeSingle()) as any;
-    if (profile?.supplier_id) return profile.supplier_id;
-    if (profile?.email) {
-      const { data: sup } = (await supabase
-        .from("suppliers")
-        .select("id")
-        .eq("contact_email", profile.email)
-        .maybeSingle()) as any;
-      return sup?.id ?? null;
-    }
-    return null;
+    if (!profile?.email) return null;
+    const { data: sup } = (await supabase
+      .from("suppliers")
+      .select("id")
+      .eq("contact_email", profile.email)
+      .maybeSingle()) as any;
+    return sup?.id ?? null;
   } catch {
     return null;
   }
@@ -436,13 +445,15 @@ async function focusedDomainAnswer(
           const rows = (data as any[]) ?? [];
           return `📋 **Your Purchase Orders** — ${rows.length} on record.\n\n${rows.slice(0, 3).map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`).join("\n")}`;
         }
+        // Customers read their own customer_orders; internal roles see the
+        // customer order book (source of truth for the order lifecycle).
         const q: any = scoped(
-          supabase.from("sales_orders").select("*").order("created_at", { ascending: false }).limit(6),
+          supabase.from("customer_orders").select("*").order("created_at", { ascending: false }).limit(6),
         );
         if (customerId) q.eq("customer_id", customerId);
         const { data } = await q;
         const rows = (data as any[]) ?? [];
-        return `📋 **Orders** — ${rows.length} on record.\n\n${rows.slice(0, 3).map((o: any) => `- ${o.so_number ?? "SO"} · ${label(o.status)}`).join("\n")}`;
+        return `📋 **Orders** — ${rows.length} on record.\n\n${rows.slice(0, 3).map((o: any) => `- ${o.order_number ?? "ORD"} · ${label(o.status)}`).join("\n")}`;
       }
       case "employees": {
         const rows = await listRows("employees", 5);
@@ -475,20 +486,21 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
       const customerId = await resolveCustomerId(userId);
       // Fail closed — never fall back to "all orders in the company".
       if (!customerId) return { text: UNLINKED_PORTAL_MSG("customer"), conf: 100 };
+      // customer_orders is the source of truth for customer-placed orders
       const q: any = scoped(
-        supabase.from("sales_orders").select("*").order("created_at", { ascending: false }).limit(6),
+        supabase.from("customer_orders").select("*").order("created_at", { ascending: false }).limit(6),
       ).eq("customer_id", customerId);
       const { data: orders } = await q;
       const myOrders = (orders as any[]) ?? [];
 
       // Specific order lookup when the question names one
       const asked = myOrders.find((o: any) =>
-        (o.so_number ?? "").toLowerCase().includes(topic) ||
-        (o.product_name ?? o.product ?? "").toLowerCase().includes(topic),
+        (o.order_number ?? "").toLowerCase().includes(topic) ||
+        (o.product ?? "").toLowerCase().includes(topic),
       );
       if (asked) {
         return {
-          text: `📦 **Order ${asked.so_number}** — status: **${label(asked.status)}**\n\n- Priority: ${label(asked.priority)}\n- Amount: $${Number(asked.total_amount ?? 0).toLocaleString()}\n- Due: ${asked.due_date ? new Date(asked.due_date).toLocaleDateString() : "—"}\n\nTrack it live in **Orders → Order Tracking**.`,
+          text: `📦 **Order ${asked.order_number}** — status: **${label(asked.status)}**\n\n- Product: ${asked.product ?? "—"} × ${asked.quantity ?? "—"}\n- Priority: ${label(asked.priority)}\n- Order total: $${Number(asked.order_total ?? 0).toLocaleString()} · Advance: ${label(asked.advance_payment_status)} · Balance due: $${Number(asked.balance_due ?? 0).toLocaleString()}\n- Delivery date: ${asked.delivery_date ? new Date(asked.delivery_date).toLocaleDateString() : "—"}\n\nTrack it live in **Orders → Order Tracking**.`,
           conf: 97,
         };
       }
@@ -498,7 +510,7 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
       const open = myOrders.filter((o: any) => !["delivered", "completed", "cancelled", "rejected"].includes(o.status));
       const latest = myOrders[0];
       return {
-        text: `You have **${myOrders.length} order(s)**, ${open.length} currently open.\n\nMost recent: **${latest?.so_number ?? "—"}** — ${label(latest?.status)}.\n\nWant the status of a specific one? Just say the order number.`,
+        text: `You have **${myOrders.length} order(s)**, ${open.length} currently open.\n\nMost recent: **${latest?.order_number ?? "—"}** — ${label(latest?.status)}.\n\nWant the status of a specific one? Just say the order number.`,
         conf: 96,
       };
     }
@@ -520,7 +532,7 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
 
     case "production_manager": {
       const prodOrders = await listRows("production_orders", 8);
-      const approved = await listRows("sales_orders", 5);
+      const approved = await listRows("customer_orders", 8);
       const inProgress = prodOrders.filter((p: any) => ["in_progress", "in-production"].includes(p.status)).length;
       return {
         text: `🏭 **Production**\n\n- Production orders: **${prodOrders.length}** (${inProgress} in progress)\n- Approved customer orders ready to plan: **${approved.filter((s: any) => s.status === "approved").length}**\n\n${prodOrders.slice(0, 3).map((p: any) => `- ${p.order_number ?? p.id?.slice(0, 8)} · ${label(p.status)}`).join("\n")}\n\nStart production from **Approved Orders** → create production planning → the inventory auto-check runs.`,
@@ -608,7 +620,7 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
 
     case "company_admin": {
       const [pendingApproval, prodOrders, machines, lowStock, employees, customers, materialReq] = await Promise.all([
-        countWhere("sales_orders", "status", "pending_approval"),
+        countWhere("customer_orders", "status", "pending_approval"),
         countWhere("production_orders", "status", "in_progress"),
         countWhere("machines", "status", "operational"),
         countWhere("inventory", "status", "low_stock"),
@@ -637,12 +649,12 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
     case "auditor": {
       const [audit, orders, prod, machines] = await Promise.all([
         countWhere("audit_logs", "company_id", companyId ?? ""),
-        countWhere("sales_orders", "company_id", companyId ?? ""),
+        countWhere("customer_orders", "company_id", companyId ?? ""),
         countWhere("production_orders", "company_id", companyId ?? ""),
         countWhere("machines", "company_id", companyId ?? ""),
       ]);
       return {
-        text: `📋 **Read-Only Overview**\n\n- Audit events: **${audit}**\n- Sales orders: **${orders}** · Production orders: **${prod}** · Machines: **${machines}**\n\nYou have read-only access to every module — drill into **Audit Logs**, **Reports**, and **Compliance**.`,
+        text: `📋 **Read-Only Overview**\n\n- Audit events: **${audit}**\n- Customer orders: **${orders}** · Production orders: **${prod}** · Machines: **${machines}**\n\nYou have read-only access to every module — drill into **Audit Logs**, **Reports**, and **Compliance**.`,
         conf: 95,
       };
     }
