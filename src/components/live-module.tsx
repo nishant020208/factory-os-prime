@@ -231,11 +231,22 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
       if (columns.some(c => c.key === k) && !(k in row)) row[k] = `${prefix}-${nowNum}`;
     }
 
-    const { error } = await supabase.from(table as never).insert(row as never);
+    const { data: created, error } = (await supabase
+      .from(table as never)
+      .insert(row as never)
+      .select("*")
+      .maybeSingle()) as any;
     setSaving(false);
     if (error) { setFormError(error.message); toast.error(error.message); return; }
     toast.success(`${singular} created`);
     setShowNew(false);
+    // Cross-module notification triggers (fail-soft, never blocks the write)
+    void notifyOnCreate(
+      table,
+      (created as Record<string, unknown>) ?? row,
+      companyId,
+      profile?.full_name ?? profile?.email ?? "A team member",
+    );
     void refetch();
   }
 
