@@ -445,13 +445,15 @@ async function focusedDomainAnswer(
           const rows = (data as any[]) ?? [];
           return `📋 **Your Purchase Orders** — ${rows.length} on record.\n\n${rows.slice(0, 3).map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`).join("\n")}`;
         }
+        // Customers read their own customer_orders; internal roles see the
+        // customer order book (source of truth for the order lifecycle).
         const q: any = scoped(
-          supabase.from("sales_orders").select("*").order("created_at", { ascending: false }).limit(6),
+          supabase.from("customer_orders").select("*").order("created_at", { ascending: false }).limit(6),
         );
         if (customerId) q.eq("customer_id", customerId);
         const { data } = await q;
         const rows = (data as any[]) ?? [];
-        return `📋 **Orders** — ${rows.length} on record.\n\n${rows.slice(0, 3).map((o: any) => `- ${o.so_number ?? "SO"} · ${label(o.status)}`).join("\n")}`;
+        return `📋 **Orders** — ${rows.length} on record.\n\n${rows.slice(0, 3).map((o: any) => `- ${o.order_number ?? "ORD"} · ${label(o.status)}`).join("\n")}`;
       }
       case "employees": {
         const rows = await listRows("employees", 5);
