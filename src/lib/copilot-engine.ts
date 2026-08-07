@@ -654,7 +654,7 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
         countWhere("machines", "company_id", companyId ?? ""),
       ]);
       return {
-        text: `📋 **Read-Only Overview**\n\n- Audit events: **${audit}**\n- Sales orders: **${orders}** · Production orders: **${prod}** · Machines: **${machines}**\n\nYou have read-only access to every module — drill into **Audit Logs**, **Reports**, and **Compliance**.`,
+        text: `📋 **Read-Only Overview**\n\n- Audit events: **${audit}**\n- Customer orders: **${orders}** · Production orders: **${prod}** · Machines: **${machines}**\n\nYou have read-only access to every module — drill into **Audit Logs**, **Reports**, and **Compliance**.`,
         conf: 95,
       };
     }
