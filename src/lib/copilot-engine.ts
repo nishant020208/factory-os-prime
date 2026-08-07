@@ -532,7 +532,7 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
 
     case "production_manager": {
       const prodOrders = await listRows("production_orders", 8);
-      const approved = await listRows("sales_orders", 5);
+      const approved = await listRows("customer_orders", 8);
       const inProgress = prodOrders.filter((p: any) => ["in_progress", "in-production"].includes(p.status)).length;
       return {
         text: `🏭 **Production**\n\n- Production orders: **${prodOrders.length}** (${inProgress} in progress)\n- Approved customer orders ready to plan: **${approved.filter((s: any) => s.status === "approved").length}**\n\n${prodOrders.slice(0, 3).map((p: any) => `- ${p.order_number ?? p.id?.slice(0, 8)} · ${label(p.status)}`).join("\n")}\n\nStart production from **Approved Orders** → create production planning → the inventory auto-check runs.`,
