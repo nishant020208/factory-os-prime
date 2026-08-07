@@ -484,20 +484,21 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
       const customerId = await resolveCustomerId(userId);
       // Fail closed — never fall back to "all orders in the company".
       if (!customerId) return { text: UNLINKED_PORTAL_MSG("customer"), conf: 100 };
+      // customer_orders is the source of truth for customer-placed orders
       const q: any = scoped(
-        supabase.from("sales_orders").select("*").order("created_at", { ascending: false }).limit(6),
+        supabase.from("customer_orders").select("*").order("created_at", { ascending: false }).limit(6),
       ).eq("customer_id", customerId);
       const { data: orders } = await q;
       const myOrders = (orders as any[]) ?? [];
 
       // Specific order lookup when the question names one
       const asked = myOrders.find((o: any) =>
-        (o.so_number ?? "").toLowerCase().includes(topic) ||
-        (o.product_name ?? o.product ?? "").toLowerCase().includes(topic),
+        (o.order_number ?? "").toLowerCase().includes(topic) ||
+        (o.product ?? "").toLowerCase().includes(topic),
       );
       if (asked) {
         return {
-          text: `📦 **Order ${asked.so_number}** — status: **${label(asked.status)}**\n\n- Priority: ${label(asked.priority)}\n- Amount: $${Number(asked.total_amount ?? 0).toLocaleString()}\n- Due: ${asked.due_date ? new Date(asked.due_date).toLocaleDateString() : "—"}\n\nTrack it live in **Orders → Order Tracking**.`,
+          text: `📦 **Order ${asked.order_number}** — status: **${label(asked.status)}**\n\n- Product: ${asked.product ?? "—"} × ${asked.quantity ?? "—"}\n- Priority: ${label(asked.priority)}\n- Order total: $${Number(asked.order_total ?? 0).toLocaleString()} · Advance: ${label(asked.advance_payment_status)} · Balance due: $${Number(asked.balance_due ?? 0).toLocaleString()}\n- Delivery date: ${asked.delivery_date ? new Date(asked.delivery_date).toLocaleDateString() : "—"}\n\nTrack it live in **Orders → Order Tracking**.`,
           conf: 97,
         };
       }
@@ -507,7 +508,7 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
       const open = myOrders.filter((o: any) => !["delivered", "completed", "cancelled", "rejected"].includes(o.status));
       const latest = myOrders[0];
       return {
-        text: `You have **${myOrders.length} order(s)**, ${open.length} currently open.\n\nMost recent: **${latest?.so_number ?? "—"}** — ${label(latest?.status)}.\n\nWant the status of a specific one? Just say the order number.`,
+        text: `You have **${myOrders.length} order(s)**, ${open.length} currently open.\n\nMost recent: **${latest?.order_number ?? "—"}** — ${label(latest?.status)}.\n\nWant the status of a specific one? Just say the order number.`,
         conf: 96,
       };
     }
