@@ -322,49 +322,58 @@ function detectFollowupDomain(q: string): string | null {
   return null;
 }
 
-/** Resolve the current customer's own customer_id (RLS may not fully scope it) */
+/** Resolve the current customer's own customer_id (customers.user_id is the link) */
 async function resolveCustomerId(userId: string | null): Promise<string | null> {
   if (!userId) return null;
   try {
+    const { data: byUser } = (await supabase
+      .from("customers")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle()) as any;
+    if (byUser?.id) return byUser.id;
+
+    // Fallback: match on the profile email (legacy rows created before linking)
     const { data: profile } = (await supabase
       .from("profiles")
-      .select("customer_id,email")
+      .select("email")
       .eq("id", userId)
       .maybeSingle()) as any;
-    if (profile?.customer_id) return profile.customer_id;
-    if (profile?.email) {
-      const { data: cust } = (await supabase
-        .from("customers")
-        .select("id")
-        .eq("contact_email", profile.email)
-        .maybeSingle()) as any;
-      return cust?.id ?? null;
-    }
-    return null;
+    if (!profile?.email) return null;
+    const { data: cust } = (await supabase
+      .from("customers")
+      .select("id")
+      .or(`email.eq.${profile.email},contact_email.eq.${profile.email}`)
+      .maybeSingle()) as any;
+    return cust?.id ?? null;
   } catch {
     return null;
   }
 }
 
-/** Resolve the current supplier's own id (RLS may not fully scope it) */
+/** Resolve the current supplier's own id (suppliers.user_id is the link) */
 async function resolveSupplierId(userId: string | null): Promise<string | null> {
   if (!userId) return null;
   try {
+    const { data: byUser } = (await supabase
+      .from("suppliers")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle()) as any;
+    if (byUser?.id) return byUser.id;
+
     const { data: profile } = (await supabase
       .from("profiles")
-      .select("supplier_id,email")
+      .select("email")
       .eq("id", userId)
       .maybeSingle()) as any;
-    if (profile?.supplier_id) return profile.supplier_id;
-    if (profile?.email) {
-      const { data: sup } = (await supabase
-        .from("suppliers")
-        .select("id")
-        .eq("contact_email", profile.email)
-        .maybeSingle()) as any;
-      return sup?.id ?? null;
-    }
-    return null;
+    if (!profile?.email) return null;
+    const { data: sup } = (await supabase
+      .from("suppliers")
+      .select("id")
+      .eq("contact_email", profile.email)
+      .maybeSingle()) as any;
+    return sup?.id ?? null;
   } catch {
     return null;
   }
