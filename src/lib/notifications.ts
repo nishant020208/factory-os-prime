@@ -41,17 +41,20 @@ export const NOTIFICATION_TRIGGERS = {
   "1. New company registration request": {
     sender: "Visitor (public)",
     receivers: ["root_super_admin"],
-    description: "When a new company submits a registration request, Root Super Admin is notified to review.",
+    description:
+      "When a new company submits a registration request, Root Super Admin is notified to review.",
   },
   "2. Root approves/rejects company": {
     sender: "root_super_admin",
     receivers: ["company_admin"],
-    description: "When Root approves or rejects a company registration, the new Company Admin receives a welcome/activation or rejection notice.",
+    description:
+      "When Root approves or rejects a company registration, the new Company Admin receives a welcome/activation or rejection notice.",
   },
   "3. New customer access request": {
     sender: "Visitor (public)",
     receivers: ["company_admin"],
-    description: "When a customer requests access to a company, Company Admin is notified to approve/reject.",
+    description:
+      "When a customer requests access to a company, Company Admin is notified to approve/reject.",
   },
   "4. New employee whitelist request": {
     sender: "hr_manager",
@@ -66,7 +69,8 @@ export const NOTIFICATION_TRIGGERS = {
   "6. Company Admin approves/rejects order": {
     sender: "company_admin",
     receivers: ["customer_portal", "production_manager"],
-    description: "Company Admin approves → Customer notified (success) + Production Manager notified (plan). Reject → Customer notified (reason).",
+    description:
+      "Company Admin approves → Customer notified (success) + Production Manager notified (plan). Reject → Customer notified (reason).",
   },
   "7. Profile/role change request": {
     sender: "Any employee",
@@ -81,7 +85,8 @@ export const NOTIFICATION_TRIGGERS = {
   "9. Machine in maintenance": {
     sender: "production_operator / maintenance_engineer",
     receivers: ["plant_admin", "plant_manager"],
-    description: "A machine goes into maintenance status → Plant Admin/Manager are notified (plant-scoped).",
+    description:
+      "A machine goes into maintenance status → Plant Admin/Manager are notified (plant-scoped).",
   },
   "10. Quality fail rate exceeds threshold": {
     sender: "quality_inspector",
@@ -96,32 +101,38 @@ export const NOTIFICATION_TRIGGERS = {
   "12. Company Admin approves order → PM": {
     sender: "company_admin",
     receivers: ["production_manager"],
-    description: "Customer Order approved by Company Admin → Production Manager notified to plan production.",
+    description:
+      "Customer Order approved by Company Admin → Production Manager notified to plan production.",
   },
   "13. Advance payment received": {
     sender: "customer_portal",
     receivers: ["production_manager", "finance_manager"],
-    description: "Customer pays advance → Production Manager (start production) + Finance Manager (reconcile).",
+    description:
+      "Customer pays advance → Production Manager (start production) + Finance Manager (reconcile).",
   },
   "14. Inventory check insufficient": {
     sender: "System (auto)",
     receivers: ["production_manager", "procurement_manager"],
-    description: "Inventory check fails → Production Manager (informational) + Procurement Manager (primary action).",
+    description:
+      "Inventory check fails → Production Manager (informational) + Procurement Manager (primary action).",
   },
   "15. Quality Inspector fails batch": {
     sender: "quality_inspector",
     receivers: ["production_manager", "production_operator"],
-    description: "Batch fails QC → Production Manager (re-plan) + Production Operator (rework with rejection notes).",
+    description:
+      "Batch fails QC → Production Manager (re-plan) + Production Operator (rework with rejection notes).",
   },
   "16. Operator flags machine issue": {
     sender: "production_operator",
     receivers: ["production_manager", "maintenance_engineer"],
-    description: "Operator flags machine → Production Manager (schedule impact) + Maintenance Engineer (repair).",
+    description:
+      "Operator flags machine → Production Manager (schedule impact) + Maintenance Engineer (repair).",
   },
   "17. Work Order reaches 100%": {
     sender: "production_operator",
     receivers: ["production_manager", "quality_inspector"],
-    description: "WO completed → Production Manager (completion) + Quality Inspector (batch ready for inspection).",
+    description:
+      "WO completed → Production Manager (completion) + Quality Inspector (batch ready for inspection).",
   },
   "18. Work Order assigned to operator": {
     sender: "production_manager",
@@ -131,7 +142,8 @@ export const NOTIFICATION_TRIGGERS = {
   "19. Maintenance ticket resolved": {
     sender: "maintenance_engineer",
     receivers: ["production_operator", "production_manager"],
-    description: "Machine back online → Operator (resume work) + Production Manager (machine available).",
+    description:
+      "Machine back online → Operator (resume work) + Production Manager (machine available).",
   },
   "20. Material reservation requested": {
     sender: "System (auto via production_planning)",
@@ -146,7 +158,8 @@ export const NOTIFICATION_TRIGGERS = {
   "22. Quality passes batch → Finished Goods": {
     sender: "quality_inspector",
     receivers: ["warehouse_manager", "production_manager"],
-    description: "QC passes batch → Warehouse Manager (FG ready) + Production Manager (completion).",
+    description:
+      "QC passes batch → Warehouse Manager (FG ready) + Production Manager (completion).",
   },
   "23. Stock below reorder threshold": {
     sender: "System (auto)",
@@ -218,7 +231,7 @@ export const NOTIFICATION_COUNTS_BY_ROLE: Record<string, number> = {
   quality_inspector: 1,
   maintenance_engineer: 1,
   finance_manager: 3,
-  hr_manager: 3,  // pending dept assignments, whitelist decisions, whitelist confirmation
+  hr_manager: 3, // pending dept assignments, whitelist decisions, whitelist confirmation
   customer_portal: 10, // order status, advance payment QR, shipment updates, invoice, payment, support ticket, production pause
   supplier_portal: 2,
   auditor: 0,
@@ -252,7 +265,10 @@ export const NOTIFICATION_COUNTS_BY_ROLE: Record<string, number> = {
  */
 const EXTERNAL_ROLES = new Set(["customer_portal", "supplier_portal"]);
 
-function resolveTarget(role: string, userId: string | null | undefined): [string | null, string | null] {
+function resolveTarget(
+  role: string,
+  userId: string | null | undefined,
+): [string | null, string | null] {
   if (userId) return [null, userId];
   if (EXTERNAL_ROLES.has(role)) return [null, null];
   return [role, null];
@@ -308,14 +324,23 @@ export async function fireNotification(
 // ═══════════════════════════════════════════════════════════════════
 
 /** Trigger 1+2: Company registration request / Root approves */
-export async function notifyCompanyRegistrationRequest(companyId: string | null, businessName: string) {
+export async function notifyCompanyRegistrationRequest(
+  companyId: string | null,
+  businessName: string,
+) {
   // The pending registration's id is NOT a companies(id) yet (the company
   // only exists after Root approves), so company_id must be null here to
   // avoid a foreign-key violation. Root sees it via to_role.
-  await fireNotification(null, "root_super_admin", null,
+  await fireNotification(
+    null,
+    "root_super_admin",
+    null,
     "🏢 New Company Registration",
     `"${businessName}" has submitted a registration request. Review in Pending Requests.`,
-    "info", "company_registrations", companyId);
+    "info",
+    "company_registrations",
+    companyId,
+  );
 }
 
 export async function notifyCompanyRegistrationApproved(companyId: string, companyName: string) {
@@ -323,384 +348,883 @@ export async function notifyCompanyRegistrationApproved(companyId: string, compa
   // user doesn't exist until they sign up with their whitelisted email, so we
   // cannot (yet) target to_user. RLS scopes by company_id, so only admins of
   // this new company see it — never other companies, never broadcast.
-  await fireNotification(companyId, "company_admin", null,
+  await fireNotification(
+    companyId,
+    "company_admin",
+    null,
     "✅ Company Activated",
     `"${companyName}" has been approved and activated. Welcome to FactoryOS! Sign in with your whitelisted email to set up your workspace.`,
-    "success", "companies", companyId);
+    "success",
+    "companies",
+    companyId,
+  );
 }
 
 /** Trigger 3: Customer access request → Company Admin */
-export async function notifyCustomerAccessRequest(companyId: string, businessName: string, requestId?: string | null) {
-  await fireNotification(companyId, "company_admin", null,
+export async function notifyCustomerAccessRequest(
+  companyId: string,
+  businessName: string,
+  requestId?: string | null,
+) {
+  await fireNotification(
+    companyId,
+    "company_admin",
+    null,
     "👤 New Customer Access Request",
     `"${businessName}" is requesting access to your company. Review in Customer Requests.`,
-    "info", "customer_requests", requestId ?? null);
+    "info",
+    "customer_requests",
+    requestId ?? null,
+  );
 }
 
 /** Trigger 4: Employee whitelist request → Company Admin */
-export async function notifyEmployeeWhitelistRequest(companyId: string, employeeName: string, employeeId: string) {
-  await fireNotification(companyId, "company_admin", null,
+export async function notifyEmployeeWhitelistRequest(
+  companyId: string,
+  employeeName: string,
+  employeeId: string,
+) {
+  await fireNotification(
+    companyId,
+    "company_admin",
+    null,
     "👥 New Employee Whitelist Request",
     `${employeeName} has been submitted for whitelist approval.`,
-    "info", "employees", employeeId);
+    "info",
+    "employees",
+    employeeId,
+  );
 }
 
 /** Trigger 5: Customer places New Order → Company Admin */
-export async function notifyNewOrder(companyId: string, orderNumber: string, customerName: string, orderId: string) {
-  await fireNotification(companyId, "company_admin", null,
+export async function notifyNewOrder(
+  companyId: string,
+  orderNumber: string,
+  customerName: string,
+  orderId: string,
+) {
+  await fireNotification(
+    companyId,
+    "company_admin",
+    null,
     "📦 New Customer Order",
     `Order ${orderNumber} from ${customerName} is pending your approval.`,
-    "info", "sales_orders", orderId);
+    "info",
+    "sales_orders",
+    orderId,
+  );
 }
 
 /** Trigger 6: Company Admin approves/rejects order → Customer + Production Manager */
-export async function notifyOrderApproved(companyId: string, orderNumber: string, customerUserId: string, orderId: string) {
+export async function notifyOrderApproved(
+  companyId: string,
+  orderNumber: string,
+  customerUserId: string,
+  orderId: string,
+) {
   // Customer (targeted by to_user only)
-  await fireNotification(companyId, null, customerUserId,
+  await fireNotification(
+    companyId,
+    null,
+    customerUserId,
     "✅ Order Approved",
     `Your order ${orderNumber} has been approved and is being processed for production.`,
-    "success", "sales_orders", orderId);
+    "success",
+    "sales_orders",
+    orderId,
+  );
   // Production Manager (role-wide)
-  await fireNotification(companyId, "production_manager", null,
+  await fireNotification(
+    companyId,
+    "production_manager",
+    null,
     "📋 New Order to Plan",
     `Order ${orderNumber} has been approved. Create a production order.`,
-    "info", "sales_orders", orderId);
+    "info",
+    "sales_orders",
+    orderId,
+  );
 }
 
-export async function notifyOrderRejected(companyId: string, orderNumber: string, customerUserId: string, reason: string, orderId: string) {
-  await fireNotification(companyId, null, customerUserId,
+export async function notifyOrderRejected(
+  companyId: string,
+  orderNumber: string,
+  customerUserId: string,
+  reason: string,
+  orderId: string,
+) {
+  await fireNotification(
+    companyId,
+    null,
+    customerUserId,
     "❌ Order Rejected",
     `Your order ${orderNumber} was rejected. Reason: ${reason}`,
-    "warning", "sales_orders", orderId);
+    "warning",
+    "sales_orders",
+    orderId,
+  );
 }
 
-export async function notifyOrderChangesRequested(companyId: string, orderNumber: string, customerUserId: string, orderId: string) {
-  await fireNotification(companyId, null, customerUserId,
+export async function notifyOrderChangesRequested(
+  companyId: string,
+  orderNumber: string,
+  customerUserId: string,
+  orderId: string,
+) {
+  await fireNotification(
+    companyId,
+    null,
+    customerUserId,
     "📝 Changes Requested",
     `Your order ${orderNumber} needs changes. Please review and update.`,
-    "info", "sales_orders", orderId);
+    "info",
+    "sales_orders",
+    orderId,
+  );
 }
 
 /** Trigger 7: Profile/role change request → Company Admin */
-export async function notifyChangeRequest(companyId: string, requesterName: string, requestId: string) {
-  await fireNotification(companyId, "company_admin", null,
+export async function notifyChangeRequest(
+  companyId: string,
+  requesterName: string,
+  requestId: string,
+) {
+  await fireNotification(
+    companyId,
+    "company_admin",
+    null,
     "✏️ Change Request Pending",
     `${requesterName} has submitted a profile/role change request.`,
-    "info", "profile_change_requests", requestId);
+    "info",
+    "profile_change_requests",
+    requestId,
+  );
 }
 
 /** Trigger 8: High-value PO escalation → Company Admin */
-export async function notifyPOEscalation(companyId: string, poNumber: string, amount: number, poId: string) {
-  await fireNotification(companyId, "company_admin", null,
+export async function notifyPOEscalation(
+  companyId: string,
+  poNumber: string,
+  amount: number,
+  poId: string,
+) {
+  await fireNotification(
+    companyId,
+    "company_admin",
+    null,
     "💰 PO Approval Required",
     `Purchase Order ${poNumber} for $${amount.toLocaleString()} exceeds the approval threshold.`,
-    "warning", "purchase_orders", poId);
+    "warning",
+    "purchase_orders",
+    poId,
+  );
 }
 
 /** Trigger 9: Machine in maintenance → Plant Admin + Plant Manager */
-export async function notifyMachineInMaintenance(companyId: string, machineName: string, machineId: string) {
-  await fireNotification(companyId, "plant_admin", null,
+export async function notifyMachineInMaintenance(
+  companyId: string,
+  machineName: string,
+  machineId: string,
+) {
+  await fireNotification(
+    companyId,
+    "plant_admin",
+    null,
     "🔧 Machine in Maintenance",
     `${machineName} has entered maintenance status.`,
-    "warning", "machines", machineId);
-  await fireNotification(companyId, "plant_manager", null,
+    "warning",
+    "machines",
+    machineId,
+  );
+  await fireNotification(
+    companyId,
+    "plant_manager",
+    null,
     "🔧 Machine in Maintenance",
     `${machineName} has entered maintenance status.`,
-    "warning", "machines", machineId);
+    "warning",
+    "machines",
+    machineId,
+  );
 }
 
 /** Trigger 10: Quality fail rate exceeds threshold → Plant Admin + Plant Manager */
 export async function notifyQualityFailRate(companyId: string, rate: number, plantName: string) {
-  await fireNotification(companyId, "plant_admin", null,
+  await fireNotification(
+    companyId,
+    "plant_admin",
+    null,
     "⚠️ Quality Fail Rate Alert",
     `Fail rate at ${plantName} is ${rate}% — exceeds threshold.`,
-    "warning", "quality", null);
-  await fireNotification(companyId, "plant_manager", null,
+    "warning",
+    "quality",
+    null,
+  );
+  await fireNotification(
+    companyId,
+    "plant_manager",
+    null,
     "⚠️ Quality Fail Rate Alert",
     `Fail rate at ${plantName} is ${rate}% — exceeds threshold.`,
-    "warning", "quality", null);
+    "warning",
+    "quality",
+    null,
+  );
 }
 
 /** Trigger 11: Production Order behind schedule → Plant Admin + Plant Manager */
-export async function notifyOrderBehindSchedule(companyId: string, orderNumber: string, orderId: string) {
-  await fireNotification(companyId, "plant_admin", null,
+export async function notifyOrderBehindSchedule(
+  companyId: string,
+  orderNumber: string,
+  orderId: string,
+) {
+  await fireNotification(
+    companyId,
+    "plant_admin",
+    null,
     "⏰ Production Behind Schedule",
     `Production Order ${orderNumber} is behind schedule.`,
-    "warning", "production_orders", orderId);
-  await fireNotification(companyId, "plant_manager", null,
+    "warning",
+    "production_orders",
+    orderId,
+  );
+  await fireNotification(
+    companyId,
+    "plant_manager",
+    null,
     "⏰ Production Behind Schedule",
     `Production Order ${orderNumber} is behind schedule.`,
-    "warning", "production_orders", orderId);
+    "warning",
+    "production_orders",
+    orderId,
+  );
 }
 
 /** Trigger 13: Advance payment received → Production Manager + Finance Manager */
-export async function notifyAdvancePaymentReceived(companyId: string, orderNumber: string, amount: number, orderId: string) {
-  await fireNotification(companyId, "production_manager", null,
+export async function notifyAdvancePaymentReceived(
+  companyId: string,
+  orderNumber: string,
+  amount: number,
+  orderId: string,
+) {
+  await fireNotification(
+    companyId,
+    "production_manager",
+    null,
     "💰 Advance Payment Received",
     `Payment of $${amount.toLocaleString()} received for order ${orderNumber}. Production can start.`,
-    "success", "sales_orders", orderId);
-  await fireNotification(companyId, "finance_manager", null,
+    "success",
+    "sales_orders",
+    orderId,
+  );
+  await fireNotification(
+    companyId,
+    "finance_manager",
+    null,
     "💰 Payment Received",
     `Advance payment of $${amount.toLocaleString()} received for order ${orderNumber}. Reconcile.`,
-    "success", "sales_orders", orderId);
+    "success",
+    "sales_orders",
+    orderId,
+  );
 }
 
 /** Trigger 14: Inventory check insufficient → Production Manager + Procurement Manager */
-export async function notifyInsufficientStock(companyId: string, materialName: string, orderNumber: string) {
-  await fireNotification(companyId, "production_manager", null,
+export async function notifyInsufficientStock(
+  companyId: string,
+  materialName: string,
+  orderNumber: string,
+) {
+  await fireNotification(
+    companyId,
+    "production_manager",
+    null,
     "📦 Insufficient Stock",
     `Inventory check failed: not enough ${materialName} for order ${orderNumber}. Procurement notified.`,
-    "warning", "inventory", null);
-  await fireNotification(companyId, "procurement_manager", null,
+    "warning",
+    "inventory",
+    null,
+  );
+  await fireNotification(
+    companyId,
+    "procurement_manager",
+    null,
     "📦 Procurement Required",
     `Stock insufficient for ${materialName} (order ${orderNumber}). Create a purchase requisition.`,
-    "warning", "inventory", null);
+    "warning",
+    "inventory",
+    null,
+  );
 }
 
 /** Trigger 15: Quality Inspector fails batch → Production Manager + Production Operator */
-export async function notifyBatchFailed(companyId: string, batchNumber: string, rejectionNotes: string, workOrderId: string) {
-  await fireNotification(companyId, "production_manager", null,
+export async function notifyBatchFailed(
+  companyId: string,
+  batchNumber: string,
+  rejectionNotes: string,
+  workOrderId: string,
+) {
+  await fireNotification(
+    companyId,
+    "production_manager",
+    null,
     "❌ Batch Failed QC",
     `Batch ${batchNumber} failed quality inspection. Notes: ${rejectionNotes}`,
-    "error", "work_orders", workOrderId);
-  await fireNotification(companyId, "production_operator", null,
+    "error",
+    "work_orders",
+    workOrderId,
+  );
+  await fireNotification(
+    companyId,
+    "production_operator",
+    null,
     "❌ Batch Requires Rework",
     `Your batch ${batchNumber} failed QC. Rejection notes: ${rejectionNotes}`,
-    "error", "work_orders", workOrderId);
+    "error",
+    "work_orders",
+    workOrderId,
+  );
 }
 
 /** Trigger 16: Operator flags machine issue → Production Manager + Maintenance Engineer */
-export async function notifyMachineIssue(companyId: string, machineName: string, operatorName: string, ticketId: string) {
-  await fireNotification(companyId, "production_manager", null,
+export async function notifyMachineIssue(
+  companyId: string,
+  machineName: string,
+  operatorName: string,
+  ticketId: string,
+) {
+  await fireNotification(
+    companyId,
+    "production_manager",
+    null,
     "🔧 Machine Issue Reported",
     `${operatorName} flagged an issue on ${machineName}. Schedule impact.`,
-    "warning", "maintenance_tickets", ticketId);
-  await fireNotification(companyId, "maintenance_engineer", null,
+    "warning",
+    "maintenance_tickets",
+    ticketId,
+  );
+  await fireNotification(
+    companyId,
+    "maintenance_engineer",
+    null,
     "🔧 Maintenance Ticket Created",
     `${operatorName} reported an issue on ${machineName}. Please investigate.`,
-    "warning", "maintenance_tickets", ticketId);
+    "warning",
+    "maintenance_tickets",
+    ticketId,
+  );
 }
 
 /** Trigger 17: Work Order reaches 100% → Production Manager + Quality Inspector */
-export async function notifyWorkOrderCompleted(companyId: string, woNumber: string, operatorName: string, workOrderId: string) {
-  await fireNotification(companyId, "production_manager", null,
+export async function notifyWorkOrderCompleted(
+  companyId: string,
+  woNumber: string,
+  operatorName: string,
+  workOrderId: string,
+) {
+  await fireNotification(
+    companyId,
+    "production_manager",
+    null,
     "✅ Work Order Complete",
     `Work Order ${woNumber} completed by ${operatorName}.`,
-    "success", "work_orders", workOrderId);
-  await fireNotification(companyId, "quality_inspector", null,
+    "success",
+    "work_orders",
+    workOrderId,
+  );
+  await fireNotification(
+    companyId,
+    "quality_inspector",
+    null,
     "🔍 Batch Ready for Inspection",
     `Work Order ${woNumber} is 100% complete and awaiting inspection.`,
-    "info", "work_orders", workOrderId);
+    "info",
+    "work_orders",
+    workOrderId,
+  );
 }
 
 /** Trigger 18: Work Order assigned to operator */
-export async function notifyWorkOrderAssigned(companyId: string, woNumber: string, operatorUserId: string, workOrderId: string) {
+export async function notifyWorkOrderAssigned(
+  companyId: string,
+  woNumber: string,
+  operatorUserId: string,
+  workOrderId: string,
+) {
   const [ntRole, ntUser] = resolveTarget("production_operator", operatorUserId);
-  await fireNotification(companyId, ntRole, ntUser,
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
     "📋 New Work Order Assigned",
     `Work Order ${woNumber} has been assigned to you.`,
-    "info", "work_orders", workOrderId);
+    "info",
+    "work_orders",
+    workOrderId,
+  );
 }
 
 /** Trigger 19: Maintenance ticket resolved → Operator + Production Manager */
-export async function notifyMaintenanceResolved(companyId: string, machineName: string, operatorUserId: string, ticketId: string) {
+export async function notifyMaintenanceResolved(
+  companyId: string,
+  machineName: string,
+  operatorUserId: string,
+  ticketId: string,
+) {
   const [ntRole, ntUser] = resolveTarget("production_operator", operatorUserId);
-  await fireNotification(companyId, ntRole, ntUser,
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
     "✅ Machine Back Online",
     `${machineName} is back online. You can resume work.`,
-    "success", "maintenance_tickets", ticketId);
-  await fireNotification(companyId, "production_manager", null,
+    "success",
+    "maintenance_tickets",
+    ticketId,
+  );
+  await fireNotification(
+    companyId,
+    "production_manager",
+    null,
     "✅ Maintenance Resolved",
     `${machineName} repair complete. Machine is available.`,
-    "success", "maintenance_tickets", ticketId);
+    "success",
+    "maintenance_tickets",
+    ticketId,
+  );
 }
 
 /** Trigger 20: Material reservation requested → Warehouse Manager */
-export async function notifyMaterialReservation(companyId: string, orderNumber: string, materialName: string) {
-  await fireNotification(companyId, "warehouse_manager", null,
+export async function notifyMaterialReservation(
+  companyId: string,
+  orderNumber: string,
+  materialName: string,
+) {
+  await fireNotification(
+    companyId,
+    "warehouse_manager",
+    null,
     "📦 Material Reservation Requested",
     `Production needs ${materialName} reserved for order ${orderNumber}.`,
-    "info", "production_orders", null);
+    "info",
+    "production_orders",
+    null,
+  );
 }
 
 /** Trigger 21: Supplier accepts PO and ships → Warehouse Manager */
-export async function notifySupplierShipped(companyId: string, poNumber: string, supplierName: string, poId: string) {
-  await fireNotification(companyId, "warehouse_manager", null,
+export async function notifySupplierShipped(
+  companyId: string,
+  poNumber: string,
+  supplierName: string,
+  poId: string,
+) {
+  await fireNotification(
+    companyId,
+    "warehouse_manager",
+    null,
     "🚚 Supplier Shipment Incoming",
     `${supplierName} has shipped PO ${poNumber}. Expect Goods Receipt.`,
-    "info", "purchase_orders", poId);
+    "info",
+    "purchase_orders",
+    poId,
+  );
 }
 
 /** Trigger 22: Quality passes batch → Warehouse Manager + Production Manager */
-export async function notifyQualityPassed(companyId: string, batchNumber: string, workOrderId: string) {
-  await fireNotification(companyId, "warehouse_manager", null,
+export async function notifyQualityPassed(
+  companyId: string,
+  batchNumber: string,
+  workOrderId: string,
+) {
+  await fireNotification(
+    companyId,
+    "warehouse_manager",
+    null,
     "✅ Finished Goods Ready",
     `Batch ${batchNumber} passed QC and is ready for warehouse.`,
-    "success", "work_orders", workOrderId);
-  await fireNotification(companyId, "production_manager", null,
+    "success",
+    "work_orders",
+    workOrderId,
+  );
+  await fireNotification(
+    companyId,
+    "production_manager",
+    null,
     "✅ Quality Passed",
     `Batch ${batchNumber} passed inspection.`,
-    "success", "work_orders", workOrderId);
+    "success",
+    "work_orders",
+    workOrderId,
+  );
 }
 
 /** Trigger 23: Stock below reorder threshold → Warehouse Manager + Procurement Manager */
-export async function notifyLowStock(companyId: string, skuName: string, currentQty: number, reorderLevel: number) {
-  await fireNotification(companyId, "warehouse_manager", null,
+export async function notifyLowStock(
+  companyId: string,
+  skuName: string,
+  currentQty: number,
+  reorderLevel: number,
+) {
+  await fireNotification(
+    companyId,
+    "warehouse_manager",
+    null,
     "📉 Low Stock Alert",
     `${skuName} is at ${currentQty} units (reorder at ${reorderLevel}).`,
-    "warning", "inventory", null);
-  await fireNotification(companyId, "procurement_manager", null,
+    "warning",
+    "inventory",
+    null,
+  );
+  await fireNotification(
+    companyId,
+    "procurement_manager",
+    null,
     "📉 Low Stock Alert",
     `${skuName} is at ${currentQty} units. Reorder needed.`,
-    "warning", "inventory", null);
+    "warning",
+    "inventory",
+    null,
+  );
 }
 
 /** Trigger 24: Supplier responds to PO → Procurement Manager */
-export async function notifySupplierPOResponse(companyId: string, poNumber: string, supplierName: string, status: string, poId: string) {
-  await fireNotification(companyId, "procurement_manager", null,
+export async function notifySupplierPOResponse(
+  companyId: string,
+  poNumber: string,
+  supplierName: string,
+  status: string,
+  poId: string,
+) {
+  await fireNotification(
+    companyId,
+    "procurement_manager",
+    null,
     "📋 PO Response Received",
     `${supplierName} has ${status} PO ${poNumber}.`,
-    status === "accepted" ? "success" : "warning", "purchase_orders", poId);
+    status === "accepted" ? "success" : "warning",
+    "purchase_orders",
+    poId,
+  );
 }
 
 /** Trigger 25: Dispatch Ready → Finance Manager (generate invoice) */
-export async function notifyDispatchReady(companyId: string, orderNumber: string, shipmentId: string) {
-  await fireNotification(companyId, "finance_manager", null,
+export async function notifyDispatchReady(
+  companyId: string,
+  orderNumber: string,
+  shipmentId: string,
+) {
+  await fireNotification(
+    companyId,
+    "finance_manager",
+    null,
     "📄 Dispatch Ready — Generate Invoice",
     `Order ${orderNumber} is dispatch-ready. Generate the final invoice.`,
-    "info", "shipments", shipmentId);
+    "info",
+    "shipments",
+    shipmentId,
+  );
 }
 
 /** Trigger 26: Supplier GRN confirmed → Finance Manager (release payment) */
-export async function notifyGRNConfirmed(companyId: string, poNumber: string, supplierName: string) {
-  await fireNotification(companyId, "finance_manager", null,
+export async function notifyGRNConfirmed(
+  companyId: string,
+  poNumber: string,
+  supplierName: string,
+) {
+  await fireNotification(
+    companyId,
+    "finance_manager",
+    null,
     "✅ Goods Receipt Confirmed",
     `GRN confirmed for PO ${poNumber} from ${supplierName}. Release supplier payment.`,
-    "success", "purchase_orders", null);
+    "success",
+    "purchase_orders",
+    null,
+  );
 }
 
 /** Trigger 27: New employee → Department pending for HR Manager */
-export async function notifyNewEmployeeDepartmentRequest(companyId: string, employeeName: string, employeeId: string) {
-  await fireNotification(companyId, "hr_manager", null,
+export async function notifyNewEmployeeDepartmentRequest(
+  companyId: string,
+  employeeName: string,
+  employeeId: string,
+) {
+  await fireNotification(
+    companyId,
+    "hr_manager",
+    null,
     "👤 Employee Needs Department",
     `${employeeName} needs a department assignment pending.`,
-    "info", "employees", employeeId);
+    "info",
+    "employees",
+    employeeId,
+  );
 }
 
 /** When Company Admin approves/rejects employee whitelist → HR Manager confirmation */
-export async function notifyWhitelistDecision(companyId: string, employeeName: string, decision: string) {
-  await fireNotification(companyId, "hr_manager", null,
+export async function notifyWhitelistDecision(
+  companyId: string,
+  employeeName: string,
+  decision: string,
+) {
+  await fireNotification(
+    companyId,
+    "hr_manager",
+    null,
     `📋 Whitelist ${decision === "approved" ? "Approved" : "Rejected"}`,
     `${employeeName} has been ${decision} by Company Admin.`,
-    decision === "approved" ? "success" : "warning", "employees", null);
+    decision === "approved" ? "success" : "warning",
+    "employees",
+    null,
+  );
 }
 
 /** When Company Admin approves employee → that employee notified (uses to_user ONLY for precise targeting) */
-export async function notifyEmployeeApproved(companyId: string, employeeUserId: string, employeeName: string) {
-  await fireNotification(companyId, null, employeeUserId,
+export async function notifyEmployeeApproved(
+  companyId: string,
+  employeeUserId: string,
+  employeeName: string,
+) {
+  await fireNotification(
+    companyId,
+    null,
+    employeeUserId,
     "✅ Account Activated",
     `${employeeName}, your account has been approved and activated. Welcome!`,
-    "success", "employees", null);
+    "success",
+    "employees",
+    null,
+  );
 }
 
 /** When Company Admin approves/rejects a change request → the requester notified (to_user ONLY, no role broadcast) */
-export async function notifyChangeRequestApproved(companyId: string, requesterUserId: string, requestType: string) {
-  await fireNotification(companyId, null, requesterUserId,
+export async function notifyChangeRequestApproved(
+  companyId: string,
+  requesterUserId: string,
+  requestType: string,
+) {
+  await fireNotification(
+    companyId,
+    null,
+    requesterUserId,
     "✅ Change Request Approved",
     `Your ${requestType} change request has been approved.`,
-    "success", "profile_change_requests", null);
+    "success",
+    "profile_change_requests",
+    null,
+  );
 }
 
-export async function notifyChangeRequestRejected(companyId: string, requesterUserId: string, requestType: string, reason: string) {
-  await fireNotification(companyId, null, requesterUserId,
+export async function notifyChangeRequestRejected(
+  companyId: string,
+  requesterUserId: string,
+  requestType: string,
+  reason: string,
+) {
+  await fireNotification(
+    companyId,
+    null,
+    requesterUserId,
     "❌ Change Request Rejected",
     `Your ${requestType} change request was rejected. Reason: ${reason}`,
-    "warning", "profile_change_requests", null);
+    "warning",
+    "profile_change_requests",
+    null,
+  );
 }
 
 /** Trigger 28: Customer creates Support Ticket → Company Admin */
-export async function notifySupportTicket(companyId: string, ticketNumber: string, customerName: string, ticketId: string) {
-  await fireNotification(companyId, "company_admin", null,
+export async function notifySupportTicket(
+  companyId: string,
+  ticketNumber: string,
+  customerName: string,
+  ticketId: string,
+) {
+  await fireNotification(
+    companyId,
+    "company_admin",
+    null,
     "🎫 New Support Ticket",
     `${customerName} opened ticket ${ticketNumber}.`,
-    "info", "support_tickets", ticketId);
+    "info",
+    "support_tickets",
+    ticketId,
+  );
 }
 
 /** Trigger 29: Invoice generated / payment status → Customer */
-export async function notifyInvoiceGenerated(companyId: string, invoiceNumber: string, customerUserId: string, invoiceId: string) {
+export async function notifyInvoiceGenerated(
+  companyId: string,
+  invoiceNumber: string,
+  customerUserId: string,
+  invoiceId: string,
+) {
   const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
-  await fireNotification(companyId, ntRole, ntUser,
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
     "📄 Invoice Generated",
     `Invoice ${invoiceNumber} is ready. View in your Invoices tab.`,
-    "info", "invoices", invoiceId);
+    "info",
+    "invoices",
+    invoiceId,
+  );
 }
 
-export async function notifyPaymentStatusChanged(companyId: string, invoiceNumber: string, customerUserId: string, status: string, invoiceId: string) {
+export async function notifyPaymentStatusChanged(
+  companyId: string,
+  invoiceNumber: string,
+  customerUserId: string,
+  status: string,
+  invoiceId: string,
+) {
   const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
-  await fireNotification(companyId, ntRole, ntUser,
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
     "💰 Payment Status Updated",
     `Invoice ${invoiceNumber} status: ${status}.`,
-    "success", "invoices", invoiceId);
+    "success",
+    "invoices",
+    invoiceId,
+  );
 }
 
 /** Trigger 30: Supplier payment released → Supplier */
-export async function notifySupplierPaymentReleased(companyId: string, poNumber: string, supplierUserId: string, amount: number) {
+export async function notifySupplierPaymentReleased(
+  companyId: string,
+  poNumber: string,
+  supplierUserId: string,
+  amount: number,
+) {
   const [ntRole, ntUser] = resolveTarget("supplier_portal", supplierUserId);
-  await fireNotification(companyId, ntRole, ntUser,
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
     "💰 Payment Released",
     `Payment of $${amount.toLocaleString()} for PO ${poNumber} has been released.`,
-    "success", "purchase_orders", null);
+    "success",
+    "purchase_orders",
+    null,
+  );
 }
 
 /** Trigger 31: New PO sent to Supplier */
-export async function notifyNewPOToSupplier(companyId: string, poNumber: string, supplierUserId: string, poId: string) {
+export async function notifyNewPOToSupplier(
+  companyId: string,
+  poNumber: string,
+  supplierUserId: string,
+  poId: string,
+) {
   const [ntRole, ntUser] = resolveTarget("supplier_portal", supplierUserId);
-  await fireNotification(companyId, ntRole, ntUser,
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
     "📋 New Purchase Order",
     `Purchase Order ${poNumber} has been issued to you. Review in your portal.`,
-    "info", "purchase_orders", poId);
+    "info",
+    "purchase_orders",
+    poId,
+  );
 }
 
 /** Advance payment QR generated → Customer */
-export async function notifyAdvancePaymentQRGenerated(companyId: string, orderNumber: string, customerUserId: string, amount: number) {
+export async function notifyAdvancePaymentQRGenerated(
+  companyId: string,
+  orderNumber: string,
+  customerUserId: string,
+  amount: number,
+) {
   const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
-  await fireNotification(companyId, ntRole, ntUser,
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
     "📱 Advance Payment Required",
     `An advance payment of $${amount.toLocaleString()} is required for order ${orderNumber}. Scan the QR code to pay.`,
-    "info", "sales_orders", null);
+    "info",
+    "sales_orders",
+    null,
+  );
 }
 
 /** Support ticket status updated → Customer */
-export async function notifySupportTicketUpdate(companyId: string, ticketNumber: string, customerUserId: string, status: string, ticketId: string) {
+export async function notifySupportTicketUpdate(
+  companyId: string,
+  ticketNumber: string,
+  customerUserId: string,
+  status: string,
+  ticketId: string,
+) {
   const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
-  await fireNotification(companyId, ntRole, ntUser,
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
     "🎫 Support Ticket Updated",
     `Your ticket ${ticketNumber} status: ${status}.`,
-    "info", "support_tickets", ticketId);
+    "info",
+    "support_tickets",
+    ticketId,
+  );
 }
 
 /** Work Order progress update → Customer (live tracking notification) */
-export async function notifyProgressUpdate(companyId: string, orderNumber: string, customerUserId: string, progress: number, workOrderId: string) {
+export async function notifyProgressUpdate(
+  companyId: string,
+  orderNumber: string,
+  customerUserId: string,
+  progress: number,
+  workOrderId: string,
+) {
   const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
-  await fireNotification(companyId, ntRole, ntUser,
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
     "📈 Order Progress Update",
     `Your order ${orderNumber} is ${progress}% complete.`,
-    "info", "work_orders", workOrderId);
+    "info",
+    "work_orders",
+    workOrderId,
+  );
 }
 
 /** Quality inspection passed/failed → Customer (status update, no raw QC detail) */
-export async function notifyQualityStatusUpdate(companyId: string, orderNumber: string, customerUserId: string, passed: boolean) {
+export async function notifyQualityStatusUpdate(
+  companyId: string,
+  orderNumber: string,
+  customerUserId: string,
+  passed: boolean,
+) {
   const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
-  await fireNotification(companyId, ntRole, ntUser,
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
     passed ? "✅ Quality Inspection Passed" : "❌ Quality Inspection Ongoing",
     passed
       ? `Your order ${orderNumber} has passed quality inspection and is moving to dispatch.`
       : `Your order ${orderNumber} is undergoing additional quality checks. We'll update you.`,
-    passed ? "success" : "info", "sales_orders", null);
+    passed ? "success" : "info",
+    "sales_orders",
+    null,
+  );
 }
 
 /** Trigger 32: Shipment created/dispatched → Customer */
-export async function notifyShipmentUpdate(companyId: string, orderNumber: string, customerUserId: string, status: string, shipmentId: string) {
+export async function notifyShipmentUpdate(
+  companyId: string,
+  orderNumber: string,
+  customerUserId: string,
+  status: string,
+  shipmentId: string,
+) {
   const labels: Record<string, string> = {
     dispatch_ready: "📦 Shipment Ready for Dispatch",
     out_for_delivery: "🚚 Order Out for Delivery",
@@ -708,19 +1232,36 @@ export async function notifyShipmentUpdate(companyId: string, orderNumber: strin
   };
   const title = labels[status] ?? "🚚 Shipment Update";
   const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
-  await fireNotification(companyId, ntRole, ntUser,
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
     title,
     `Your order ${orderNumber} shipment status: ${status.replace(/_/g, " ")}.`,
-    status === "delivered" ? "success" : "info", "shipments", shipmentId);
+    status === "delivered" ? "success" : "info",
+    "shipments",
+    shipmentId,
+  );
 }
 
 /** Trigger 33: Production paused for maintenance → Customer */
-export async function notifyProductionPaused(companyId: string, orderNumber: string, customerUserId: string, reason: string) {
+export async function notifyProductionPaused(
+  companyId: string,
+  orderNumber: string,
+  customerUserId: string,
+  reason: string,
+) {
   const [ntRole, ntUser] = resolveTarget("customer_portal", customerUserId);
-  await fireNotification(companyId, ntRole, ntUser,
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
     "⏸️ Production Paused",
     `Your order ${orderNumber} is paused due to maintenance. We'll update you when it resumes.`,
-    "warning", "sales_orders", null);
+    "warning",
+    "sales_orders",
+    null,
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════

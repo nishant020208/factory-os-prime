@@ -50,12 +50,7 @@ export async function notifyOnCreate(
       case "purchase_orders": {
         const supplier = await lookup("suppliers", row.supplier_id, "user_id,name");
         if (!supplier?.user_id) return; // fail closed — never broadcast to all suppliers
-        await notifyNewPOToSupplier(
-          companyId,
-          row.po_number ?? "PO",
-          supplier.user_id,
-          row.id,
-        );
+        await notifyNewPOToSupplier(companyId, row.po_number ?? "PO", supplier.user_id, row.id);
         return;
       }
 
@@ -87,12 +82,7 @@ export async function notifyOnCreate(
       case "maintenance_tickets":
       case "machine_breakdowns": {
         const machine = await lookup("machines", row.machine_id, "name");
-        await notifyMachineIssue(
-          companyId,
-          machine?.name ?? "a machine",
-          actorName,
-          row.id,
-        );
+        await notifyMachineIssue(companyId, machine?.name ?? "a machine", actorName, row.id);
         return;
       }
 

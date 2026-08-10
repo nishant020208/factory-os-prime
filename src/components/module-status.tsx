@@ -30,8 +30,6 @@ export function ModuleStatusBar({ moduleName }: { moduleName: string }) {
   );
 }
 
-
-
 /**
  * Working AI Copilot for every module.
  * Shows contextual insights, answers questions, and provides recommendations.
@@ -61,7 +59,7 @@ export function ModuleCopilot({ moduleName }: { moduleName: string }) {
       userId: user?.id ?? null,
       history: messages, // prior turns give follow-up context like "and production?"
     });
-    setMessages(prev => [...prev, { role: "ai", text }]);
+    setMessages((prev) => [...prev, { role: "ai", text }]);
     setLoading(false);
   };
 
@@ -73,10 +71,12 @@ export function ModuleCopilot({ moduleName }: { moduleName: string }) {
         onClick={() => {
           setOpen(true);
           if (messages.length === 0) {
-            setMessages([{
-              role: "ai",
-              text: `Hey! 👋 I'm your **${moduleName}** Copilot. Ask me anything about this module — I'll pull live, role-scoped data. Try "show the latest orders", "any low stock?", or "how do I create a record?".`,
-            }]);
+            setMessages([
+              {
+                role: "ai",
+                text: `Hey! 👋 I'm your **${moduleName}** Copilot. Ask me anything about this module — I'll pull live, role-scoped data. Try "show the latest orders", "any low stock?", or "how do I create a record?".`,
+              },
+            ]);
           }
         }}
       >
@@ -100,12 +100,13 @@ export function ModuleCopilot({ moduleName }: { moduleName: string }) {
                 key={i}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`text-sm leading-relaxed ${msg.role === "ai"
-                  ? "bg-card/80 border border-white/5 rounded-xl p-3"
-                  : "bg-primary/10 border border-primary/20 rounded-xl p-3 ml-8"
+                className={`text-sm leading-relaxed ${
+                  msg.role === "ai"
+                    ? "bg-card/80 border border-white/5 rounded-xl p-3"
+                    : "bg-primary/10 border border-primary/20 rounded-xl p-3 ml-8"
                 }`}
               >
-            {msg.text.replace(/\*\*/g, "")}
+                {msg.text.replace(/\*\*/g, "")}
               </motion.div>
             ))}
             {loading && (
@@ -139,11 +140,13 @@ export function ModuleCopilot({ moduleName }: { moduleName: string }) {
               </Button>
             </div>
             <div className="flex flex-wrap gap-1 mt-2">
-              {["Summary", "Insights", "Alerts", "Create new"].map(q => (
+              {["Summary", "Insights", "Alerts", "Create new"].map((q) => (
                 <button
                   key={q}
                   className="text-[10px] px-2 py-0.5 rounded-full border border-white/10 bg-muted/30 text-muted-foreground hover:bg-primary/10 hover:text-primary transition"
-                  onClick={() => { setInput(q); }}
+                  onClick={() => {
+                    setInput(q);
+                  }}
                 >
                   {q}
                 </button>

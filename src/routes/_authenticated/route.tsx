@@ -28,11 +28,15 @@ export const Route = createFileRoute("/_authenticated")({
     // Graceful fallback: if roles query fails, try profiles
     let roles: AppRole[] = [];
     if (!rolesError && rolesData) {
-      roles = rolesData.map(r => r.role as AppRole);
+      roles = rolesData.map((r) => r.role as AppRole);
     }
     const role = primaryRole(roles);
 
-    if (role === "root_super_admin" && !location.pathname.startsWith("/platform") && !location.pathname.startsWith("/notifications")) {
+    if (
+      role === "root_super_admin" &&
+      !location.pathname.startsWith("/platform") &&
+      !location.pathname.startsWith("/notifications")
+    ) {
       throw redirect({ to: "/platform" });
     }
     if (role !== "root_super_admin" && location.pathname.startsWith("/platform")) {
@@ -51,12 +55,13 @@ function AuthErrorBoundary({ error, reset }: { error: Error; reset: () => void }
   const [expanded, setExpanded] = useState(false);
   const msg = error?.message || "Unknown error";
   const isAuthError = msg.includes("auth") || msg.includes("session") || msg.includes("JWT");
-  const isNotFound = msg.includes("relation") || msg.includes("does not exist") || msg.includes("42P01");
+  const isNotFound =
+    msg.includes("relation") || msg.includes("does not exist") || msg.includes("42P01");
   const hint = isAuthError
     ? "🔑 Your session may have expired. Try signing out and back in."
     : isNotFound
-    ? "🗄️ A database table wasn't found. The data may be loading from a different source or the page is still being set up. Try navigating to another tab and back."
-    : "⚠️ An unexpected error occurred. Retrying usually resolves it.";
+      ? "🗄️ A database table wasn't found. The data may be loading from a different source or the page is still being set up. Try navigating to another tab and back."
+      : "⚠️ An unexpected error occurred. Retrying usually resolves it.";
 
   return (
     <AppShell>
@@ -66,7 +71,9 @@ function AuthErrorBoundary({ error, reset }: { error: Error; reset: () => void }
           <p className="text-sm text-muted-foreground mb-4">{hint}</p>
           <div className="flex justify-center gap-3 mb-4">
             <button
-              onClick={() => { reset(); }}
+              onClick={() => {
+                reset();
+              }}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-all"
             >
               Retry

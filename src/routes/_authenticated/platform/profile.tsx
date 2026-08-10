@@ -42,11 +42,14 @@ function PlatformProfile() {
     mutationFn: async () => {
       if (!user) throw new Error("Not authenticated");
       // Root Super Admin edits directly - NO audit log generated (per spec)
-      const { error } = await supabase.from("profiles").update({
-        full_name: form.full_name,
-        phone: form.phone || null,
-        job_title: form.job_title || null,
-      }).eq("id", user.id);
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: form.full_name,
+          phone: form.phone || null,
+          job_title: form.job_title || null,
+        })
+        .eq("id", user.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -56,7 +59,12 @@ function PlatformProfile() {
     onError: (err: any) => toast.error(err.message),
   });
 
-  const initials = (form.full_name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const initials = (form.full_name || "?")
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="max-w-[800px] mx-auto space-y-4">
@@ -83,7 +91,11 @@ function PlatformProfile() {
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Full Name</Label>
-            <Input value={form.full_name} onChange={(e) => setForm(f => ({ ...f, full_name: e.target.value }))} className="h-10" />
+            <Input
+              value={form.full_name}
+              onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
+              className="h-10"
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Email</Label>
@@ -91,11 +103,21 @@ function PlatformProfile() {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Phone</Label>
-            <Input value={form.phone} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+1 555-0123" className="h-10" />
+            <Input
+              value={form.phone}
+              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              placeholder="+1 555-0123"
+              className="h-10"
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Job Title</Label>
-            <Input value={form.job_title} onChange={(e) => setForm(f => ({ ...f, job_title: e.target.value }))} placeholder="Platform Owner" className="h-10" />
+            <Input
+              value={form.job_title}
+              onChange={(e) => setForm((f) => ({ ...f, job_title: e.target.value }))}
+              placeholder="Platform Owner"
+              className="h-10"
+            />
           </div>
         </div>
         <div className="flex justify-end mt-4">
@@ -104,7 +126,11 @@ function PlatformProfile() {
             onClick={() => updateMutation.mutate()}
             disabled={updateMutation.isPending}
           >
-            {updateMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
+            {updateMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-1.5" />
+            )}
             Save Profile
           </Button>
         </div>

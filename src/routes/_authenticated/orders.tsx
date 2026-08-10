@@ -1,6 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ShoppingCart, Truck, CheckCircle2, Clock, DollarSign, AlertTriangle, FileText, Send, Eye, Download, Search as SearchIcon } from "lucide-react";
+import {
+  ShoppingCart,
+  Truck,
+  CheckCircle2,
+  Clock,
+  DollarSign,
+  AlertTriangle,
+  FileText,
+  Send,
+  Eye,
+  Download,
+  Search as SearchIcon,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ResourceView, type FormField } from "@/components/resource-view";
 import { Kpi, StatusBadge } from "@/components/ui-parts";
@@ -8,41 +20,75 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  notifyNewOrder,
-  notifyOrderApproved,
-  notifyOrderRejected,
-} from "@/lib/notifications";
+import { notifyNewOrder, notifyOrderApproved, notifyOrderRejected } from "@/lib/notifications";
 import { getCustomerUserId } from "@/lib/customer-lookup";
 import { approveCustomerOrder, rejectCustomerOrder } from "@/lib/order-lifecycle";
 
 export const Route = createFileRoute("/_authenticated/orders")({
-  head: () => ({ meta: [
-    { title: "Orders — FactoryOS AI" },
-    { name: "description", content: "Sales orders, delivery tracking and customer fulfillment." },
-  ]}),
+  head: () => ({
+    meta: [
+      { title: "Orders — FactoryOS AI" },
+      { name: "description", content: "Sales orders, delivery tracking and customer fulfillment." },
+    ],
+  }),
   component: OrdersPage,
 });
 
 // Dynamic order form fields - customer dropdown is populated from DB
 function getOrderFormFields(customers: any[]): FormField[] {
   return [
-    { key: "so_number", label: "Order Number", type: "text", placeholder: "SO-2026-001", required: true },
-    { key: "customer_id", label: "Customer", type: "select", placeholder: "Select customer", required: true,
-      options: (customers ?? []).map((c: any) => ({ value: c.id, label: c.name })) },
-    { key: "product_name", label: "Product / Description", type: "text", placeholder: "Product name or description", required: true },
+    {
+      key: "so_number",
+      label: "Order Number",
+      type: "text",
+      placeholder: "SO-2026-001",
+      required: true,
+    },
+    {
+      key: "customer_id",
+      label: "Customer",
+      type: "select",
+      placeholder: "Select customer",
+      required: true,
+      options: (customers ?? []).map((c: any) => ({ value: c.id, label: c.name })),
+    },
+    {
+      key: "product_name",
+      label: "Product / Description",
+      type: "text",
+      placeholder: "Product name or description",
+      required: true,
+    },
     { key: "quantity", label: "Quantity", type: "number", placeholder: "100", required: true },
-    { key: "total_amount", label: "Total Amount ($)", type: "number", placeholder: "5000", required: true },
-    { key: "priority", label: "Priority", type: "select", defaultValue: "medium", options: [
-      { value: "low", label: "Low" },
-      { value: "medium", label: "Medium" },
-      { value: "high", label: "High" },
-      { value: "critical", label: "Critical" },
-    ]},
+    {
+      key: "total_amount",
+      label: "Total Amount ($)",
+      type: "number",
+      placeholder: "5000",
+      required: true,
+    },
+    {
+      key: "priority",
+      label: "Priority",
+      type: "select",
+      defaultValue: "medium",
+      options: [
+        { value: "low", label: "Low" },
+        { value: "medium", label: "Medium" },
+        { value: "high", label: "High" },
+        { value: "critical", label: "Critical" },
+      ],
+    },
     { key: "due_date", label: "Delivery Date", type: "date" },
     { key: "notes", label: "Notes", type: "textarea" },
   ];
@@ -51,7 +97,10 @@ function getOrderFormFields(customers: any[]): FormField[] {
 function OrdersPage() {
   const queryClient = useQueryClient();
   const { companyId, user, roles } = useAuth();
-  const [rejectDialog, setRejectDialog] = useState<{ open: boolean; orderId: string; }>({ open: false, orderId: "" });
+  const [rejectDialog, setRejectDialog] = useState<{ open: boolean; orderId: string }>({
+    open: false,
+    orderId: "",
+  });
   const [rejectReason, setRejectReason] = useState("");
   const [approving, setApproving] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
@@ -59,7 +108,9 @@ function OrdersPage() {
   // Fetch customers for dropdown
   const { data: customerList } = useQuery({
     queryKey: ["order-customers", companyId],
-    queryFn: async () => (await supabase.from("customers").select("id,name").eq("status", "active").order("name")).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("customers").select("id,name").eq("status", "active").order("name"))
+        .data ?? [],
     enabled: !!companyId,
   });
 
@@ -99,9 +150,7 @@ function OrdersPage() {
   const { data: salesOrders } = useQuery({
     queryKey: ["orders-sales", companyId, isCustomer ? myCustomerId : "all"],
     queryFn: async () => {
-      let query = supabase
-        .from("sales_orders")
-        .select("*, customers!inner(name, contact_email)");
+      let query = supabase.from("sales_orders").select("*, customers!inner(name, contact_email)");
 
       // DATA ISOLATION: Customer portal users only see their own orders
       if (isCustomer && myCustomerId) {
@@ -149,16 +198,20 @@ function OrdersPage() {
   // Fetch shipments for orders
   const { data: shipments } = useQuery({
     queryKey: ["orders-shipments", companyId],
-    queryFn: async () => (await supabase.from("shipments").select("*").order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("shipments").select("*").order("created_at", { ascending: false }))
+        .data ?? [],
     enabled: !!companyId,
   });
 
   // Fetch invoices for orders
   const { data: invoices } = useQuery({
     queryKey: ["orders-invoices", companyId],
-    queryFn: async () => (await supabase.from("invoices").select("*").order("issue_date", { ascending: false })).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("invoices").select("*").order("issue_date", { ascending: false }))
+        .data ?? [],
     enabled: !!companyId,
-  });  // Create order mutation
+  }); // Create order mutation
   const createMutation = useMutation({
     mutationFn: async (formData: Record<string, string>) => {
       const now = new Date().toISOString();
@@ -188,7 +241,8 @@ function OrdersPage() {
 
       // Fire notification to Company Admin
       if (inserted && companyId) {
-        const customerName = customerList?.find((c: any) => c.id === customerId)?.name ?? "Customer";
+        const customerName =
+          customerList?.find((c: any) => c.id === customerId)?.name ?? "Customer";
         await notifyNewOrder(companyId, soNumber, customerName, inserted.id);
       }
     },
@@ -220,7 +274,10 @@ function OrdersPage() {
       toast.success("Order approved — Customer & Production Manager notified");
       setApproving(null);
     },
-    onError: (err: any) => { toast.error(err.message); setApproving(null); },
+    onError: (err: any) => {
+      toast.error(err.message);
+      setApproving(null);
+    },
   });
 
   // Reject order mutation (Company Admin action)
@@ -246,7 +303,10 @@ function OrdersPage() {
       setRejectReason("");
       setRejecting(null);
     },
-    onError: (err: any) => { toast.error(err.message); setRejecting(null); },
+    onError: (err: any) => {
+      toast.error(err.message);
+      setRejecting(null);
+    },
   });
 
   // Merge data
@@ -261,13 +321,31 @@ function OrdersPage() {
       shipments: soShipments,
       invoices: soInvoices,
       status_history: soHistory,
-      progress: so.progress ?? (so.status === "completed" ? 100 : so.status === "delivered" ? 100 : so.status === "dispatch_ready" ? 85 : so.status === "quality_passed" ? 70 : so.status === "in_production" ? 30 : so.status === "approved" ? 10 : 0),
+      progress:
+        so.progress ??
+        (so.status === "completed"
+          ? 100
+          : so.status === "delivered"
+            ? 100
+            : so.status === "dispatch_ready"
+              ? 85
+              : so.status === "quality_passed"
+                ? 70
+                : so.status === "in_production"
+                  ? 30
+                  : so.status === "approved"
+                    ? 10
+                    : 0),
     };
   });
 
   const pendingApproval = rows.filter((r: any) => r.status === "pending_approval").length;
-  const inProd = rows.filter((r: any) => r.status === "in_production" || r.status === "approved").length;
-  const delivered = rows.filter((r: any) => r.status === "delivered" || r.status === "completed").length;
+  const inProd = rows.filter(
+    (r: any) => r.status === "in_production" || r.status === "approved",
+  ).length;
+  const delivered = rows.filter(
+    (r: any) => r.status === "delivered" || r.status === "completed",
+  ).length;
   const totalRevenue = rows.reduce((s: number, r: any) => s + Number(r.total_amount ?? 0), 0);
   const rejected = rows.filter((r: any) => r.status === "rejected").length;
 
@@ -288,66 +366,135 @@ function OrdersPage() {
           <>
             {pendingApproval > 0 && isCompanyAdmin && (
               <Button variant="outline" className="border-amber-500/30 text-amber-400">
-                <AlertTriangle className="h-4 w-4 mr-1.5" />{pendingApproval} Pending
+                <AlertTriangle className="h-4 w-4 mr-1.5" />
+                {pendingApproval} Pending
               </Button>
             )}
           </>
         }
         kpis={
           <>
-            <Kpi label="Total Orders" value={String(rows.length)} icon={ShoppingCart} tone="primary" />
-            <Kpi label="Pending Approval" value={String(pendingApproval)} icon={Clock} tone="warning" />
+            <Kpi
+              label="Total Orders"
+              value={String(rows.length)}
+              icon={ShoppingCart}
+              tone="primary"
+            />
+            <Kpi
+              label="Pending Approval"
+              value={String(pendingApproval)}
+              icon={Clock}
+              tone="warning"
+            />
             <Kpi label="In Production" value={String(inProd)} icon={Truck} tone="info" />
             <Kpi label="Delivered" value={String(delivered)} icon={CheckCircle2} tone="success" />
-            <Kpi label="Revenue" value={`$${(totalRevenue / 1000).toFixed(0)}k`} icon={DollarSign} tone="primary" />
-            {rejected > 0 && <Kpi label="Rejected" value={String(rejected)} icon={AlertTriangle} tone="destructive" />}
+            <Kpi
+              label="Revenue"
+              value={`$${(totalRevenue / 1000).toFixed(0)}k`}
+              icon={DollarSign}
+              tone="primary"
+            />
+            {rejected > 0 && (
+              <Kpi
+                label="Rejected"
+                value={String(rejected)}
+                icon={AlertTriangle}
+                tone="destructive"
+              />
+            )}
           </>
         }
         columns={[
-          { key: "so_number", header: "Order #", render: (r: any) => <span className="font-medium">{r.so_number}</span> },
-          { key: "customer_name", header: "Customer", render: (r: any) => <span className="text-sm">{r.customer_name ?? "—"}</span> },
-          { key: "total_amount", header: "Amount", hideOnMobile: true, render: (r: any) => <span className="font-mono text-xs">${Number(r.total_amount ?? 0).toLocaleString()}</span> },
-          { key: "priority", header: "Priority", render: (r: any) => <StatusBadge status={r.priority} /> },
-          { key: "status", header: "Status", render: (r: any) => (
-            <div className="flex items-center gap-2">
-              <StatusBadge status={r.status} />
-              {r.status === "pending_approval" && isCompanyAdmin && (
-                <div className="flex gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0 text-success"
-                    onClick={(e) => { e.stopPropagation(); approveMutation.mutate(r.id); }}
-                    disabled={approving === r.id}
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0 text-destructive"
-                    onClick={(e) => { e.stopPropagation(); setRejectDialog({ open: true, orderId: r.id }); }}
-                  >
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          )},
-          { key: "progress", header: "Progress", render: (r: any) => (
-            <div className="flex items-center gap-2 w-28">
-              <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
-                <div className="h-full bg-[image:var(--gradient-primary)]" style={{ width: `${r.progress}%` }} />
+          {
+            key: "so_number",
+            header: "Order #",
+            render: (r: any) => <span className="font-medium">{r.so_number}</span>,
+          },
+          {
+            key: "customer_name",
+            header: "Customer",
+            render: (r: any) => <span className="text-sm">{r.customer_name ?? "—"}</span>,
+          },
+          {
+            key: "total_amount",
+            header: "Amount",
+            hideOnMobile: true,
+            render: (r: any) => (
+              <span className="font-mono text-xs">
+                ${Number(r.total_amount ?? 0).toLocaleString()}
+              </span>
+            ),
+          },
+          {
+            key: "priority",
+            header: "Priority",
+            render: (r: any) => <StatusBadge status={r.priority} />,
+          },
+          {
+            key: "status",
+            header: "Status",
+            render: (r: any) => (
+              <div className="flex items-center gap-2">
+                <StatusBadge status={r.status} />
+                {r.status === "pending_approval" && isCompanyAdmin && (
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 text-success"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        approveMutation.mutate(r.id);
+                      }}
+                      disabled={approving === r.id}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRejectDialog({ open: true, orderId: r.id });
+                      }}
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
               </div>
-              <span className="tabular-nums text-xs w-8 text-right">{r.progress}%</span>
-            </div>
-          )},
-          { key: "due_date", header: "Due", hideOnMobile: true, render: (r: any) => r.due_date ? new Date(r.due_date).toLocaleDateString() : "—" },
+            ),
+          },
+          {
+            key: "progress",
+            header: "Progress",
+            render: (r: any) => (
+              <div className="flex items-center gap-2 w-28">
+                <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                  <div
+                    className="h-full bg-[image:var(--gradient-primary)]"
+                    style={{ width: `${r.progress}%` }}
+                  />
+                </div>
+                <span className="tabular-nums text-xs w-8 text-right">{r.progress}%</span>
+              </div>
+            ),
+          },
+          {
+            key: "due_date",
+            header: "Due",
+            hideOnMobile: true,
+            render: (r: any) => (r.due_date ? new Date(r.due_date).toLocaleDateString() : "—"),
+          },
         ]}
       />
 
       {/* Reject Dialog */}
-      <Dialog open={rejectDialog.open} onOpenChange={(o) => setRejectDialog(d => ({ ...d, open: o }))}>
+      <Dialog
+        open={rejectDialog.open}
+        onOpenChange={(o) => setRejectDialog((d) => ({ ...d, open: o }))}
+      >
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Reject Order</DialogTitle>
@@ -362,10 +509,14 @@ function OrdersPage() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectDialog({ open: false, orderId: "" })}>Cancel</Button>
+            <Button variant="outline" onClick={() => setRejectDialog({ open: false, orderId: "" })}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
-              onClick={() => rejectMutation.mutate({ orderId: rejectDialog.orderId, reason: rejectReason })}
+              onClick={() =>
+                rejectMutation.mutate({ orderId: rejectDialog.orderId, reason: rejectReason })
+              }
               disabled={!rejectReason.trim() || rejecting === rejectDialog.orderId}
             >
               {rejecting === rejectDialog.orderId ? "Rejecting..." : "Reject Order"}

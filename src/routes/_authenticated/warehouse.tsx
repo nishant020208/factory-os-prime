@@ -8,20 +8,38 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/warehouse")({
-  head: () => ({ meta: [
-    { title: "Warehouses — FactoryOS AI" },
-    { name: "description", content: "Multi-warehouse management, bin-level control and cycle counting." },
-  ]}),
+  head: () => ({
+    meta: [
+      { title: "Warehouses — FactoryOS AI" },
+      {
+        name: "description",
+        content: "Multi-warehouse management, bin-level control and cycle counting.",
+      },
+    ],
+  }),
   component: WarehousePage,
 });
 
 // warehouses table only has: id, company_id, plant_id, name, code, created_at
 const WAREHOUSE_FORM_FIELDS: FormField[] = [
-  { key: "name", label: "Warehouse Name", type: "text", placeholder: "Main Distribution Center", required: true },
+  {
+    key: "name",
+    label: "Warehouse Name",
+    type: "text",
+    placeholder: "Main Distribution Center",
+    required: true,
+  },
   { key: "code", label: "Warehouse Code", type: "text", placeholder: "WH-01", required: true },
 ];
 
-type WarehouseRow = { id: string; name: string; code: string; company_id: string; plant_id: string | null; created_at: string };
+type WarehouseRow = {
+  id: string;
+  name: string;
+  code: string;
+  company_id: string;
+  plant_id: string | null;
+  created_at: string;
+};
 
 function WarehousePage() {
   const queryClient = useQueryClient();
@@ -52,19 +70,28 @@ function WarehousePage() {
       });
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["warehouses"] }); toast.success("Warehouse created"); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["warehouses"] });
+      toast.success("Warehouse created");
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data: d }: { id: string; data: Record<string, string> }) => {
-      const { error } = await supabase.from("warehouses").update({
-        name: d.name,
-        code: d.code,
-      }).eq("id", id);
+      const { error } = await supabase
+        .from("warehouses")
+        .update({
+          name: d.name,
+          code: d.code,
+        })
+        .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["warehouses"] }); toast.success("Warehouse updated"); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["warehouses"] });
+      toast.success("Warehouse updated");
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
@@ -73,7 +100,10 @@ function WarehousePage() {
       const { error } = await supabase.from("warehouses").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["warehouses"] }); toast.success("Warehouse deleted"); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["warehouses"] });
+      toast.success("Warehouse deleted");
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
@@ -96,16 +126,37 @@ function WarehousePage() {
       onDelete={(row) => deleteMutation.mutateAsync(row.id)}
       kpis={
         <>
-          <Kpi label="Warehouses" value={String(data?.length ?? 0)} icon={Warehouse} tone="primary" />
+          <Kpi
+            label="Warehouses"
+            value={String(data?.length ?? 0)}
+            icon={Warehouse}
+            tone="primary"
+          />
           <Kpi label="SKUs Tracked" value={String(totalSKUs)} icon={Package} tone="info" />
           <Kpi label="Low Stock" value={String(lowStock)} icon={ArrowRightLeft} tone="warning" />
           <Kpi label="Cycle Counts" value="14" icon={ClipboardCheck} tone="success" />
         </>
       }
       columns={[
-        { key: "code", header: "Code", render: (r) => <span className="font-mono text-xs">{r.code}</span> },
-        { key: "name", header: "Name", render: (r) => <span className="font-medium">{r.name}</span> },
-        { key: "plant_id", header: "Plant", render: (r) => <span className="text-muted-foreground text-xs">{r.plant_id ? "Detroit Assembly" : "—"}</span> },
+        {
+          key: "code",
+          header: "Code",
+          render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+        },
+        {
+          key: "name",
+          header: "Name",
+          render: (r) => <span className="font-medium">{r.name}</span>,
+        },
+        {
+          key: "plant_id",
+          header: "Plant",
+          render: (r) => (
+            <span className="text-muted-foreground text-xs">
+              {r.plant_id ? "Detroit Assembly" : "—"}
+            </span>
+          ),
+        },
       ]}
     />
   );

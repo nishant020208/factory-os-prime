@@ -16,7 +16,10 @@ export function safeFrom(table: string) {
   const original = supabase.from(table as never);
   return {
     ...original,
-    select: (columns = "*", options?: { count?: "exact" | "planned" | "estimated"; head?: boolean }) => {
+    select: (
+      columns = "*",
+      options?: { count?: "exact" | "planned" | "estimated"; head?: boolean },
+    ) => {
       try {
         return original.select(columns as never, options as never);
       } catch {
@@ -48,7 +51,11 @@ export async function safeFetch(table: string): Promise<any[]> {
 /**
  * Safe data fetcher with order.
  */
-export async function safeFetchOrdered(table: string, column: string, ascending = false): Promise<any[]> {
+export async function safeFetchOrdered(
+  table: string,
+  column: string,
+  ascending = false,
+): Promise<any[]> {
   try {
     const { data } = await supabase
       .from(table as never)

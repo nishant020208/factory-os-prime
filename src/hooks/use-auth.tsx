@@ -15,20 +15,39 @@ export interface AuthState {
 
 export function useAuth(): AuthState {
   const [state, setState] = useState<AuthState>({
-    session: null, user: null, loading: true, roles: [], companyId: null, isMainAdmin: false, profile: null,
+    session: null,
+    user: null,
+    loading: true,
+    roles: [],
+    companyId: null,
+    isMainAdmin: false,
+    profile: null,
   });
 
   useEffect(() => {
     let mounted = true;
     async function hydrate(session: Session | null) {
       if (!session?.user) {
-        if (mounted) setState({ session: null, user: null, loading: false, roles: [], companyId: null, isMainAdmin: false, profile: null });
+        if (mounted)
+          setState({
+            session: null,
+            user: null,
+            loading: false,
+            roles: [],
+            companyId: null,
+            isMainAdmin: false,
+            profile: null,
+          });
         return;
       }
       try {
         const [rolesRes, profileRes] = await Promise.all([
           supabase.from("user_roles").select("role,company_id").eq("user_id", session.user.id),
-          supabase.from("profiles").select("full_name,email,avatar_url,company_id,is_main_admin").eq("id", session.user.id).maybeSingle(),
+          supabase
+            .from("profiles")
+            .select("full_name,email,avatar_url,company_id,is_main_admin")
+            .eq("id", session.user.id)
+            .maybeSingle(),
         ]);
         if (!mounted) return;
         const rolesData = rolesRes.data ?? [];
@@ -37,10 +56,17 @@ export function useAuth(): AuthState {
           session,
           user: session.user,
           loading: false,
-          roles: rolesData.length ? (rolesData as Array<{ role: string }>).map(r => r.role as AppRole) : [],
-          companyId: profile?.company_id ?? (rolesData as Array<{ company_id?: string }>)?.[0]?.company_id ?? null,
+          roles: rolesData.length
+            ? (rolesData as Array<{ role: string }>).map((r) => r.role as AppRole)
+            : [],
+          companyId:
+            profile?.company_id ??
+            (rolesData as Array<{ company_id?: string }>)?.[0]?.company_id ??
+            null,
           isMainAdmin: profile?.is_main_admin === true,
-          profile: profile ? { full_name: profile.full_name, email: profile.email, avatar_url: profile.avatar_url } : { full_name: null, email: session.user.email ?? "", avatar_url: null },
+          profile: profile
+            ? { full_name: profile.full_name, email: profile.email, avatar_url: profile.avatar_url }
+            : { full_name: null, email: session.user.email ?? "", avatar_url: null },
         });
       } catch {
         // Graceful degradation — if queries fail (table missing, RLS issue),
@@ -58,15 +84,28 @@ export function useAuth(): AuthState {
       }
     }
 
-    supabase.auth.getSession().then(({ data }) => hydrate(data.session)).catch(() => {
-      if (mounted) setState(s => ({ ...s, loading: false }));
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => hydrate(data.session))
+      .catch(() => {
+        if (mounted) setState((s) => ({ ...s, loading: false }));
+      });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED" || event === "INITIAL_SESSION") {
+      if (
+        event === "SIGNED_IN" ||
+        event === "SIGNED_OUT" ||
+        event === "USER_UPDATED" ||
+        event === "INITIAL_SESSION"
+      ) {
         hydrate(session);
       }
     });
-    return () => { mounted = false; try { sub.subscription.unsubscribe(); } catch {} };
+    return () => {
+      mounted = false;
+      try {
+        sub.subscription.unsubscribe();
+      } catch {}
+    };
   }, []);
 
   return state;

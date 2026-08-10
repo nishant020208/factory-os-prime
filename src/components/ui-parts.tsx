@@ -6,12 +6,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 export function PageHeader({
-  eyebrow, title, sub, actions,
-}: { eyebrow?: string; title: string; sub?: string; actions?: ReactNode }) {
+  eyebrow,
+  title,
+  sub,
+  actions,
+}: {
+  eyebrow?: string;
+  title: string;
+  sub?: string;
+  actions?: ReactNode;
+}) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
       <div className="min-w-0">
-        {eyebrow && <div className="text-xs uppercase tracking-widest text-primary/90">{eyebrow}</div>}
+        {eyebrow && (
+          <div className="text-xs uppercase tracking-widest text-primary/90">{eyebrow}</div>
+        )}
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mt-1">{title}</h1>
         {sub && <p className="text-sm text-muted-foreground mt-1 max-w-2xl">{sub}</p>}
       </div>
@@ -21,18 +31,32 @@ export function PageHeader({
 }
 
 export function Kpi({
-  label, value, delta, icon: Icon, tone = "primary",
-}: { label: string; value: string; delta?: string; icon?: LucideIcon; tone?: "primary" | "success" | "warning" | "info" | "destructive" }) {
+  label,
+  value,
+  delta,
+  icon: Icon,
+  tone = "primary",
+}: {
+  label: string;
+  value: string;
+  delta?: string;
+  icon?: LucideIcon;
+  tone?: "primary" | "success" | "warning" | "info" | "destructive";
+}) {
   const toneMap: Record<string, string> = {
     primary: "text-primary bg-primary/15 border-primary/20",
     success: "text-success bg-success/15 border-success/20",
     warning: "text-warning bg-warning/15 border-warning/20",
-    info:    "text-info bg-info/15 border-info/20",
+    info: "text-info bg-info/15 border-info/20",
     destructive: "text-destructive bg-destructive/15 border-destructive/20",
   };
   const up = delta?.startsWith("+");
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-5 shadow-card">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass rounded-2xl p-5 shadow-card"
+    >
       <div className="flex items-start justify-between">
         <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
         {Icon && (
@@ -43,15 +67,26 @@ export function Kpi({
       </div>
       <div className="mt-3 text-2xl sm:text-3xl font-semibold tabular-nums">{value}</div>
       {delta && (
-        <div className={`mt-1 text-xs inline-flex items-center gap-0.5 ${up ? "text-success" : "text-destructive"}`}>
-          {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />} {delta}
+        <div
+          className={`mt-1 text-xs inline-flex items-center gap-0.5 ${up ? "text-success" : "text-destructive"}`}
+        >
+          {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}{" "}
+          {delta}
         </div>
       )}
     </motion.div>
   );
 }
 
-export function Panel({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
+export function Panel({
+  title,
+  right,
+  children,
+}: {
+  title: string;
+  right?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <Card className="glass border-white/5 shadow-card">
       <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
@@ -84,13 +119,24 @@ export function StatusBadge({ status }: { status: string | null | undefined }) {
     accepted: "bg-success/15 text-success border-success/30",
   };
   return (
-    <Badge variant="outline" className={`text-[10px] font-medium capitalize ${map[s] ?? "bg-muted text-muted-foreground"}`}>
+    <Badge
+      variant="outline"
+      className={`text-[10px] font-medium capitalize ${map[s] ?? "bg-muted text-muted-foreground"}`}
+    >
       {s.replace(/_/g, " ")}
     </Badge>
   );
 }
 
-export function EmptyState({ title, sub, action }: { title: string; sub?: string; action?: ReactNode }) {
+export function EmptyState({
+  title,
+  sub,
+  action,
+}: {
+  title: string;
+  sub?: string;
+  action?: ReactNode;
+}) {
   return (
     <div className="glass rounded-2xl p-12 text-center">
       <div className="text-lg font-medium">{title}</div>

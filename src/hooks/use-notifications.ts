@@ -56,7 +56,9 @@ export function useNotifications() {
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const load = useCallback(async () => {
@@ -103,9 +105,7 @@ export function useNotifications() {
       // Root subscribes to root-targeted rows (company_id = null); company
       // roles subscribe to their own company's rows.
       const isRoot = role === "root_super_admin";
-      const filter = isRoot
-        ? "to_role=eq.root_super_admin"
-        : `company_id=eq.${companyId}`;
+      const filter = isRoot ? "to_role=eq.root_super_admin" : `company_id=eq.${companyId}`;
       channel = supabase
         .channel("notifications-realtime")
         .on(
@@ -128,7 +128,10 @@ export function useNotifications() {
                   setUnreadCount((c) => c + 1);
                 }
                 // Fire real-time toast for high-severity notifications
-                if (!notif.is_read && (notif.severity === "error" || notif.severity === "warning")) {
+                if (
+                  !notif.is_read &&
+                  (notif.severity === "error" || notif.severity === "warning")
+                ) {
                   const toastFn = notif.severity === "error" ? toast.error : toast.warning;
                   toastFn(notif.title, {
                     description: notif.body,
@@ -137,7 +140,7 @@ export function useNotifications() {
                       label: "View",
                       onClick: () => {
                         // Navigate using global handler (set by AppShell via TanStack Router)
-                        navigateTo('/notifications');
+                        navigateTo("/notifications");
                       },
                     },
                   });
@@ -166,9 +169,7 @@ export function useNotifications() {
   const markAsRead = useCallback(async (id: string) => {
     try {
       await markNotificationRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
-      );
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
       setUnreadCount((c) => Math.max(0, c - 1));
     } catch {
       // Silently fail — the UI will still show the notification

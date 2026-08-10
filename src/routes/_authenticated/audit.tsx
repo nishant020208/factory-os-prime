@@ -7,31 +7,52 @@ import { safeDate } from "@/lib/utils";
 import { ScrollText } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/audit")({
-  head: () => ({ meta: [
-    { title: "Audit Logs — FactoryOS AI" },
-    { name: "description", content: "Immutable audit trail of every action across the platform." },
-  ]}),
+  head: () => ({
+    meta: [
+      { title: "Audit Logs — FactoryOS AI" },
+      {
+        name: "description",
+        content: "Immutable audit trail of every action across the platform.",
+      },
+    ],
+  }),
   component: AuditPage,
 });
 
 function AuditPage() {
   const { data } = useQuery({
     queryKey: ["audit"],
-    queryFn: async () => (await supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(200)).data ?? [],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("audit_logs")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(200)
+      ).data ?? [],
   });
   return (
     <div className="max-w-[1600px] mx-auto">
       <ModuleStatusBar moduleName="audit" />
-      <PageHeader eyebrow="Compliance" title="Audit Logs" sub="Every action logged with actor, entity, IP and payload — immutable and exportable."
-        actions={<ModuleCopilot moduleName="audit" />} />
+      <PageHeader
+        eyebrow="Compliance"
+        title="Audit Logs"
+        sub="Every action logged with actor, entity, IP and payload — immutable and exportable."
+        actions={<ModuleCopilot moduleName="audit" />}
+      />
       <Panel title={`${data?.length ?? 0} events`}>
         {data?.length ? (
           <div className="divide-y divide-white/5 text-sm">
-            {data.map(l => (
+            {data.map((l) => (
               <div key={l.id} className="grid grid-cols-[auto_1fr_auto] gap-3 py-2 items-center">
                 <ScrollText className="h-4 w-4 text-muted-foreground" />
-                <div><span className="font-medium">{l.action}</span> <span className="text-muted-foreground">· {l.entity ?? "system"}</span></div>
-                <div className="text-xs text-muted-foreground tabular-nums">{safeDate(l.created_at, true)}</div>
+                <div>
+                  <span className="font-medium">{l.action}</span>{" "}
+                  <span className="text-muted-foreground">· {l.entity ?? "system"}</span>
+                </div>
+                <div className="text-xs text-muted-foreground tabular-nums">
+                  {safeDate(l.created_at, true)}
+                </div>
               </div>
             ))}
           </div>

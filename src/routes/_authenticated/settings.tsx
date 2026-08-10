@@ -1,6 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { SaveAll, Loader2, User, Settings as SettingsIcon, Shield, Clock, Send, CheckCircle2, XCircle } from "lucide-react";
+import {
+  SaveAll,
+  Loader2,
+  User,
+  Settings as SettingsIcon,
+  Shield,
+  Clock,
+  Send,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Panel, StatusBadge } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
@@ -8,7 +18,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -22,10 +38,12 @@ import {
 } from "@/lib/notifications";
 
 export const Route = createFileRoute("/_authenticated/settings")({
-  head: () => ({ meta: [
-    { title: "Settings — FactoryOS AI" },
-    { name: "description", content: "Profile, preferences and change requests." },
-  ]}),
+  head: () => ({
+    meta: [
+      { title: "Settings — FactoryOS AI" },
+      { name: "description", content: "Profile, preferences and change requests." },
+    ],
+  }),
   component: SettingsPage,
 });
 
@@ -52,7 +70,8 @@ function SettingsPage() {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const isRootOrCompanyAdmin = roles.includes("root_super_admin") || roles.includes("company_admin");
+  const isRootOrCompanyAdmin =
+    roles.includes("root_super_admin") || roles.includes("company_admin");
   const canEditDirectly = isRootOrCompanyAdmin;
 
   useEffect(() => {
@@ -103,12 +122,15 @@ function SettingsPage() {
   const updateProfileMutation = useMutation({
     mutationFn: async (data: any) => {
       if (!user) throw new Error("Not authenticated");
-      const { error } = await supabase.from("profiles").update({
-        full_name: data.full_name,
-        phone: data.phone || null,
-        job_title: data.job_title || null,
-        avatar_url: data.avatar_url || null,
-      }).eq("id", user.id);
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: data.full_name,
+          phone: data.phone || null,
+          job_title: data.job_title || null,
+          avatar_url: data.avatar_url || null,
+        })
+        .eq("id", user.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -137,7 +159,11 @@ function SettingsPage() {
       if (error) throw error;
 
       // Notify Company Admin that a new change request is awaiting review
-      await notifyChangeRequest(companyId, profile?.full_name ?? user.email ?? "A user", inserted?.id ?? "");
+      await notifyChangeRequest(
+        companyId,
+        profile?.full_name ?? user.email ?? "A user",
+        inserted?.id ?? "",
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["change-requests"] });
@@ -156,23 +182,38 @@ function SettingsPage() {
       if (action === "approved") {
         // Apply the change to the profile
         // @ts-expect-error — Supabase types reject computed keys
-        await supabase.from("profiles").update({
-          [req.field_name]: req.requested_value,
-        }).eq("id", req.user_id);
+        await supabase
+          .from("profiles")
+          .update({
+            [req.field_name]: req.requested_value,
+          })
+          .eq("id", req.user_id);
       }
 
       // Update the change request status
-      await supabase.from("profile_change_requests").update({
-        status: action,
-        approver_id: user?.id,
-        resolved_at: new Date().toISOString(),
-      }).eq("id", requestId);
+      await supabase
+        .from("profile_change_requests")
+        .update({
+          status: action,
+          approver_id: user?.id,
+          resolved_at: new Date().toISOString(),
+        })
+        .eq("id", requestId);
 
       // Notify the requester of the decision (targeted to them only — no broadcast)
       if (action === "approved") {
-        await notifyChangeRequestApproved(companyId ?? "", req.user_id, req.field_name?.replace(/_/g, " ") ?? "");
+        await notifyChangeRequestApproved(
+          companyId ?? "",
+          req.user_id,
+          req.field_name?.replace(/_/g, " ") ?? "",
+        );
       } else {
-        await notifyChangeRequestRejected(companyId ?? "", req.user_id, req.field_name?.replace(/_/g, " ") ?? "", "Not approved by Company Admin");
+        await notifyChangeRequestRejected(
+          companyId ?? "",
+          req.user_id,
+          req.field_name?.replace(/_/g, " ") ?? "",
+          "Not approved by Company Admin",
+        );
       }
 
       queryClient.invalidateQueries({ queryKey: ["change-requests"] });
@@ -182,7 +223,12 @@ function SettingsPage() {
     }
   };
 
-  const initials = (profileForm.full_name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const initials = (profileForm.full_name || "?")
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="max-w-[1200px] mx-auto space-y-4">
@@ -190,14 +236,24 @@ function SettingsPage() {
       <PageHeader
         eyebrow="Configuration"
         title="Profile & Settings"
-        sub={canEditDirectly ? "Edit your profile directly. Changes take effect immediately." : "Edit your profile. Sensitive fields require Company Admin approval."}
+        sub={
+          canEditDirectly
+            ? "Edit your profile directly. Changes take effect immediately."
+            : "Edit your profile. Sensitive fields require Company Admin approval."
+        }
         actions={<ModuleCopilot moduleName="settings" />}
       />
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="mb-4">
-          <TabsTrigger value="profile"><User className="h-4 w-4 mr-1.5" />Profile</TabsTrigger>
-          <TabsTrigger value="preferences"><SettingsIcon className="h-4 w-4 mr-1.5" />Preferences</TabsTrigger>
+          <TabsTrigger value="profile">
+            <User className="h-4 w-4 mr-1.5" />
+            Profile
+          </TabsTrigger>
+          <TabsTrigger value="preferences">
+            <SettingsIcon className="h-4 w-4 mr-1.5" />
+            Preferences
+          </TabsTrigger>
           {isRootOrCompanyAdmin && (
             <TabsTrigger value="change-requests">
               <Shield className="h-4 w-4 mr-1.5" />
@@ -216,12 +272,16 @@ function SettingsPage() {
           <Panel title="Personal Information">
             <div className="flex items-center gap-4 mb-6">
               <Avatar className="h-16 w-16">
-                <AvatarFallback className="bg-primary/15 text-primary text-lg">{initials}</AvatarFallback>
+                <AvatarFallback className="bg-primary/15 text-primary text-lg">
+                  {initials}
+                </AvatarFallback>
               </Avatar>
               <div>
                 <div className="font-medium">{profileForm.full_name || "Your Name"}</div>
                 <div className="text-xs text-muted-foreground">{profileForm.email}</div>
-                <div className="text-xs text-muted-foreground mt-0.5 capitalize">{roles[0]?.replace(/_/g, " ")}</div>
+                <div className="text-xs text-muted-foreground mt-0.5 capitalize">
+                  {roles[0]?.replace(/_/g, " ")}
+                </div>
               </div>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
@@ -230,7 +290,7 @@ function SettingsPage() {
                 {canEditDirectly ? (
                   <Input
                     value={profileForm.full_name}
-                    onChange={(e) => setProfileForm(f => ({ ...f, full_name: e.target.value }))}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, full_name: e.target.value }))}
                     className="h-10"
                   />
                 ) : (
@@ -240,9 +300,15 @@ function SettingsPage() {
                       variant="outline"
                       size="sm"
                       className="h-10 shrink-0"
-                      onClick={() => submitChangeRequestMutation.mutate({ field: "full_name", value: profileForm.full_name })}
+                      onClick={() =>
+                        submitChangeRequestMutation.mutate({
+                          field: "full_name",
+                          value: profileForm.full_name,
+                        })
+                      }
                     >
-                      <Send className="h-3 w-3 mr-1" />Request
+                      <Send className="h-3 w-3 mr-1" />
+                      Request
                     </Button>
                   </div>
                 )}
@@ -259,12 +325,20 @@ function SettingsPage() {
                         variant="outline"
                         size="sm"
                         className="h-10 shrink-0"
-                        onClick={() => submitChangeRequestMutation.mutate({ field: "email", value: profileForm.email })}
+                        onClick={() =>
+                          submitChangeRequestMutation.mutate({
+                            field: "email",
+                            value: profileForm.email,
+                          })
+                        }
                       >
-                        <Send className="h-3 w-3 mr-1" />Request
+                        <Send className="h-3 w-3 mr-1" />
+                        Request
                       </Button>
                     </div>
-                    <div className="text-[10px] text-muted-foreground">Email changes require Company Admin approval</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Email changes require Company Admin approval
+                    </div>
                   </>
                 )}
               </div>
@@ -273,7 +347,7 @@ function SettingsPage() {
                 {canEditDirectly ? (
                   <Input
                     value={profileForm.phone}
-                    onChange={(e) => setProfileForm(f => ({ ...f, phone: e.target.value }))}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))}
                     placeholder="+1 555-0123"
                     className="h-10"
                   />
@@ -281,7 +355,7 @@ function SettingsPage() {
                   <div className="flex gap-2">
                     <Input
                       value={profileForm.phone}
-                      onChange={(e) => setProfileForm(f => ({ ...f, phone: e.target.value }))}
+                      onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))}
                       placeholder="+1 555-0123"
                       className="h-10"
                     />
@@ -289,9 +363,15 @@ function SettingsPage() {
                       variant="outline"
                       size="sm"
                       className="h-10 shrink-0"
-                      onClick={() => submitChangeRequestMutation.mutate({ field: "phone", value: profileForm.phone })}
+                      onClick={() =>
+                        submitChangeRequestMutation.mutate({
+                          field: "phone",
+                          value: profileForm.phone,
+                        })
+                      }
                     >
-                      <Send className="h-3 w-3 mr-1" />Request
+                      <Send className="h-3 w-3 mr-1" />
+                      Request
                     </Button>
                   </div>
                 )}
@@ -301,7 +381,7 @@ function SettingsPage() {
                 {canEditDirectly ? (
                   <Input
                     value={profileForm.job_title}
-                    onChange={(e) => setProfileForm(f => ({ ...f, job_title: e.target.value }))}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, job_title: e.target.value }))}
                     placeholder="e.g. CNC Operator"
                     className="h-10"
                   />
@@ -309,7 +389,7 @@ function SettingsPage() {
                   <div className="flex gap-2">
                     <Input
                       value={profileForm.job_title}
-                      onChange={(e) => setProfileForm(f => ({ ...f, job_title: e.target.value }))}
+                      onChange={(e) => setProfileForm((f) => ({ ...f, job_title: e.target.value }))}
                       placeholder="e.g. CNC Operator"
                       className="h-10"
                     />
@@ -317,9 +397,15 @@ function SettingsPage() {
                       variant="outline"
                       size="sm"
                       className="h-10 shrink-0"
-                      onClick={() => submitChangeRequestMutation.mutate({ field: "job_title", value: profileForm.job_title })}
+                      onClick={() =>
+                        submitChangeRequestMutation.mutate({
+                          field: "job_title",
+                          value: profileForm.job_title,
+                        })
+                      }
                     >
-                      <Send className="h-3 w-3 mr-1" />Request
+                      <Send className="h-3 w-3 mr-1" />
+                      Request
                     </Button>
                   </div>
                 )}
@@ -329,7 +415,7 @@ function SettingsPage() {
                 {canEditDirectly ? (
                   <Input
                     value={profileForm.avatar_url}
-                    onChange={(e) => setProfileForm(f => ({ ...f, avatar_url: e.target.value }))}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, avatar_url: e.target.value }))}
                     placeholder="https://example.com/avatar.jpg"
                     className="h-10"
                   />
@@ -337,7 +423,9 @@ function SettingsPage() {
                   <div className="flex gap-2">
                     <Input
                       value={profileForm.avatar_url}
-                      onChange={(e) => setProfileForm(f => ({ ...f, avatar_url: e.target.value }))}
+                      onChange={(e) =>
+                        setProfileForm((f) => ({ ...f, avatar_url: e.target.value }))
+                      }
                       placeholder="https://example.com/avatar.jpg"
                       className="h-10"
                     />
@@ -345,9 +433,15 @@ function SettingsPage() {
                       variant="outline"
                       size="sm"
                       className="h-10 shrink-0"
-                      onClick={() => submitChangeRequestMutation.mutate({ field: "avatar_url", value: profileForm.avatar_url })}
+                      onClick={() =>
+                        submitChangeRequestMutation.mutate({
+                          field: "avatar_url",
+                          value: profileForm.avatar_url,
+                        })
+                      }
                     >
-                      <Send className="h-3 w-3 mr-1" />Request
+                      <Send className="h-3 w-3 mr-1" />
+                      Request
                     </Button>
                   </div>
                 )}
@@ -360,7 +454,11 @@ function SettingsPage() {
                   onClick={() => updateProfileMutation.mutate(profileForm as any)}
                   disabled={updateProfileMutation.isPending}
                 >
-                  {updateProfileMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <SaveAll className="h-4 w-4 mr-1.5" />}
+                  {updateProfileMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <SaveAll className="h-4 w-4 mr-1.5" />
+                  )}
                   Save Profile
                 </Button>
               </div>
@@ -370,47 +468,62 @@ function SettingsPage() {
           {/* Change Request Form (for non-admin roles) */}
           {!canEditDirectly && (
             <div className="mt-4 space-y-4">
-            <Panel title="Request a Change">
-              <div className="text-sm text-muted-foreground mb-4">
-                Need to update your role, email, or department? Submit a change request and your Company Admin will review it.
-              </div>
-              <div className="grid sm:grid-cols-3 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Field</Label>
-                  <Select
-                    value={changeRequestForm.field}
-                    onValueChange={(v) => setChangeRequestForm(f => ({ ...f, field: v }))}
-                  >
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Select field" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {APPROVAL_FIELDS.map(f => (
-                        <SelectItem key={f} value={f}>{f.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <Panel title="Request a Change">
+                <div className="text-sm text-muted-foreground mb-4">
+                  Need to update your role, email, or department? Submit a change request and your
+                  Company Admin will review it.
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Requested Value</Label>
-                  <Input
-                    value={changeRequestForm.requested_value}
-                    onChange={(e) => setChangeRequestForm(f => ({ ...f, requested_value: e.target.value }))}
-                    placeholder="New value..."
-                    className="h-10"
-                  />
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Field</Label>
+                    <Select
+                      value={changeRequestForm.field}
+                      onValueChange={(v) => setChangeRequestForm((f) => ({ ...f, field: v }))}
+                    >
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select field" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {APPROVAL_FIELDS.map((f) => (
+                          <SelectItem key={f} value={f}>
+                            {f.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Requested Value</Label>
+                    <Input
+                      value={changeRequestForm.requested_value}
+                      onChange={(e) =>
+                        setChangeRequestForm((f) => ({ ...f, requested_value: e.target.value }))
+                      }
+                      placeholder="New value..."
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="space-y-1.5 pt-5">
+                    <Button
+                      className="w-full"
+                      onClick={() =>
+                        submitChangeRequestMutation.mutate({
+                          field: changeRequestForm.field,
+                          value: changeRequestForm.requested_value,
+                        })
+                      }
+                      disabled={
+                        !changeRequestForm.field ||
+                        !changeRequestForm.requested_value ||
+                        submitChangeRequestMutation.isPending
+                      }
+                    >
+                      <Send className="h-4 w-4 mr-1.5" />
+                      Submit Request
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-1.5 pt-5">
-                  <Button
-                    className="w-full"
-                    onClick={() => submitChangeRequestMutation.mutate({ field: changeRequestForm.field, value: changeRequestForm.requested_value })}
-                    disabled={!changeRequestForm.field || !changeRequestForm.requested_value || submitChangeRequestMutation.isPending}
-                  >
-                    <Send className="h-4 w-4 mr-1.5" />Submit Request
-                  </Button>
-                </div>
-              </div>
-            </Panel>
+              </Panel>
             </div>
           )}
 
@@ -420,7 +533,10 @@ function SettingsPage() {
               <Panel title="My Requests">
                 <div className="space-y-2">
                   {(myRequests ?? []).map((req: any) => (
-                    <div key={req.id} className="flex items-center justify-between gap-3 rounded-lg bg-card/60 border border-white/5 px-3 py-2.5">
+                    <div
+                      key={req.id}
+                      className="flex items-center justify-between gap-3 rounded-lg bg-card/60 border border-white/5 px-3 py-2.5"
+                    >
                       <div className="min-w-0">
                         <div className="text-sm">
                           <span className="capitalize">{req.field_name?.replace(/_/g, " ")}</span>
@@ -428,7 +544,10 @@ function SettingsPage() {
                           <span className="font-medium">{req.requested_value}</span>
                         </div>
                         <div className="text-[10px] text-muted-foreground mt-0.5">
-                          {safeDate(req.created_at, true)} · {req.status === "pending" ? "Awaiting Company Admin approval" : `Resolved`}
+                          {safeDate(req.created_at, true)} ·{" "}
+                          {req.status === "pending"
+                            ? "Awaiting Company Admin approval"
+                            : `Resolved`}
                         </div>
                       </div>
                       <StatusBadge status={req.status} />
@@ -484,21 +603,29 @@ function SettingsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">{t("Language")}</Label>
-                <Select value={locale} onValueChange={(v) => { setLocale(v as Locale); toast.success("Language updated"); }}>
+                <Select
+                  value={locale}
+                  onValueChange={(v) => {
+                    setLocale(v as Locale);
+                    toast.success("Language updated");
+                  }}
+                >
                   <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {LOCALES.map(l => (
+                    {LOCALES.map((l) => (
                       <SelectItem key={l.code} value={l.code}>
-                        <span className="mr-2">{l.flag}</span>{l.label}
+                        <span className="mr-2">{l.flag}</span>
+                        {l.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="text-[10px] text-muted-foreground">Affects navigation, menus and shared UI labels for your account.</div>
+                <div className="text-[10px] text-muted-foreground">
+                  Affects navigation, menus and shared UI labels for your account.
+                </div>
               </div>
-
             </div>
           </Panel>
         </TabsContent>
@@ -508,7 +635,8 @@ function SettingsPage() {
           <Panel title="Pending Change Requests">
             {(!changeRequests || changeRequests.length === 0) && (
               <div className="text-sm text-muted-foreground py-8 text-center">
-                No pending change requests. When employees request profile changes, they'll appear here.
+                No pending change requests. When employees request profile changes, they'll appear
+                here.
               </div>
             )}
             <div className="divide-y divide-white/5">
@@ -516,9 +644,13 @@ function SettingsPage() {
                 <div key={req.id} className="py-3 flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium">{req.profiles?.full_name ?? req.user_id?.slice(0, 8)}</span>
+                      <span className="font-medium">
+                        {req.profiles?.full_name ?? req.user_id?.slice(0, 8)}
+                      </span>
                       <span className="text-xs text-muted-foreground">wants to change</span>
-                      <span className="font-medium capitalize">{req.field_name.replace(/_/g, " ")}</span>
+                      <span className="font-medium capitalize">
+                        {req.field_name.replace(/_/g, " ")}
+                      </span>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
                       Current: <span className="line-through">{req.current_value || "—"}</span>
@@ -538,7 +670,8 @@ function SettingsPage() {
                           className="h-8 text-success"
                           onClick={() => handleChangeRequest(req.id, "approved")}
                         >
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />Approve
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                          Approve
                         </Button>
                         <Button
                           size="sm"
@@ -546,13 +679,12 @@ function SettingsPage() {
                           className="h-8 text-destructive"
                           onClick={() => handleChangeRequest(req.id, "rejected")}
                         >
-                          <XCircle className="h-3.5 w-3.5 mr-1" />Reject
+                          <XCircle className="h-3.5 w-3.5 mr-1" />
+                          Reject
                         </Button>
                       </>
                     )}
-                    {req.status !== "pending" && (
-                      <StatusBadge status={req.status} />
-                    )}
+                    {req.status !== "pending" && <StatusBadge status={req.status} />}
                   </div>
                 </div>
               ))}

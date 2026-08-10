@@ -1,9 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Bell, CheckCheck, Info, AlertTriangle, CheckCircle2, XCircle,
-  Clock, ExternalLink, Loader2, Inbox, ChevronRight, HelpCircle,
-  Send, ShieldAlert, Building2,
+  Bell,
+  CheckCheck,
+  Info,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  ExternalLink,
+  Loader2,
+  Inbox,
+  ChevronRight,
+  HelpCircle,
+  Send,
+  ShieldAlert,
+  Building2,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -14,13 +26,14 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useAuth } from "@/hooks/use-auth";
 import { primaryRole } from "@/lib/route-access";
 import { ROLE_MAP } from "@/lib/roles";
-import { NOTIFICATION_TRIGGERS, NOTIFICATION_COUNTS_BY_ROLE, fireNotification, type NotificationSeverity } from "@/lib/notifications";
-import { ROLES } from "@/lib/roles";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  NOTIFICATION_TRIGGERS,
+  NOTIFICATION_COUNTS_BY_ROLE,
+  fireNotification,
+  type NotificationSeverity,
+} from "@/lib/notifications";
+import { ROLES } from "@/lib/roles";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,18 +42,38 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated/notifications")({
-  head: () => ({ meta: [
-    { title: "Notifications — FactoryOS AI" },
-    { name: "description", content: "Role-scoped notifications across the order lifecycle." },
-  ]}),
+  head: () => ({
+    meta: [
+      { title: "Notifications — FactoryOS AI" },
+      { name: "description", content: "Role-scoped notifications across the order lifecycle." },
+    ],
+  }),
   component: NotificationsPage,
 });
 
-const severityConfig: Record<NotificationSeverity, { icon: typeof Info; color: string; bg: string; border: string }> = {
-  info:    { icon: Info,       color: "text-blue-400",   bg: "bg-blue-500/10", border: "border-blue-500/20" },
-  warning: { icon: AlertTriangle, color: "text-amber-400", bg: "bg-amber-500/10",  border: "border-amber-500/20" },
-  success: { icon: CheckCircle2,  color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-  error:   { icon: XCircle,    color: "text-rose-400",   bg: "bg-rose-500/10",  border: "border-rose-500/20" },
+const severityConfig: Record<
+  NotificationSeverity,
+  { icon: typeof Info; color: string; bg: string; border: string }
+> = {
+  info: { icon: Info, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+  warning: {
+    icon: AlertTriangle,
+    color: "text-amber-400",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/20",
+  },
+  success: {
+    icon: CheckCircle2,
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/20",
+  },
+  error: {
+    icon: XCircle,
+    color: "text-rose-400",
+    bg: "bg-rose-500/10",
+    border: "border-rose-500/20",
+  },
 };
 
 function severityIcon(severity: string) {
@@ -74,20 +107,23 @@ function TriggerReferencePanel({ role }: { role: string | null }) {
       <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-card/60 transition-colors cursor-pointer group">
         <div className="flex items-center gap-2">
           <HelpCircle className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-          <span className="font-medium">How notifications work for <span className="text-primary">{roleLabel(role)}</span></span>
+          <span className="font-medium">
+            How notifications work for <span className="text-primary">{roleLabel(role)}</span>
+          </span>
           <span className="text-[10px] text-muted-foreground bg-muted/30 px-2 py-0.5 rounded-full">
             {totalCount} trigger{totalCount !== 1 ? "s" : ""}
           </span>
         </div>
-        <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
+        <ChevronRight
+          className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`}
+        />
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="px-4 pb-4 space-y-3">
           <p className="text-xs text-muted-foreground/70 leading-relaxed">
-            These are the events that trigger a notification for your role. Every notification
-            is <strong className="text-foreground/80">targeted</strong> — you only see what's
-            relevant to you. Other roles never receive your notifications, and you never receive
-            theirs.
+            These are the events that trigger a notification for your role. Every notification is{" "}
+            <strong className="text-foreground/80">targeted</strong> — you only see what's relevant
+            to you. Other roles never receive your notifications, and you never receive theirs.
           </p>
           <div className="space-y-2">
             {relevantTriggers.map((trigger) => (
@@ -101,7 +137,9 @@ function TriggerReferencePanel({ role }: { role: string | null }) {
                     {trigger.sender} →
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">{trigger.description}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {trigger.description}
+                </p>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {trigger.receivers.map((r: string) => {
                     const isCurrentRole = r === role;
@@ -114,7 +152,8 @@ function TriggerReferencePanel({ role }: { role: string | null }) {
                             : "bg-muted/20 border-white/5 text-muted-foreground"
                         }`}
                       >
-                        {isCurrentRole ? "✦ " : ""}{roleLabel(r)}
+                        {isCurrentRole ? "✦ " : ""}
+                        {roleLabel(r)}
                       </span>
                     );
                   })}
@@ -128,7 +167,15 @@ function TriggerReferencePanel({ role }: { role: string | null }) {
   );
 }
 
-function SendNotificationForm({ companyId, senderRole, isMainAdmin }: { companyId: string | null; senderRole: string | null; isMainAdmin: boolean }) {
+function SendNotificationForm({
+  companyId,
+  senderRole,
+  isMainAdmin,
+}: {
+  companyId: string | null;
+  senderRole: string | null;
+  isMainAdmin: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -138,7 +185,9 @@ function SendNotificationForm({ companyId, senderRole, isMainAdmin }: { companyI
 
   // Only the designated MAIN-ADMIN may send a manual message to Root Super Admin.
   // Enforced in the UI here AND at the RLS layer (notifications_insert_main_admin_only).
-  const availableRoles = ROLES.filter((r) => r.id !== senderRole && (r.id !== "root_super_admin" || isMainAdmin));
+  const availableRoles = ROLES.filter(
+    (r) => r.id !== senderRole && (r.id !== "root_super_admin" || isMainAdmin),
+  );
 
   function toggleRole(roleId: string) {
     setSelectedRoles((prev) =>
@@ -150,10 +199,18 @@ function SendNotificationForm({ companyId, senderRole, isMainAdmin }: { companyI
     if (!companyId || !body.trim() || selectedRoles.length === 0) return;
     setSending(true);
     try {
-      const notificationTitle = title.trim() || `📨 Manual message from ${roleLabel(senderRole ?? "unknown")}`;
+      const notificationTitle =
+        title.trim() || `📨 Manual message from ${roleLabel(senderRole ?? "unknown")}`;
       let sent = 0;
       for (const toRole of selectedRoles) {
-        const ok = await fireNotification(companyId, toRole, null, notificationTitle, body.trim(), severity);
+        const ok = await fireNotification(
+          companyId,
+          toRole,
+          null,
+          notificationTitle,
+          body.trim(),
+          severity,
+        );
         if (ok) sent += 1;
       }
       if (sent === 0) {
@@ -177,7 +234,11 @@ function SendNotificationForm({ companyId, senderRole, isMainAdmin }: { companyI
   }
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="rounded-xl border border-white/5 bg-card/40 backdrop-blur-sm mb-8 overflow-hidden">
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="rounded-xl border border-white/5 bg-card/40 backdrop-blur-sm mb-8 overflow-hidden"
+    >
       <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-3 text-sm hover:bg-card/60 transition-colors cursor-pointer group">
         <div className="flex items-center gap-2">
           <Send className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -188,13 +249,15 @@ function SendNotificationForm({ companyId, senderRole, isMainAdmin }: { companyI
             </span>
           )}
         </div>
-        <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
+        <ChevronRight
+          className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${open ? "rotate-90" : ""}`}
+        />
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="px-4 pb-4 space-y-4">
           <p className="text-xs text-muted-foreground/70">
-            Send a manual notification to specific roles. Select the roles you want to notify,
-            write your message, and choose a severity level.
+            Send a manual notification to specific roles. Select the roles you want to notify, write
+            your message, and choose a severity level.
           </p>
 
           <div className="space-y-1.5">
@@ -221,12 +284,32 @@ function SendNotificationForm({ companyId, senderRole, isMainAdmin }: { companyI
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Severity</Label>
             <div className="flex gap-2">
-              {([
-                { value: "info" as const, label: "Info", color: "text-blue-400", bg: "bg-blue-500/10" },
-                { value: "success" as const, label: "Success", color: "text-emerald-400", bg: "bg-emerald-500/10" },
-                { value: "warning" as const, label: "Warning", color: "text-amber-400", bg: "bg-amber-500/10" },
-                { value: "error" as const, label: "Error", color: "text-rose-400", bg: "bg-rose-500/10" },
-              ]).map((opt) => (
+              {[
+                {
+                  value: "info" as const,
+                  label: "Info",
+                  color: "text-blue-400",
+                  bg: "bg-blue-500/10",
+                },
+                {
+                  value: "success" as const,
+                  label: "Success",
+                  color: "text-emerald-400",
+                  bg: "bg-emerald-500/10",
+                },
+                {
+                  value: "warning" as const,
+                  label: "Warning",
+                  color: "text-amber-400",
+                  bg: "bg-amber-500/10",
+                },
+                {
+                  value: "error" as const,
+                  label: "Error",
+                  color: "text-rose-400",
+                  bg: "bg-rose-500/10",
+                },
+              ].map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setSeverity(opt.value)}
@@ -304,15 +387,23 @@ function RootNotificationsFeed() {
           .order("created_at", { ascending: false })
           .limit(25);
         return data ?? [];
-      } catch { return []; }
+      } catch {
+        return [];
+      }
     },
   });
   const pending = (registrations ?? []).filter((r: any) => r.status === "pending").length;
 
   return (
-    <Panel title="Company Registration Requests" right={
-      <span className="text-[10px] text-primary flex items-center gap-1"><Building2 className="h-3 w-3" />{pending} pending</span>
-    }>
+    <Panel
+      title="Company Registration Requests"
+      right={
+        <span className="text-[10px] text-primary flex items-center gap-1">
+          <Building2 className="h-3 w-3" />
+          {pending} pending
+        </span>
+      }
+    >
       {!registrations?.length ? (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <Inbox className="h-12 w-12 mb-3 opacity-30" />
@@ -323,21 +414,37 @@ function RootNotificationsFeed() {
         <div className="space-y-2">
           {(registrations ?? []).map((reg: any) => {
             const sev: NotificationSeverity =
-              reg.status === "pending" ? "warning" :
-              reg.status === "approved" ? "success" : "error";
+              reg.status === "pending"
+                ? "warning"
+                : reg.status === "approved"
+                  ? "success"
+                  : "error";
             return (
               <div key={reg.id} className="rounded-xl border border-white/5 bg-card/60 p-3 text-sm">
                 <div className="flex items-center gap-3">
-                  <div className={cn("h-8 w-8 rounded-lg grid place-items-center shrink-0", sev === "warning" ? "bg-amber-500/10" : sev === "success" ? "bg-emerald-500/10" : "bg-rose-500/10")}>
+                  <div
+                    className={cn(
+                      "h-8 w-8 rounded-lg grid place-items-center shrink-0",
+                      sev === "warning"
+                        ? "bg-amber-500/10"
+                        : sev === "success"
+                          ? "bg-emerald-500/10"
+                          : "bg-rose-500/10",
+                    )}
+                  >
                     {severityIcon(sev)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium truncate">🏢 {reg.company_name}</span>
-                      <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{timeAgo(reg.created_at)}</span>
+                      <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                        {timeAgo(reg.created_at)}
+                      </span>
                     </div>
                     <div className="mt-0.5 text-xs text-muted-foreground">
-                      {reg.email}{reg.industry ? ` · ${reg.industry}` : ""} · status: <span className="capitalize">{reg.status}</span>
+                      {reg.email}
+                      {reg.industry ? ` · ${reg.industry}` : ""} · status:{" "}
+                      <span className="capitalize">{reg.status}</span>
                     </div>
                   </div>
                 </div>
@@ -410,7 +517,9 @@ function NotificationsPage() {
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
           <Inbox className="h-12 w-12 mb-3 opacity-30" />
           <div className="text-sm">No notifications yet</div>
-          <div className="text-xs mt-1">Role-specific notifications will appear here in real time.</div>
+          <div className="text-xs mt-1">
+            Role-specific notifications will appear here in real time.
+          </div>
         </div>
       ) : (
         <div className="space-y-6">
@@ -443,11 +552,7 @@ function NotificationsPage() {
               </h2>
               <div className="space-y-1.5 opacity-70">
                 {grouped.read.map((n) => (
-                  <NotificationCard
-                    key={n.id}
-                    notification={n}
-                    read
-                  />
+                  <NotificationCard key={n.id} notification={n} read />
                 ))}
               </div>
             </div>
@@ -491,25 +596,22 @@ function NotificationCard({
       )}
     >
       <div className="flex items-start gap-3">
-        <div className={cn(
-          "h-8 w-8 rounded-lg grid place-items-center shrink-0",
-          read ? "bg-muted/30" : sev.bg,
-        )}>
+        <div
+          className={cn(
+            "h-8 w-8 rounded-lg grid place-items-center shrink-0",
+            read ? "bg-muted/30" : sev.bg,
+          )}
+        >
           {severityIcon(n.severity)}
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <span className={cn(
-                "font-medium truncate",
-                read && "text-muted-foreground",
-              )}>
+              <span className={cn("font-medium truncate", read && "text-muted-foreground")}>
                 {n.title}
               </span>
-              {!read && (
-                <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
-              )}
+              {!read && <span className="h-2 w-2 rounded-full bg-primary shrink-0" />}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span className="text-[10px] text-muted-foreground tabular-nums">
@@ -525,16 +627,20 @@ function NotificationCard({
               )}
             </div>
           </div>
-          <div className={cn(
-            "mt-0.5 text-xs leading-relaxed",
-            read ? "text-muted-foreground/60" : "text-muted-foreground",
-          )}>
+          <div
+            className={cn(
+              "mt-0.5 text-xs leading-relaxed",
+              read ? "text-muted-foreground/60" : "text-muted-foreground",
+            )}
+          >
             {n.body}
           </div>
           {n.related_entity_type && (
             <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
               <ExternalLink className="h-3 w-3" />
-              <span>{n.related_entity_type} · {n.related_entity_id?.slice(0, 8)}</span>
+              <span>
+                {n.related_entity_type} · {n.related_entity_id?.slice(0, 8)}
+              </span>
             </div>
           )}
         </div>

@@ -9,10 +9,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/customers")({
-  head: () => ({ meta: [
-    { title: "Customers — FactoryOS AI" },
-    { name: "description", content: "Customer accounts, segments and lifetime value." },
-  ]}),
+  head: () => ({
+    meta: [
+      { title: "Customers — FactoryOS AI" },
+      { name: "description", content: "Customer accounts, segments and lifetime value." },
+    ],
+  }),
   component: CustomersPage,
 });
 
@@ -20,20 +22,32 @@ const CUSTOMER_FORM_FIELDS: FormField[] = [
   { key: "name", label: "Company Name", type: "text", placeholder: "Acme Corp", required: true },
   { key: "contact_email", label: "Contact Email", type: "email", placeholder: "proc@acme.com" },
   { key: "contact_phone", label: "Phone", type: "text", placeholder: "+1 555-0123" },
-  { key: "segment", label: "Segment", type: "select", placeholder: "Select segment", options: [
-    { value: "Aerospace", label: "Aerospace" },
-    { value: "Automotive", label: "Automotive" },
-    { value: "Medical", label: "Medical" },
-    { value: "Industrial", label: "Industrial" },
-    { value: "Consumer", label: "Consumer" },
-    { value: "Energy", label: "Energy" },
-    { value: "Defense", label: "Defense" },
-  ]},
-  { key: "status", label: "Status", type: "select", defaultValue: "active", options: [
-    { value: "active", label: "Active" },
-    { value: "inactive", label: "Inactive" },
-    { value: "prospect", label: "Prospect" },
-  ]},
+  {
+    key: "segment",
+    label: "Segment",
+    type: "select",
+    placeholder: "Select segment",
+    options: [
+      { value: "Aerospace", label: "Aerospace" },
+      { value: "Automotive", label: "Automotive" },
+      { value: "Medical", label: "Medical" },
+      { value: "Industrial", label: "Industrial" },
+      { value: "Consumer", label: "Consumer" },
+      { value: "Energy", label: "Energy" },
+      { value: "Defense", label: "Defense" },
+    ],
+  },
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    defaultValue: "active",
+    options: [
+      { value: "active", label: "Active" },
+      { value: "inactive", label: "Inactive" },
+      { value: "prospect", label: "Prospect" },
+    ],
+  },
 ];
 
 function CustomersPage() {
@@ -66,13 +80,16 @@ function CustomersPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Record<string, string> }) => {
-      const { error } = await supabase.from("customers").update({
-        name: data.name,
-        contact_email: data.contact_email || null,
-        contact_phone: data.contact_phone || null,
-        segment: data.segment || null,
-        status: data.status || "active",
-      }).eq("id", id);
+      const { error } = await supabase
+        .from("customers")
+        .update({
+          name: data.name,
+          contact_email: data.contact_email || null,
+          contact_phone: data.contact_phone || null,
+          segment: data.segment || null,
+          status: data.status || "active",
+        })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -113,17 +130,53 @@ function CustomersPage() {
       onDelete={(row) => deleteMutation.mutateAsync(row.id)}
       kpis={
         <>
-          <Kpi label="Active Accounts" value={String(data?.filter(c => c.status === "active").length ?? 0)} icon={UserRound} tone="primary" />
-          <Kpi label="Total Customers" value={String(data?.length ?? 0)} icon={DollarSign} tone="success" />
-          <Kpi label="Segments" value={String(new Set(data?.map(c => c.segment).filter(Boolean)).size)} icon={ShoppingBag} tone="info" />
-          <Kpi label="With Email" value={String(data?.filter(c => c.contact_email).length ?? 0)} icon={Repeat} tone="warning" />
+          <Kpi
+            label="Active Accounts"
+            value={String(data?.filter((c) => c.status === "active").length ?? 0)}
+            icon={UserRound}
+            tone="primary"
+          />
+          <Kpi
+            label="Total Customers"
+            value={String(data?.length ?? 0)}
+            icon={DollarSign}
+            tone="success"
+          />
+          <Kpi
+            label="Segments"
+            value={String(new Set(data?.map((c) => c.segment).filter(Boolean)).size)}
+            icon={ShoppingBag}
+            tone="info"
+          />
+          <Kpi
+            label="With Email"
+            value={String(data?.filter((c) => c.contact_email).length ?? 0)}
+            icon={Repeat}
+            tone="warning"
+          />
         </>
       }
       columns={[
-        { key: "name", header: "Customer", render: (r) => <span className="font-medium">{r.name}</span> },
-        { key: "segment", header: "Segment", render: (r) => r.segment ? (
-          <Badge variant="outline" className="text-[10px] font-medium bg-info/10 text-info border-info/20">{r.segment}</Badge>
-        ) : <span className="text-muted-foreground">—</span> },
+        {
+          key: "name",
+          header: "Customer",
+          render: (r) => <span className="font-medium">{r.name}</span>,
+        },
+        {
+          key: "segment",
+          header: "Segment",
+          render: (r) =>
+            r.segment ? (
+              <Badge
+                variant="outline"
+                className="text-[10px] font-medium bg-info/10 text-info border-info/20"
+              >
+                {r.segment}
+              </Badge>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            ),
+        },
         { key: "contact_email", header: "Contact", className: "hidden md:table-cell" },
         { key: "contact_phone", header: "Phone", hideOnMobile: true },
         { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },

@@ -10,33 +10,62 @@ import { notifyDispatchReady } from "@/lib/notifications";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dispatch")({
-  head: () => ({ meta: [
-    { title: "Dispatch — FactoryOS AI" },
-    { name: "description", content: "Outbound dispatch, shipment tracking and delivery management." },
-  ]}),
+  head: () => ({
+    meta: [
+      { title: "Dispatch — FactoryOS AI" },
+      {
+        name: "description",
+        content: "Outbound dispatch, shipment tracking and delivery management.",
+      },
+    ],
+  }),
   component: DispatchPage,
 });
 
 const DISPATCH_FORM_FIELDS: FormField[] = [
-  { key: "order_number", label: "Order Reference", type: "text", placeholder: "SO-2026-001", required: true },
-  { key: "customer", label: "Customer", type: "text", placeholder: "Customer name", required: true },
+  {
+    key: "order_number",
+    label: "Order Reference",
+    type: "text",
+    placeholder: "SO-2026-001",
+    required: true,
+  },
+  {
+    key: "customer",
+    label: "Customer",
+    type: "text",
+    placeholder: "Customer name",
+    required: true,
+  },
   { key: "product", label: "Product", type: "text", placeholder: "Product name", required: true },
   { key: "quantity", label: "Quantity", type: "number", placeholder: "100", required: true },
   { key: "destination", label: "Destination", type: "text", placeholder: "City, State" },
-  { key: "carrier", label: "Carrier", type: "select", placeholder: "Select carrier", options: [
-    { value: "FedEx", label: "FedEx" },
-    { value: "UPS", label: "UPS" },
-    { value: "DHL", label: "DHL" },
-    { value: "LTL Freight", label: "LTL Freight" },
-    { value: "Flatbed", label: "Flatbed Truck" },
-  ]},
-  { key: "status", label: "Status", type: "select", defaultValue: "pending", options: [
-    { value: "pending", label: "Pending" },
-    { value: "packed", label: "Packed" },
-    { value: "shipped", label: "Shipped" },
-    { value: "in_transit", label: "In Transit" },
-    { value: "delivered", label: "Delivered" },
-  ]},
+  {
+    key: "carrier",
+    label: "Carrier",
+    type: "select",
+    placeholder: "Select carrier",
+    options: [
+      { value: "FedEx", label: "FedEx" },
+      { value: "UPS", label: "UPS" },
+      { value: "DHL", label: "DHL" },
+      { value: "LTL Freight", label: "LTL Freight" },
+      { value: "Flatbed", label: "Flatbed Truck" },
+    ],
+  },
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    defaultValue: "pending",
+    options: [
+      { value: "pending", label: "Pending" },
+      { value: "packed", label: "Packed" },
+      { value: "shipped", label: "Shipped" },
+      { value: "in_transit", label: "In Transit" },
+      { value: "delivered", label: "Delivered" },
+    ],
+  },
 ];
 
 // Build dispatch data from production_orders (completed ones)
@@ -58,7 +87,13 @@ function DispatchPage() {
   const queryClient = useQueryClient();
   const { data: prodOrders } = useQuery({
     queryKey: ["dispatch-orders"],
-    queryFn: async () => (await supabase.from("production_orders").select("*").order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("production_orders")
+          .select("*")
+          .order("created_at", { ascending: false })
+      ).data ?? [],
   });
   const { data: products } = useQuery({
     queryKey: ["dispatch-products"],
@@ -78,14 +113,19 @@ function DispatchPage() {
     quantity: Number(o.quantity ?? 0),
     destination: cities[i % cities.length],
     carrier: carriers[i % carriers.length],
-    status: o.status === "completed" ? "delivered" : o.status === "in_progress" ? "in_transit" : "pending",
-    shipped_at: o.status !== "planned" ? new Date(Date.now() - (i * 86400000)).toISOString() : null,
+    status:
+      o.status === "completed"
+        ? "delivered"
+        : o.status === "in_progress"
+          ? "in_transit"
+          : "pending",
+    shipped_at: o.status !== "planned" ? new Date(Date.now() - i * 86400000).toISOString() : null,
     tracking: o.status !== "planned" ? `TRK${100000 + i}` : "",
   }));
 
-  const inTransit = rows.filter(r => r.status === "in_transit" || r.status === "shipped").length;
-  const delivered = rows.filter(r => r.status === "delivered").length;
-  const pending = rows.filter(r => r.status === "pending" || r.status === "packed").length;
+  const inTransit = rows.filter((r) => r.status === "in_transit" || r.status === "shipped").length;
+  const delivered = rows.filter((r) => r.status === "delivered").length;
+  const pending = rows.filter((r) => r.status === "pending" || r.status === "packed").length;
 
   return (
     <ResourceView
@@ -128,19 +168,49 @@ function DispatchPage() {
         </>
       }
       columns={[
-        { key: "order_number", header: "Order #", render: (r) => <span className="font-medium">{r.order_number}</span> },
+        {
+          key: "order_number",
+          header: "Order #",
+          render: (r) => <span className="font-medium">{r.order_number}</span>,
+        },
         { key: "customer", header: "Customer" },
         { key: "product", header: "Product", hideOnMobile: true },
         { key: "quantity", header: "Qty", render: (r) => Number(r.quantity).toLocaleString() },
-        { key: "carrier", header: "Carrier", hideOnMobile: true, render: (r) => (
-          <Badge variant="outline" className="text-[10px] font-medium bg-info/10 text-info border-info/20">{r.carrier}</Badge>
-        )},
-        { key: "destination", header: "Destination", hideOnMobile: true, render: (r) => (
-          <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-muted-foreground" />{r.destination}</span>
-        )},
-        { key: "tracking", header: "Tracking", hideOnMobile: true, render: (r) => r.tracking ? (
-          <span className="font-mono text-xs">{r.tracking}</span>
-        ) : <span className="text-muted-foreground">—</span> },
+        {
+          key: "carrier",
+          header: "Carrier",
+          hideOnMobile: true,
+          render: (r) => (
+            <Badge
+              variant="outline"
+              className="text-[10px] font-medium bg-info/10 text-info border-info/20"
+            >
+              {r.carrier}
+            </Badge>
+          ),
+        },
+        {
+          key: "destination",
+          header: "Destination",
+          hideOnMobile: true,
+          render: (r) => (
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3 w-3 text-muted-foreground" />
+              {r.destination}
+            </span>
+          ),
+        },
+        {
+          key: "tracking",
+          header: "Tracking",
+          hideOnMobile: true,
+          render: (r) =>
+            r.tracking ? (
+              <span className="font-mono text-xs">{r.tracking}</span>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            ),
+        },
         { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
       ]}
     />

@@ -8,24 +8,38 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/plants")({
-  head: () => ({ meta: [
-    { title: "Plants — FactoryOS AI" },
-    { name: "description", content: "All manufacturing plants belonging to your company." },
-  ]}),
+  head: () => ({
+    meta: [
+      { title: "Plants — FactoryOS AI" },
+      { name: "description", content: "All manufacturing plants belonging to your company." },
+    ],
+  }),
   component: PlantsPage,
 });
 
 const PLANT_FORM_FIELDS: FormField[] = [
-  { key: "name", label: "Plant Name", type: "text", placeholder: "Detroit Assembly Plant", required: true },
+  {
+    key: "name",
+    label: "Plant Name",
+    type: "text",
+    placeholder: "Detroit Assembly Plant",
+    required: true,
+  },
   { key: "code", label: "Plant Code", type: "text", placeholder: "DET-01", required: true },
   { key: "city", label: "City", type: "text", placeholder: "Detroit" },
   { key: "country", label: "Country", type: "text", placeholder: "United States" },
   { key: "address", label: "Address", type: "text", placeholder: "123 Industrial Blvd" },
-  { key: "status", label: "Status", type: "select", defaultValue: "active", options: [
-    { value: "active", label: "Active" },
-    { value: "inactive", label: "Inactive" },
-    { value: "maintenance", label: "Under Maintenance" },
-  ]},
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    defaultValue: "active",
+    options: [
+      { value: "active", label: "Active" },
+      { value: "inactive", label: "Inactive" },
+      { value: "maintenance", label: "Under Maintenance" },
+    ],
+  },
 ];
 
 function PlantsPage() {
@@ -55,23 +69,32 @@ function PlantsPage() {
       });
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["plants"] }); toast.success("Plant created"); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plants"] });
+      toast.success("Plant created");
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data: d }: { id: string; data: Record<string, string> }) => {
-      const { error } = await supabase.from("plants").update({
-        name: d.name,
-        code: d.code,
-        city: d.city || null,
-        country: d.country || null,
-        address: d.address || null,
-        status: d.status || "active",
-      }).eq("id", id);
+      const { error } = await supabase
+        .from("plants")
+        .update({
+          name: d.name,
+          code: d.code,
+          city: d.city || null,
+          country: d.country || null,
+          address: d.address || null,
+          status: d.status || "active",
+        })
+        .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["plants"] }); toast.success("Plant updated"); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plants"] });
+      toast.success("Plant updated");
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
@@ -80,7 +103,10 @@ function PlantsPage() {
       const { error } = await supabase.from("plants").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["plants"] }); toast.success("Plant deleted"); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["plants"] });
+      toast.success("Plant deleted");
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
@@ -103,15 +129,33 @@ function PlantsPage() {
       onDelete={(row) => deleteMutation.mutateAsync(row.id)}
       kpis={
         <>
-          <Kpi label="Total Plants" value={String(data?.length ?? 0)} icon={Factory} tone="primary" />
+          <Kpi
+            label="Total Plants"
+            value={String(data?.length ?? 0)}
+            icon={Factory}
+            tone="primary"
+          />
           <Kpi label="Active" value={String(activePlants)} icon={MapPin} tone="success" />
           <Kpi label="Total Machines" value={String(totalMachines)} icon={Cog} tone="info" />
-          <Kpi label="Countries" value={String(new Set(data?.map((p: any) => p.country).filter(Boolean)).size)} icon={MapPin} tone="warning" />
+          <Kpi
+            label="Countries"
+            value={String(new Set(data?.map((p: any) => p.country).filter(Boolean)).size)}
+            icon={MapPin}
+            tone="warning"
+          />
         </>
       }
       columns={[
-        { key: "code", header: "Code", render: (r) => <span className="font-mono text-xs">{r.code}</span> },
-        { key: "name", header: "Name", render: (r) => <span className="font-medium">{r.name}</span> },
+        {
+          key: "code",
+          header: "Code",
+          render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+        },
+        {
+          key: "name",
+          header: "Name",
+          render: (r) => <span className="font-medium">{r.name}</span>,
+        },
         { key: "city", header: "City", hideOnMobile: true, render: (r) => r.city ?? "—" },
         { key: "country", header: "Country", hideOnMobile: true, render: (r) => r.country ?? "—" },
         { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },

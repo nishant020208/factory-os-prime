@@ -71,14 +71,12 @@ function PendingPage() {
       if (regError) throw regError;
 
       // Whitelist the registrant's email as company_admin
-      const { error: whitelistError } = await supabase
-        .from("whitelist")
-        .insert({
-          email: registration.email,
-          role: "company_admin",
-          company_id: newCompany.id,
-          status: "pending",
-        });
+      const { error: whitelistError } = await supabase.from("whitelist").insert({
+        email: registration.email,
+        role: "company_admin",
+        company_id: newCompany.id,
+        status: "pending",
+      });
       if (whitelistError) throw whitelistError;
 
       // Notify the new Company Admin (role-wide, scoped to the new company_id)
@@ -128,9 +126,24 @@ function PendingPage() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Company Registrations" value={String(pendingCount)} icon={Building2} tone="primary" />
-        <Kpi label="Whitelist Pending" value={String(whitelistPending)} icon={Timer} tone="warning" />
-        <Kpi label="Total Pending" value={String(pendingCount + whitelistPending)} icon={Clock} tone="info" />
+        <Kpi
+          label="Company Registrations"
+          value={String(pendingCount)}
+          icon={Building2}
+          tone="primary"
+        />
+        <Kpi
+          label="Whitelist Pending"
+          value={String(whitelistPending)}
+          icon={Timer}
+          tone="warning"
+        />
+        <Kpi
+          label="Total Pending"
+          value={String(pendingCount + whitelistPending)}
+          icon={Clock}
+          tone="info"
+        />
       </div>
 
       <Tabs defaultValue="registrations">
@@ -138,20 +151,31 @@ function PendingPage() {
           <TabsTrigger value="registrations">
             <Building2 className="h-4 w-4 mr-1.5" />
             New Company Requests
-            {pendingCount > 0 && <span className="ml-1.5 h-4 w-4 rounded-full bg-amber-500 text-[10px] font-medium text-white flex items-center justify-center">{pendingCount}</span>}
+            {pendingCount > 0 && (
+              <span className="ml-1.5 h-4 w-4 rounded-full bg-amber-500 text-[10px] font-medium text-white flex items-center justify-center">
+                {pendingCount}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="whitelist">
             <Mail className="h-4 w-4 mr-1.5" />
             Admin Invites
-            {whitelistPending > 0 && <span className="ml-1.5 h-4 w-4 rounded-full bg-amber-500 text-[10px] font-medium text-white flex items-center justify-center">{whitelistPending}</span>}
+            {whitelistPending > 0 && (
+              <span className="ml-1.5 h-4 w-4 rounded-full bg-amber-500 text-[10px] font-medium text-white flex items-center justify-center">
+                {whitelistPending}
+              </span>
+            )}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="registrations">
-          <Panel title={`${pendingCount} Pending Company Registration${pendingCount !== 1 ? "s" : ""}`}>
+          <Panel
+            title={`${pendingCount} Pending Company Registration${pendingCount !== 1 ? "s" : ""}`}
+          >
             {pendingCount === 0 ? (
               <div className="text-sm text-muted-foreground py-8 text-center">
-                No pending company registrations. When companies register, they'll appear here for approval.
+                No pending company registrations. When companies register, they'll appear here for
+                approval.
               </div>
             ) : (
               <div className="divide-y divide-white/5">
@@ -164,7 +188,9 @@ function PendingPage() {
                         </div>
                         <div>
                           <div className="font-medium">{reg.company_name}</div>
-                          <div className="text-xs text-muted-foreground">{reg.email} · {reg.country ?? "—"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {reg.email} · {reg.country ?? "—"}
+                          </div>
                         </div>
                       </div>
                       <div className="text-xs text-muted-foreground mt-2 flex flex-wrap gap-2">
@@ -184,7 +210,11 @@ function PendingPage() {
                         onClick={() => approveRegistration.mutate(reg)}
                         disabled={approveRegistration.isPending}
                       >
-                        {approveRegistration.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />}
+                        {approveRegistration.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                        )}
                         Approve
                       </Button>
                       <Button
@@ -206,7 +236,9 @@ function PendingPage() {
         </TabsContent>
 
         <TabsContent value="whitelist">
-          <Panel title={`${whitelistPending} Pending Admin Invite${whitelistPending !== 1 ? "s" : ""}`}>
+          <Panel
+            title={`${whitelistPending} Pending Admin Invite${whitelistPending !== 1 ? "s" : ""}`}
+          >
             {whitelistPending === 0 ? (
               <div className="text-sm text-muted-foreground py-8 text-center">
                 No pending admin whitelist requests.

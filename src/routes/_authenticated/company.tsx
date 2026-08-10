@@ -9,16 +9,24 @@ import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 
 export const Route = createFileRoute("/_authenticated/company")({
-  head: () => ({ meta: [
-    { title: "My Company — FactoryOS AI" },
-    { name: "description", content: "Company profile, legal identity and corporate settings" },
-  ]}),
+  head: () => ({
+    meta: [
+      { title: "My Company — FactoryOS AI" },
+      { name: "description", content: "Company profile, legal identity and corporate settings" },
+    ],
+  }),
   component: CompanyPage,
 });
 
@@ -41,10 +49,22 @@ function CompanyPage() {
     queryFn: async () => {
       if (!companyId) return { plants: 0, employees: 0, departments: 0, products: 0 };
       const [plants, employees, departments, products] = await Promise.all([
-        supabase.from("plants").select("*", { count: "exact", head: true }).eq("company_id", companyId),
-        supabase.from("employees").select("*", { count: "exact", head: true }).eq("company_id", companyId),
-        supabase.from("departments").select("*", { count: "exact", head: true }).eq("company_id", companyId),
-        supabase.from("products").select("*", { count: "exact", head: true }).eq("company_id", companyId),
+        supabase
+          .from("plants")
+          .select("*", { count: "exact", head: true })
+          .eq("company_id", companyId),
+        supabase
+          .from("employees")
+          .select("*", { count: "exact", head: true })
+          .eq("company_id", companyId),
+        supabase
+          .from("departments")
+          .select("*", { count: "exact", head: true })
+          .eq("company_id", companyId),
+        supabase
+          .from("products")
+          .select("*", { count: "exact", head: true })
+          .eq("company_id", companyId),
       ]);
       return {
         plants: plants.count ?? 0,
@@ -89,19 +109,22 @@ function CompanyPage() {
   const updateMutation = useMutation({
     mutationFn: async () => {
       if (!companyId) throw new Error("No company selected");
-      const { error } = await supabase.from("companies").update({
-        name: form.name,
-        legal_name: form.legal_name || null,
-        address: form.address || null,
-        country: form.country,
-        industry: form.industry || null,
-        currency: form.currency,
-        timezone: form.timezone,
-        gst_number: form.gst_number || null,
-        registration_number: form.registration_number || null,
-        plan_tier: form.plan_tier,
-        updated_at: new Date().toISOString(),
-      }).eq("id", companyId);
+      const { error } = await supabase
+        .from("companies")
+        .update({
+          name: form.name,
+          legal_name: form.legal_name || null,
+          address: form.address || null,
+          country: form.country,
+          industry: form.industry || null,
+          currency: form.currency,
+          timezone: form.timezone,
+          gst_number: form.gst_number || null,
+          registration_number: form.registration_number || null,
+          plan_tier: form.plan_tier,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", companyId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -132,52 +155,104 @@ function CompanyPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Kpi label="Employees" value={String(counts?.employees ?? 0)} icon={Users} tone="primary" />
-        <Kpi label="Departments" value={String(counts?.departments ?? 0)} icon={Building2} tone="info" />
+        <Kpi
+          label="Departments"
+          value={String(counts?.departments ?? 0)}
+          icon={Building2}
+          tone="info"
+        />
         <Kpi label="Plants" value={String(counts?.plants ?? 0)} icon={Factory} tone="success" />
-        <Kpi label="Products" value={String(counts?.products ?? 0)} icon={CreditCard} tone="warning" />
+        <Kpi
+          label="Products"
+          value={String(counts?.products ?? 0)}
+          icon={CreditCard}
+          tone="warning"
+        />
       </div>
 
       <Panel title="Company Details">
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Company Name *" value={form.name} onChange={(v) => setForm(f => ({ ...f, name: v }))} />
-          <Field label="Legal Name" value={form.legal_name} onChange={(v) => setForm(f => ({ ...f, legal_name: v }))} />
-          <Field label="Address" value={form.address} onChange={(v) => setForm(f => ({ ...f, address: v }))} />
+          <Field
+            label="Company Name *"
+            value={form.name}
+            onChange={(v) => setForm((f) => ({ ...f, name: v }))}
+          />
+          <Field
+            label="Legal Name"
+            value={form.legal_name}
+            onChange={(v) => setForm((f) => ({ ...f, legal_name: v }))}
+          />
+          <Field
+            label="Address"
+            value={form.address}
+            onChange={(v) => setForm((f) => ({ ...f, address: v }))}
+          />
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Country</Label>
-            <Select value={form.country} onValueChange={(v) => setForm(f => ({ ...f, country: v }))}>
+            <Select
+              value={form.country}
+              onValueChange={(v) => setForm((f) => ({ ...f, country: v }))}
+            >
               <SelectTrigger className="h-10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {["US", "CA", "GB", "DE", "FR", "IN", "JP", "CN", "BR", "AU", "SG"].map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                {["US", "CA", "GB", "DE", "FR", "IN", "JP", "CN", "BR", "AU", "SG"].map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <Field label="Industry" value={form.industry} onChange={(v) => setForm(f => ({ ...f, industry: v }))} />
+          <Field
+            label="Industry"
+            value={form.industry}
+            onChange={(v) => setForm((f) => ({ ...f, industry: v }))}
+          />
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Currency</Label>
-            <Select value={form.currency} onValueChange={(v) => setForm(f => ({ ...f, currency: v }))}>
+            <Select
+              value={form.currency}
+              onValueChange={(v) => setForm((f) => ({ ...f, currency: v }))}
+            >
               <SelectTrigger className="h-10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {["USD", "EUR", "GBP", "INR", "JPY", "CNY", "CAD", "AUD"].map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                {["USD", "EUR", "GBP", "INR", "JPY", "CNY", "CAD", "AUD"].map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Timezone</Label>
-            <Select value={form.timezone} onValueChange={(v) => setForm(f => ({ ...f, timezone: v }))}>
+            <Select
+              value={form.timezone}
+              onValueChange={(v) => setForm((f) => ({ ...f, timezone: v }))}
+            >
               <SelectTrigger className="h-10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Detroit", "Europe/London", "Europe/Berlin", "Asia/Kolkata", "Asia/Tokyo", "Asia/Singapore"].map(t => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                {[
+                  "America/New_York",
+                  "America/Chicago",
+                  "America/Denver",
+                  "America/Los_Angeles",
+                  "America/Detroit",
+                  "Europe/London",
+                  "Europe/Berlin",
+                  "Asia/Kolkata",
+                  "Asia/Tokyo",
+                  "Asia/Singapore",
+                ].map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -187,17 +262,30 @@ function CompanyPage() {
 
       <Panel title="Registration & Tax">
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="GST / VAT Number" value={form.gst_number} onChange={(v) => setForm(f => ({ ...f, gst_number: v }))} />
-          <Field label="Registration Number" value={form.registration_number} onChange={(v) => setForm(f => ({ ...f, registration_number: v }))} />
+          <Field
+            label="GST / VAT Number"
+            value={form.gst_number}
+            onChange={(v) => setForm((f) => ({ ...f, gst_number: v }))}
+          />
+          <Field
+            label="Registration Number"
+            value={form.registration_number}
+            onChange={(v) => setForm((f) => ({ ...f, registration_number: v }))}
+          />
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Plan Tier</Label>
-            <Select value={form.plan_tier} onValueChange={(v) => setForm(f => ({ ...f, plan_tier: v }))}>
+            <Select
+              value={form.plan_tier}
+              onValueChange={(v) => setForm((f) => ({ ...f, plan_tier: v }))}
+            >
               <SelectTrigger className="h-10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {["starter", "growth", "enterprise", "custom"].map(t => (
-                  <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>
+                {["starter", "growth", "enterprise", "custom"].map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -217,7 +305,11 @@ function CompanyPage() {
           onClick={() => updateMutation.mutate()}
           disabled={updateMutation.isPending || !form.name}
         >
-          {updateMutation.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
+          {updateMutation.isPending ? (
+            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4 mr-1.5" />
+          )}
           Save Changes
         </Button>
       </div>
@@ -226,13 +318,25 @@ function CompanyPage() {
 }
 
 function Field({
-  label, value, onChange, icon,
-}: { label: string; value: string; onChange: (v: string) => void; icon?: React.ReactNode }) {
+  label,
+  value,
+  onChange,
+  icon,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  icon?: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       <div className="relative">
-        {icon && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{icon}</div>}
+        {icon && (
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+            {icon}
+          </div>
+        )}
         <Input
           value={value}
           onChange={(e) => onChange(e.target.value)}

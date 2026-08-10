@@ -8,34 +8,63 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/machines")({
-  head: () => ({ meta: [
-    { title: "Machines — FactoryOS AI" },
-    { name: "description", content: "Machine fleet management, utilization and maintenance tracking." },
-  ]}),
+  head: () => ({
+    meta: [
+      { title: "Machines — FactoryOS AI" },
+      {
+        name: "description",
+        content: "Machine fleet management, utilization and maintenance tracking.",
+      },
+    ],
+  }),
   component: MachinesPage,
 });
 
 const MACHINE_FORM_FIELDS: FormField[] = [
-  { key: "name", label: "Machine Name", type: "text", placeholder: "CNC Mill Alpha-1", required: true },
+  {
+    key: "name",
+    label: "Machine Name",
+    type: "text",
+    placeholder: "CNC Mill Alpha-1",
+    required: true,
+  },
   { key: "code", label: "Machine Code", type: "text", placeholder: "MC-A1", required: true },
-  { key: "type", label: "Type", type: "select", placeholder: "Select type", options: [
-    { value: "5-axis CNC", label: "5-axis CNC" },
-    { value: "3-axis CNC", label: "3-axis CNC" },
-    { value: "Turning Center", label: "Turning Center" },
-    { value: "6-axis Robot", label: "6-axis Robot" },
-    { value: "Molding", label: "Molding" },
-    { value: "Fiber Laser", label: "Fiber Laser" },
-    { value: "Press Brake", label: "Press Brake" },
-    { value: "EDM", label: "EDM" },
-    { value: "Grinder", label: "Grinder" },
-    { value: "Welding Robot", label: "Welding Robot" },
-  ]},
-  { key: "status", label: "Status", type: "select", defaultValue: "operational", options: [
-    { value: "operational", label: "Operational" },
-    { value: "maintenance", label: "Maintenance" },
-    { value: "down", label: "Down" },
-  ]},
-  { key: "utilization", label: "Utilization %", type: "number", placeholder: "85", defaultValue: "80" },
+  {
+    key: "type",
+    label: "Type",
+    type: "select",
+    placeholder: "Select type",
+    options: [
+      { value: "5-axis CNC", label: "5-axis CNC" },
+      { value: "3-axis CNC", label: "3-axis CNC" },
+      { value: "Turning Center", label: "Turning Center" },
+      { value: "6-axis Robot", label: "6-axis Robot" },
+      { value: "Molding", label: "Molding" },
+      { value: "Fiber Laser", label: "Fiber Laser" },
+      { value: "Press Brake", label: "Press Brake" },
+      { value: "EDM", label: "EDM" },
+      { value: "Grinder", label: "Grinder" },
+      { value: "Welding Robot", label: "Welding Robot" },
+    ],
+  },
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    defaultValue: "operational",
+    options: [
+      { value: "operational", label: "Operational" },
+      { value: "maintenance", label: "Maintenance" },
+      { value: "down", label: "Down" },
+    ],
+  },
+  {
+    key: "utilization",
+    label: "Utilization %",
+    type: "number",
+    placeholder: "85",
+    defaultValue: "80",
+  },
 ];
 
 function MachinesPage() {
@@ -47,8 +76,9 @@ function MachinesPage() {
     queryFn: async () => (await supabase.from("machines").select("*").order("name")).data ?? [],
   });
 
-  const operational = data?.filter(m => m.status === "operational").length ?? 0;
-  const downCount = data?.filter(m => m.status === "down" || m.status === "maintenance").length ?? 0;
+  const operational = data?.filter((m) => m.status === "operational").length ?? 0;
+  const downCount =
+    data?.filter((m) => m.status === "down" || m.status === "maintenance").length ?? 0;
   const avgUtil = data?.length
     ? (data.reduce((s, m) => s + Number(m.utilization ?? 0), 0) / data.length).toFixed(1)
     : "—";
@@ -65,28 +95,43 @@ function MachinesPage() {
       });
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["machines"] }); toast.success("Machine added"); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      toast.success("Machine added");
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Record<string, string> }) => {
-      const { error } = await supabase.from("machines").update({
-        name: data.name,
-        code: data.code,
-        type: data.type || null,
-        status: data.status || "operational",
-        utilization: parseFloat(data.utilization) || 0,
-      }).eq("id", id);
+      const { error } = await supabase
+        .from("machines")
+        .update({
+          name: data.name,
+          code: data.code,
+          type: data.type || null,
+          status: data.status || "operational",
+          utilization: parseFloat(data.utilization) || 0,
+        })
+        .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["machines"] }); toast.success("Machine updated"); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      toast.success("Machine updated");
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => { const { error } = await supabase.from("machines").delete().eq("id", id); if (error) throw error; },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["machines"] }); toast.success("Machine removed"); },
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("machines").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      toast.success("Machine removed");
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
@@ -113,24 +158,34 @@ function MachinesPage() {
         </>
       }
       columns={[
-        { key: "name", header: "Machine", render: (r) => (
-          <div>
-            <div className="font-medium">{r.name}</div>
-            <div className="text-[11px] text-muted-foreground">{r.code}</div>
-          </div>
-        )},
-        { key: "type", header: "Type", hideOnMobile: true },
-        { key: "utilization", header: "Utilization", render: (r) => (
-          <div className="flex items-center gap-2 w-32">
-            <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
-              <div
-                className={`h-full rounded-full ${Number(r.utilization) > 80 ? "bg-success" : Number(r.utilization) > 50 ? "bg-warning" : "bg-destructive"}`}
-                style={{ width: `${Math.min(Number(r.utilization ?? 0), 100)}%` }}
-              />
+        {
+          key: "name",
+          header: "Machine",
+          render: (r) => (
+            <div>
+              <div className="font-medium">{r.name}</div>
+              <div className="text-[11px] text-muted-foreground">{r.code}</div>
             </div>
-            <span className="tabular-nums text-xs w-10 text-right">{Math.round(Number(r.utilization ?? 0))}%</span>
-          </div>
-        )},
+          ),
+        },
+        { key: "type", header: "Type", hideOnMobile: true },
+        {
+          key: "utilization",
+          header: "Utilization",
+          render: (r) => (
+            <div className="flex items-center gap-2 w-32">
+              <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${Number(r.utilization) > 80 ? "bg-success" : Number(r.utilization) > 50 ? "bg-warning" : "bg-destructive"}`}
+                  style={{ width: `${Math.min(Number(r.utilization ?? 0), 100)}%` }}
+                />
+              </div>
+              <span className="tabular-nums text-xs w-10 text-right">
+                {Math.round(Number(r.utilization ?? 0))}%
+              </span>
+            </div>
+          ),
+        },
         { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
       ]}
     />

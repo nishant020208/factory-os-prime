@@ -1,25 +1,65 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ListTodo, Cog, Users, Clock, CheckCircle2, AlertTriangle, Loader2, Plus, UserCheck, Ban } from "lucide-react";
+import {
+  ListTodo,
+  Cog,
+  Users,
+  Clock,
+  CheckCircle2,
+  AlertTriangle,
+  Loader2,
+  Plus,
+  UserCheck,
+  Ban,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
-import { notifyWorkOrderAssigned, notifyWorkOrderCompleted, notifyQualityPassed, notifyBatchFailed } from "@/lib/notifications";
+import {
+  notifyWorkOrderAssigned,
+  notifyWorkOrderCompleted,
+  notifyQualityPassed,
+  notifyBatchFailed,
+} from "@/lib/notifications";
 import { toast } from "sonner";
 import { useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/work-orders")({
-  head: () => ({ meta: [
-    { title: "Work Orders — FactoryOS AI" },
-    { name: "description", content: "Work orders with operator assignment, progress tracking and machine status." },
-  ]}),
+  head: () => ({
+    meta: [
+      { title: "Work Orders — FactoryOS AI" },
+      {
+        name: "description",
+        content: "Work orders with operator assignment, progress tracking and machine status.",
+      },
+    ],
+  }),
   component: WorkOrdersPage,
 });
 
@@ -27,7 +67,10 @@ function WorkOrdersPage() {
   const queryClient = useQueryClient();
   const { companyId, user, roles } = useAuth();
   const [showNew, setShowNew] = useState(false);
-  const [showAssign, setShowAssign] = useState<{ open: boolean; woId: string }>({ open: false, woId: "" });
+  const [showAssign, setShowAssign] = useState<{ open: boolean; woId: string }>({
+    open: false,
+    woId: "",
+  });
   const [assignOp, setAssignOp] = useState("");
   const [formData, setFormData] = useState({
     wo_number: "",
@@ -37,7 +80,8 @@ function WorkOrdersPage() {
     quantity: "100",
   });
 
-  const isProductionManager = roles.includes("production_manager") || roles.includes("company_admin");
+  const isProductionManager =
+    roles.includes("production_manager") || roles.includes("company_admin");
   const isOperator = roles.includes("production_operator");
 
   // Fetch work orders
@@ -60,13 +104,26 @@ function WorkOrdersPage() {
   // Fetch production orders
   const { data: prodOrders } = useQuery({
     queryKey: ["wo-prod-orders", companyId],
-    queryFn: async () => (await supabase.from("production_orders").select("id, order_number").eq("company_id", companyId!)).data ?? [],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("production_orders")
+          .select("id, order_number")
+          .eq("company_id", companyId!)
+      ).data ?? [],
   });
 
   // Fetch machines (exclude those under maintenance)
   const { data: machines } = useQuery({
     queryKey: ["wo-machines", companyId],
-    queryFn: async () => (await supabase.from("machines").select("id, name, status").eq("company_id", companyId!).order("name")).data ?? [],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("machines")
+          .select("id, name, status")
+          .eq("company_id", companyId!)
+          .order("name")
+      ).data ?? [],
   });
 
   // Fetch operators (production operators from user_roles)
@@ -92,7 +149,9 @@ function WorkOrdersPage() {
       if (!companyId) throw new Error("No company");
       const machine = machines?.find((m: any) => m.id === formData.machine_id);
       if (machine?.status === "maintenance" || machine?.status === "down") {
-        throw new Error(`Machine "${machine.name}" is ${machine.status} — cannot assign work orders`);
+        throw new Error(
+          `Machine "${machine.name}" is ${machine.status} — cannot assign work orders`,
+        );
       }
       const { error } = await supabase.from("work_orders").insert({
         company_id: companyId,
@@ -109,7 +168,13 @@ function WorkOrdersPage() {
       queryClient.invalidateQueries({ queryKey: ["work-orders"] });
       toast.success("Work order created");
       setShowNew(false);
-      setFormData({ wo_number: "", production_order_id: "", operation: "", machine_id: "", quantity: "100" });
+      setFormData({
+        wo_number: "",
+        production_order_id: "",
+        operation: "",
+        machine_id: "",
+        quantity: "100",
+      });
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -118,10 +183,13 @@ function WorkOrdersPage() {
   const assignMutation = useMutation({
     mutationFn: async () => {
       if (!assignOp) throw new Error("Select an operator");
-      const { error } = await supabase.from("work_orders").update({
-        operator_id: assignOp,
-        status: "in_progress",
-      }).eq("id", showAssign.woId);
+      const { error } = await supabase
+        .from("work_orders")
+        .update({
+          operator_id: assignOp,
+          status: "in_progress",
+        })
+        .eq("id", showAssign.woId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -142,11 +210,13 @@ function WorkOrdersPage() {
   const updateProgressMutation = useMutation({
     mutationFn: async ({ woId, progress }: { woId: string; progress: number }) => {
       const newStatus = progress >= 100 ? "completed" : "in_progress";
-      const { error } = await (supabase.from("work_orders") as any).update({
-        progress,
-        status: newStatus,
-        end_time: progress >= 100 ? new Date().toISOString() : null,
-      }).eq("id", woId);
+      const { error } = await (supabase.from("work_orders") as any)
+        .update({
+          progress,
+          status: newStatus,
+          end_time: progress >= 100 ? new Date().toISOString() : null,
+        })
+        .eq("id", woId);
       if (error) throw error;
     },
     onSuccess: (_data, variables) => {
@@ -155,7 +225,12 @@ function WorkOrdersPage() {
       if (variables.progress >= 100 && companyId) {
         const completedWO = workOrders?.find((w: any) => w.id === variables.woId);
         if (completedWO) {
-          notifyWorkOrderCompleted(companyId, completedWO.wo_number, completedWO.operator_name || "Operator", variables.woId);
+          notifyWorkOrderCompleted(
+            companyId,
+            completedWO.wo_number,
+            completedWO.operator_name || "Operator",
+            variables.woId,
+          );
         }
       }
       toast.success("Progress updated");
@@ -163,7 +238,8 @@ function WorkOrdersPage() {
     onError: (err: any) => toast.error(err.message),
   });
 
-  const blockedMachines = machines?.filter((m: any) => m.status === "maintenance" || m.status === "down") ?? [];
+  const blockedMachines =
+    machines?.filter((m: any) => m.status === "maintenance" || m.status === "down") ?? [];
   const pending = workOrders?.filter((w: any) => w.status === "pending").length ?? 0;
   const inProgress = workOrders?.filter((w: any) => w.status === "in_progress").length ?? 0;
   const completed = workOrders?.filter((w: any) => w.status === "completed").length ?? 0;
@@ -180,8 +256,12 @@ function WorkOrdersPage() {
           <div className="flex items-center gap-2">
             <ModuleCopilot moduleName="work-orders" />
             {isProductionManager && (
-              <Button className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={() => setShowNew(true)}>
-                <Plus className="h-4 w-4 mr-1.5" />New Work Order
+              <Button
+                className="bg-[image:var(--gradient-primary)] shadow-glow"
+                onClick={() => setShowNew(true)}
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                New Work Order
               </Button>
             )}
           </div>
@@ -193,7 +273,9 @@ function WorkOrdersPage() {
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 mb-4 flex items-center gap-2">
           <Ban className="h-4 w-4 text-amber-400 shrink-0" />
           <span className="text-sm text-amber-400">
-            {blockedMachines.length} machine{blockedMachines.length > 1 ? "s" : ""} under maintenance — new work orders blocked: {blockedMachines.map((m: any) => m.name).join(", ")}
+            {blockedMachines.length} machine{blockedMachines.length > 1 ? "s" : ""} under
+            maintenance — new work orders blocked:{" "}
+            {blockedMachines.map((m: any) => m.name).join(", ")}
           </span>
         </div>
       )}
@@ -210,8 +292,22 @@ function WorkOrdersPage() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-white/5">
-                {["WO #", "Operation", "Machine", "Operator", "Qty", "Progress", "Status", "Actions"].map(h => (
-                  <TableHead key={h} className="text-[11px] uppercase tracking-wider text-muted-foreground">{h}</TableHead>
+                {[
+                  "WO #",
+                  "Operation",
+                  "Machine",
+                  "Operator",
+                  "Qty",
+                  "Progress",
+                  "Status",
+                  "Actions",
+                ].map((h) => (
+                  <TableHead
+                    key={h}
+                    className="text-[11px] uppercase tracking-wider text-muted-foreground"
+                  >
+                    {h}
+                  </TableHead>
                 ))}
               </TableRow>
             </TableHeader>
@@ -236,32 +332,49 @@ function WorkOrdersPage() {
                       <span className="text-muted-foreground">Unassigned</span>
                     )}
                   </TableCell>
-                  <TableCell className="tabular-nums">{Number(wo.quantity ?? 0).toLocaleString()}</TableCell>
+                  <TableCell className="tabular-nums">
+                    {Number(wo.quantity ?? 0).toLocaleString()}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2 w-28">
                       <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
-                        <div className="h-full bg-[image:var(--gradient-primary)]" style={{ width: `${wo.progress ?? 0}%` }} />
+                        <div
+                          className="h-full bg-[image:var(--gradient-primary)]"
+                          style={{ width: `${wo.progress ?? 0}%` }}
+                        />
                       </div>
-                      <span className="tabular-nums text-xs w-8 text-right">{Math.round(Number(wo.progress ?? 0))}%</span>
+                      <span className="tabular-nums text-xs w-8 text-right">
+                        {Math.round(Number(wo.progress ?? 0))}%
+                      </span>
                     </div>
                   </TableCell>
-                  <TableCell><StatusBadge status={wo.status} /></TableCell>
+                  <TableCell>
+                    <StatusBadge status={wo.status} />
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       {isProductionManager && !wo.operator_id && wo.status === "pending" && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowAssign({ open: true, woId: wo.id })}>
-                          <Users className="h-3 w-3 mr-1" />Assign
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          onClick={() => setShowAssign({ open: true, woId: wo.id })}
+                        >
+                          <Users className="h-3 w-3 mr-1" />
+                          Assign
                         </Button>
                       )}
                       {isOperator && wo.operator_id === user?.id && wo.status !== "completed" && (
                         <div className="flex gap-1">
-                          {[25, 50, 75, 100].map(pct => (
+                          {[25, 50, 75, 100].map((pct) => (
                             <Button
                               key={pct}
                               size="sm"
                               variant="ghost"
                               className="h-7 text-xs"
-                              onClick={() => updateProgressMutation.mutate({ woId: wo.id, progress: pct })}
+                              onClick={() =>
+                                updateProgressMutation.mutate({ woId: wo.id, progress: pct })
+                              }
                               disabled={updateProgressMutation.isPending}
                             >
                               {pct}%
@@ -269,39 +382,48 @@ function WorkOrdersPage() {
                           ))}
                         </div>
                       )}
-                      {roles.includes("quality_inspector") && wo.status === "completed" && wo.progress >= 100 && (
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 text-xs text-success"
-                            onClick={async () => {
-                              if (!companyId) return;
-                              await supabase.from("work_orders").update({ status: "quality_passed" }).eq("id", wo.id);
-                              queryClient.invalidateQueries({ queryKey: ["work-orders"] });
-                              notifyQualityPassed(companyId, wo.wo_number, wo.id);
-                              toast.success(`${wo.wo_number} passed — Warehouse notified`);
-                            }}
-                          >
-                            <CheckCircle2 className="h-3 w-3 mr-1" />Pass
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 text-xs text-destructive"
-                            onClick={async () => {
-                              const reason = prompt("Rejection notes:");
-                              if (!reason || !companyId) return;
-                              await (supabase.from("work_orders") as any).update({ status: "quality_failed", rejection_notes: reason }).eq("id", wo.id);
-                              queryClient.invalidateQueries({ queryKey: ["work-orders"] });
-                              notifyBatchFailed(companyId, wo.wo_number, reason, wo.id);
-                              toast.error(`${wo.wo_number} failed — operator notified`);
-                            }}
-                          >
-                            <AlertTriangle className="h-3 w-3 mr-1" />Fail
-                          </Button>
-                        </div>
-                      )}
+                      {roles.includes("quality_inspector") &&
+                        wo.status === "completed" &&
+                        wo.progress >= 100 && (
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs text-success"
+                              onClick={async () => {
+                                if (!companyId) return;
+                                await supabase
+                                  .from("work_orders")
+                                  .update({ status: "quality_passed" })
+                                  .eq("id", wo.id);
+                                queryClient.invalidateQueries({ queryKey: ["work-orders"] });
+                                notifyQualityPassed(companyId, wo.wo_number, wo.id);
+                                toast.success(`${wo.wo_number} passed — Warehouse notified`);
+                              }}
+                            >
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Pass
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs text-destructive"
+                              onClick={async () => {
+                                const reason = prompt("Rejection notes:");
+                                if (!reason || !companyId) return;
+                                await (supabase.from("work_orders") as any)
+                                  .update({ status: "quality_failed", rejection_notes: reason })
+                                  .eq("id", wo.id);
+                                queryClient.invalidateQueries({ queryKey: ["work-orders"] });
+                                notifyBatchFailed(companyId, wo.wo_number, reason, wo.id);
+                                toast.error(`${wo.wo_number} failed — operator notified`);
+                              }}
+                            >
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              Fail
+                            </Button>
+                          </div>
+                        )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -314,35 +436,66 @@ function WorkOrdersPage() {
       {/* New Work Order Dialog */}
       <Dialog open={showNew} onOpenChange={setShowNew}>
         <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader><DialogTitle>New Work Order</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>New Work Order</DialogTitle>
+          </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
               <Label className="text-xs">WO Number</Label>
-              <Input value={formData.wo_number} onChange={(e) => setFormData(f => ({ ...f, wo_number: e.target.value }))} placeholder="WO-2026-0001" />
+              <Input
+                value={formData.wo_number}
+                onChange={(e) => setFormData((f) => ({ ...f, wo_number: e.target.value }))}
+                placeholder="WO-2026-0001"
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Production Order</Label>
-              <Select value={formData.production_order_id} onValueChange={(v) => setFormData(f => ({ ...f, production_order_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select production order" /></SelectTrigger>
+              <Select
+                value={formData.production_order_id}
+                onValueChange={(v) => setFormData((f) => ({ ...f, production_order_id: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select production order" />
+                </SelectTrigger>
                 <SelectContent>
                   {(prodOrders ?? []).map((po: any) => (
-                    <SelectItem key={po.id} value={po.id}>{po.order_number}</SelectItem>
+                    <SelectItem key={po.id} value={po.id}>
+                      {po.order_number}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Operation</Label>
-              <Input value={formData.operation} onChange={(e) => setFormData(f => ({ ...f, operation: e.target.value }))} placeholder="CNC Milling" />
+              <Input
+                value={formData.operation}
+                onChange={(e) => setFormData((f) => ({ ...f, operation: e.target.value }))}
+                placeholder="CNC Milling"
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Machine *</Label>
-              <Select value={formData.machine_id} onValueChange={(v) => setFormData(f => ({ ...f, machine_id: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select machine" /></SelectTrigger>
+              <Select
+                value={formData.machine_id}
+                onValueChange={(v) => setFormData((f) => ({ ...f, machine_id: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select machine" />
+                </SelectTrigger>
                 <SelectContent>
                   {(machines ?? []).map((m: any) => (
-                    <SelectItem key={m.id} value={m.id} disabled={m.status === "maintenance" || m.status === "down"}>
-                      {m.name} {m.status === "maintenance" ? "(Maintenance)" : m.status === "down" ? "(Down)" : ""}
+                    <SelectItem
+                      key={m.id}
+                      value={m.id}
+                      disabled={m.status === "maintenance" || m.status === "down"}
+                    >
+                      {m.name}{" "}
+                      {m.status === "maintenance"
+                        ? "(Maintenance)"
+                        : m.status === "down"
+                          ? "(Down)"
+                          : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -350,13 +503,27 @@ function WorkOrdersPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Quantity</Label>
-              <Input type="number" value={formData.quantity} onChange={(e) => setFormData(f => ({ ...f, quantity: e.target.value }))} />
+              <Input
+                type="number"
+                value={formData.quantity}
+                onChange={(e) => setFormData((f) => ({ ...f, quantity: e.target.value }))}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
-            <Button className="bg-[image:var(--gradient-primary)]" onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
-              {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Plus className="h-4 w-4 mr-1.5" />}
+            <Button variant="outline" onClick={() => setShowNew(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-[image:var(--gradient-primary)]"
+              onClick={() => createMutation.mutate()}
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : (
+                <Plus className="h-4 w-4 mr-1.5" />
+              )}
               Create
             </Button>
           </DialogFooter>
@@ -364,24 +531,40 @@ function WorkOrdersPage() {
       </Dialog>
 
       {/* Assign Operator Dialog */}
-      <Dialog open={showAssign.open} onOpenChange={(o) => setShowAssign(d => ({ ...d, open: o }))}>
+      <Dialog
+        open={showAssign.open}
+        onOpenChange={(o) => setShowAssign((d) => ({ ...d, open: o }))}
+      >
         <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader><DialogTitle>Assign Operator</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Assign Operator</DialogTitle>
+          </DialogHeader>
           <div className="space-y-3 py-2">
             <Label className="text-xs">Select Operator</Label>
             <Select value={assignOp} onValueChange={setAssignOp}>
-              <SelectTrigger><SelectValue placeholder="Choose operator" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose operator" />
+              </SelectTrigger>
               <SelectContent>
                 {(operators ?? []).map((op: any) => (
-                  <SelectItem key={op.id} value={op.id}>{op.full_name}</SelectItem>
+                  <SelectItem key={op.id} value={op.id}>
+                    {op.full_name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAssign({ open: false, woId: "" })}>Cancel</Button>
-            <Button className="bg-[image:var(--gradient-primary)]" onClick={() => assignMutation.mutate()} disabled={!assignOp}>
-              <UserCheck className="h-4 w-4 mr-1.5" />Assign
+            <Button variant="outline" onClick={() => setShowAssign({ open: false, woId: "" })}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-[image:var(--gradient-primary)]"
+              onClick={() => assignMutation.mutate()}
+              disabled={!assignOp}
+            >
+              <UserCheck className="h-4 w-4 mr-1.5" />
+              Assign
             </Button>
           </DialogFooter>
         </DialogContent>

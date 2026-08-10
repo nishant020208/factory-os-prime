@@ -49,9 +49,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const resolved: "dark" | "light" = theme === "light" ? "light" : "dark";
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, resolved }}>
-      {children}
-    </ThemeContext.Provider>
+    <ThemeContext.Provider value={{ theme, setTheme, resolved }}>{children}</ThemeContext.Provider>
   );
 }
 

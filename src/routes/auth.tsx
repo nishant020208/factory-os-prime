@@ -2,17 +2,30 @@ import { createFileRoute, useNavigate, useSearch, Link } from "@tanstack/react-r
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
-import { ArrowLeft, Factory, Loader2, Lock, Mail, ShieldCheck, Sparkles, Zap, Building2, Globe, UserPlus, CheckCircle2, Eye, EyeOff, Store } from "lucide-react";
+import {
+  ArrowLeft,
+  Factory,
+  Loader2,
+  Lock,
+  Mail,
+  ShieldCheck,
+  Sparkles,
+  Zap,
+  Building2,
+  Globe,
+  UserPlus,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Store,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ROLES, ROLE_MAP, type AppRole } from "@/lib/roles";
-import {
-  notifyCompanyRegistrationRequest,
-  notifyCustomerAccessRequest,
-} from "@/lib/notifications";
+import { notifyCompanyRegistrationRequest, notifyCustomerAccessRequest } from "@/lib/notifications";
 
 const searchSchema = z.object({ role: z.string().optional(), redirect: z.string().optional() });
 
@@ -21,9 +34,16 @@ export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "Sign in — FactoryOS AI" },
-      { name: "description", content: "Access FactoryOS AI — the Smart Manufacturing Operating System. Select your role to continue." },
+      {
+        name: "description",
+        content:
+          "Access FactoryOS AI — the Smart Manufacturing Operating System. Select your role to continue.",
+      },
       { property: "og:title", content: "Sign in to FactoryOS AI" },
-      { property: "og:description", content: "Role-based access to the enterprise manufacturing OS." },
+      {
+        property: "og:description",
+        content: "Role-based access to the enterprise manufacturing OS.",
+      },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -46,14 +66,24 @@ function FloatingParticles() {
 
     const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (isMobile || prefersReduced) { canvas.style.display = "none"; return; }
+    if (isMobile || prefersReduced) {
+      canvas.style.display = "none";
+      return;
+    }
 
-    let w = 0, h = 0;
+    let w = 0,
+      h = 0;
     const count = 60;
     const particles: Array<{
-      x: number; y: number; vx: number; vy: number;
-      size: number; alpha: number; phase: number;
-      baseX: number; baseY: number;
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      size: number;
+      alpha: number;
+      phase: number;
+      baseX: number;
+      baseY: number;
     }> = [];
 
     function resize() {
@@ -74,8 +104,10 @@ function FloatingParticles() {
         const angle = Math.random() * Math.PI * 2;
         const speed = 0.1 + Math.random() * 0.2;
         particles.push({
-          x, y,
-          baseX: x, baseY: y,
+          x,
+          y,
+          baseX: x,
+          baseY: y,
           vx: Math.cos(angle) * speed,
           vy: -(0.08 + Math.random() * 0.15),
           size: 1.2 + Math.random() * 2,
@@ -87,7 +119,10 @@ function FloatingParticles() {
 
     resize();
     init();
-    window.addEventListener("resize", () => { resize(); init(); });
+    window.addEventListener("resize", () => {
+      resize();
+      init();
+    });
 
     const onMouse = (e: MouseEvent) => {
       const rect = canvas!.getBoundingClientRect();
@@ -106,14 +141,26 @@ function FloatingParticles() {
       for (const p of particles) {
         p.x += p.vx + Math.sin(Date.now() * 0.001 + p.phase) * 0.06;
         p.y += p.vy;
-        if (p.y < -10) { p.y = h + 10; p.baseY = p.y; p.baseX = Math.random() * w; p.x = p.baseX; }
-        if (p.y > h + 10) { p.y = -10; p.baseY = p.y; }
-        if (p.x < -10 || p.x > w + 10) { p.baseX = Math.random() * w; p.x = p.baseX; }
+        if (p.y < -10) {
+          p.y = h + 10;
+          p.baseY = p.y;
+          p.baseX = Math.random() * w;
+          p.x = p.baseX;
+        }
+        if (p.y > h + 10) {
+          p.y = -10;
+          p.baseY = p.y;
+        }
+        if (p.x < -10 || p.x > w + 10) {
+          p.baseX = Math.random() * w;
+          p.x = p.baseX;
+        }
 
-        const dx = p.x - mx, dy = p.y - my;
+        const dx = p.x - mx,
+          dy = p.y - my;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < repelRadius && dist > 0) {
-          const force = (repelRadius - dist) / repelRadius * repelStrength;
+          const force = ((repelRadius - dist) / repelRadius) * repelStrength;
           p.x += (dx / dist) * force * 2.5;
           p.y += (dy / dist) * force * 2.5;
         }
@@ -121,7 +168,9 @@ function FloatingParticles() {
         p.y += (p.baseY - p.y) * 0.001;
 
         const isAesthetic = document.documentElement.getAttribute("data-theme") === "aesthetic";
-        const color = isAesthetic ? `oklch(0.79 0.17 75 / ${p.alpha})` : `oklch(0.58 0.22 259 / ${p.alpha})`;
+        const color = isAesthetic
+          ? `oklch(0.79 0.17 75 / ${p.alpha})`
+          : `oklch(0.58 0.22 259 / ${p.alpha})`;
 
         ctx!.beginPath();
         ctx!.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -154,12 +203,7 @@ function FloatingParticles() {
     };
   }, []);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 pointer-events-none z-0"
-    />
-  );
+  return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-0" />;
 }
 
 /* ───────────────────────────────────────────────────── */
@@ -235,7 +279,9 @@ function AuthPage() {
           >
             <Factory className="h-4 w-4 text-primary-foreground" />
           </motion.div>
-          <span className="font-semibold">FactoryOS <span className="text-muted-foreground">AI</span></span>
+          <span className="font-semibold">
+            FactoryOS <span className="text-muted-foreground">AI</span>
+          </span>
         </Link>
         {selected && (
           <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/auth" })}>
@@ -249,7 +295,10 @@ function AuthPage() {
           {showRegisterCompany ? (
             <RegisterCompany key="register" onBack={() => setShowRegisterCompany(false)} />
           ) : showRegisterCustomer ? (
-            <RegisterCustomer key="register-customer" onBack={() => setShowRegisterCustomer(false)} />
+            <RegisterCustomer
+              key="register-customer"
+              onBack={() => setShowRegisterCustomer(false)}
+            />
           ) : !selected ? (
             <RoleGrid
               key="grid"
@@ -288,7 +337,10 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
 
   const handleMouse = (e: React.MouseEvent) => {
     const r = cardRef.current?.getBoundingClientRect();
-    if (r) { mouseX.set((e.clientX - r.left) / r.width); mouseY.set((e.clientY - r.top) / r.height); }
+    if (r) {
+      mouseX.set((e.clientX - r.left) / r.width);
+      mouseY.set((e.clientY - r.top) / r.height);
+    }
   };
 
   async function handleSubmit(e: React.FormEvent) {
@@ -297,17 +349,15 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
     try {
       // No .select() here on purpose: anonymous visitors may submit a
       // registration but must never be able to read this table back.
-      const { error } = await supabase
-        .from("company_registrations")
-        .insert({
-          company_name: form.company_name,
-          email: form.email,
-          phone: form.phone || null,
-          country: form.country,
-          industry: form.industry || null,
-          registration_data: { full_name: form.full_name },
-          status: "pending",
-        });
+      const { error } = await supabase.from("company_registrations").insert({
+        company_name: form.company_name,
+        email: form.email,
+        phone: form.phone || null,
+        country: form.country,
+        industry: form.industry || null,
+        registration_data: { full_name: form.full_name },
+        status: "pending",
+      });
       if (error) throw error;
       // Notify Root Super Admin that a new company registration is pending review
       await notifyCompanyRegistrationRequest(null, form.company_name);
@@ -321,14 +371,22 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mt-6 max-w-md mx-auto">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className="mt-6 max-w-md mx-auto"
+    >
       <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">
         <ArrowLeft className="h-4 w-4 mr-1" /> Back to roles
       </Button>
       <motion.div
         ref={cardRef}
         onMouseMove={handleMouse}
-        onMouseLeave={() => { mouseX.set(0.5); mouseY.set(0.5); }}
+        onMouseLeave={() => {
+          mouseX.set(0.5);
+          mouseY.set(0.5);
+        }}
         style={{
           rotateX: useTransform(springY, [0, 1], [2, -2]),
           rotateY: useTransform(springX, [0, 1], [-2, 2]),
@@ -356,15 +414,31 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
           </motion.div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <FloatingLabelField icon={Building2} label="Company Name *" value={form.company_name} onChange={(v) => setForm(f => ({ ...f, company_name: v }))} />
-            <FloatingLabelField icon={Mail} label="Your Email *" value={form.email} onChange={(v) => setForm(f => ({ ...f, email: v }))} type="email" />
-            <FloatingLabelField icon={UserPlus} label="Your Full Name *" value={form.full_name} onChange={(v) => setForm(f => ({ ...f, full_name: v }))} />
-            <PhoneField value={form.phone} onChange={(v) => setForm(f => ({ ...f, phone: v }))} />
+            <FloatingLabelField
+              icon={Building2}
+              label="Company Name *"
+              value={form.company_name}
+              onChange={(v) => setForm((f) => ({ ...f, company_name: v }))}
+            />
+            <FloatingLabelField
+              icon={Mail}
+              label="Your Email *"
+              value={form.email}
+              onChange={(v) => setForm((f) => ({ ...f, email: v }))}
+              type="email"
+            />
+            <FloatingLabelField
+              icon={UserPlus}
+              label="Your Full Name *"
+              value={form.full_name}
+              onChange={(v) => setForm((f) => ({ ...f, full_name: v }))}
+            />
+            <PhoneField value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} />
             <FloatingSelectField
               icon={Globe}
               label="Country"
               value={form.country}
-              onChange={(v) => setForm(f => ({ ...f, country: v }))}
+              onChange={(v) => setForm((f) => ({ ...f, country: v }))}
               options={[
                 { value: "US", label: "🇺🇸 United States" },
                 { value: "CA", label: "🇨🇦 Canada" },
@@ -379,7 +453,12 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
                 { value: "SG", label: "🇸🇬 Singapore" },
               ]}
             />
-            <FloatingLabelField icon={Factory} label="Industry" value={form.industry} onChange={(v) => setForm(f => ({ ...f, industry: v }))} />
+            <FloatingLabelField
+              icon={Factory}
+              label="Industry"
+              value={form.industry}
+              onChange={(v) => setForm((f) => ({ ...f, industry: v }))}
+            />
 
             <RippleButton
               type="submit"
@@ -389,7 +468,8 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit Registration"}
             </RippleButton>
             <p className="text-xs text-muted-foreground mt-2">
-              A Root Super Admin will review your registration. You'll receive an email when your company is approved.
+              A Root Super Admin will review your registration. You'll receive an email when your
+              company is approved.
             </p>
           </form>
         </div>
@@ -402,7 +482,9 @@ function RegisterCompany({ onBack }: { onBack: () => void }) {
 /*  REGISTER AS A CUSTOMER — company-specific          */
 /* ───────────────────────────────────────────────────── */
 function RegisterCustomer({ onBack }: { onBack: () => void }) {
-  const [companies, setCompanies] = useState<Array<{ id: string; name: string; industry: string | null }>>([]);
+  const [companies, setCompanies] = useState<
+    Array<{ id: string; name: string; industry: string | null }>
+  >([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [form, setForm] = useState({
     company_id: "",
@@ -422,38 +504,50 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
         // Prefer the RPC; fall back to direct table read for existing auth users
         const { data: rpc, error: rpcError } = await supabase.rpc("get_active_companies");
         if (!rpcError && Array.isArray(rpc)) {
-          if (mounted) { setCompanies(rpc as Array<{ id: string; name: string; industry: string | null }>); setLoadingCompanies(false); }
+          if (mounted) {
+            setCompanies(rpc as Array<{ id: string; name: string; industry: string | null }>);
+            setLoadingCompanies(false);
+          }
           return;
         }
-        const { data, error } = await supabase.from("companies").select("id,name,industry").eq("status", "active").order("name");
-        if (!error && data) { if (mounted) setCompanies(data); }
+        const { data, error } = await supabase
+          .from("companies")
+          .select("id,name,industry")
+          .eq("status", "active")
+          .order("name");
+        if (!error && data) {
+          if (mounted) setCompanies(data);
+        }
       } catch {
         // ignore — dropdown stays empty if RLS blocks
       }
       if (mounted) setLoadingCompanies(false);
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.company_id) { toast.error("Please select the company you want to order from"); return; }
+    if (!form.company_id) {
+      toast.error("Please select the company you want to order from");
+      return;
+    }
     setBusy(true);
     try {
       // No .select() here on purpose: anonymous visitors may submit a request
       // but must never be able to read customer_requests back.
-      const { error } = await supabase
-        .from("customer_requests")
-        .insert({
-          company_id: form.company_id,
-          business_name: form.business_name,
-          contact_person: form.contact_person,
-          email: form.email,
-          phone: form.phone || null,
-          gst_number: form.gst_number || null,
-          address: form.address || null,
-          status: "pending",
-        });
+      const { error } = await supabase.from("customer_requests").insert({
+        company_id: form.company_id,
+        business_name: form.business_name,
+        contact_person: form.contact_person,
+        email: form.email,
+        phone: form.phone || null,
+        gst_number: form.gst_number || null,
+        address: form.address || null,
+        status: "pending",
+      });
       if (error) throw error;
       await notifyCustomerAccessRequest(form.company_id, form.business_name);
       toast.success("Request submitted! The company's admin will approve your access.");
@@ -466,7 +560,12 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mt-6 max-w-md mx-auto">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className="mt-6 max-w-md mx-auto"
+    >
       <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">
         <ArrowLeft className="h-4 w-4 mr-1" /> Back to roles
       </Button>
@@ -477,40 +576,84 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
           </div>
           <div>
             <div className="font-semibold">Register as a Customer</div>
-            <div className="text-xs text-muted-foreground">Order from a specific company on FactoryOS</div>
+            <div className="text-xs text-muted-foreground">
+              Order from a specific company on FactoryOS
+            </div>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs text-muted-foreground">Company you want to order from *</label>
+            <label className="text-xs text-muted-foreground">
+              Company you want to order from *
+            </label>
             {loadingCompanies ? (
-              <div className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Loading companies…</div>
+              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" /> Loading companies…
+              </div>
             ) : companies.length === 0 ? (
-              <div className="text-xs text-amber-500">No active companies available yet. Please check back later.</div>
+              <div className="text-xs text-amber-500">
+                No active companies available yet. Please check back later.
+              </div>
             ) : (
               <select
                 value={form.company_id}
-                onChange={(e) => setForm(f => ({ ...f, company_id: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, company_id: e.target.value }))}
                 className="flex w-full rounded-md border border-input bg-background/40 px-3 py-2 text-sm h-11 appearance-none cursor-pointer focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
               >
                 <option value="">Select a company…</option>
-                {companies.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}{c.industry ? ` · ${c.industry}` : ""}</option>
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {c.industry ? ` · ${c.industry}` : ""}
+                  </option>
                 ))}
               </select>
             )}
           </div>
-          <FloatingLabelField icon={Building2} label="Business Name *" value={form.business_name} onChange={(v) => setForm(f => ({ ...f, business_name: v }))} />
-          <FloatingLabelField icon={UserPlus} label="Contact Person *" value={form.contact_person} onChange={(v) => setForm(f => ({ ...f, contact_person: v }))} />
-          <FloatingLabelField icon={Mail} label="Contact Email *" value={form.email} onChange={(v) => setForm(f => ({ ...f, email: v }))} type="email" />
-          <PhoneField value={form.phone} onChange={(v) => setForm(f => ({ ...f, phone: v }))} />
-          <FloatingLabelField icon={ShieldCheck} label="GST / Business Reg. No." value={form.gst_number} onChange={(v) => setForm(f => ({ ...f, gst_number: v }))} />
-          <FloatingLabelField icon={Building2} label="Billing Address" value={form.address} onChange={(v) => setForm(f => ({ ...f, address: v }))} />
+          <FloatingLabelField
+            icon={Building2}
+            label="Business Name *"
+            value={form.business_name}
+            onChange={(v) => setForm((f) => ({ ...f, business_name: v }))}
+          />
+          <FloatingLabelField
+            icon={UserPlus}
+            label="Contact Person *"
+            value={form.contact_person}
+            onChange={(v) => setForm((f) => ({ ...f, contact_person: v }))}
+          />
+          <FloatingLabelField
+            icon={Mail}
+            label="Contact Email *"
+            value={form.email}
+            onChange={(v) => setForm((f) => ({ ...f, email: v }))}
+            type="email"
+          />
+          <PhoneField value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} />
+          <FloatingLabelField
+            icon={ShieldCheck}
+            label="GST / Business Reg. No."
+            value={form.gst_number}
+            onChange={(v) => setForm((f) => ({ ...f, gst_number: v }))}
+          />
+          <FloatingLabelField
+            icon={Building2}
+            label="Billing Address"
+            value={form.address}
+            onChange={(v) => setForm((f) => ({ ...f, address: v }))}
+          />
 
           <RippleButton
             type="submit"
-            disabled={busy || !form.company_id || !form.business_name || !form.contact_person || !form.email || form.phone.length > 0 && form.phone.length !== 10}
+            disabled={
+              busy ||
+              !form.company_id ||
+              !form.business_name ||
+              !form.contact_person ||
+              !form.email ||
+              (form.phone.length > 0 && form.phone.length !== 10)
+            }
             className="w-full h-11 rounded-lg bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-600 text-white font-medium shadow-glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit Access Request"}
@@ -527,16 +670,29 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
 /* ───────────────────────────────────────────────────── */
 /*  ROLE GRID — Premium 3D Tilt Cards                   */
 /* ───────────────────────────────────────────────────── */
-function RoleGrid({ onPick, onRegisterCompany, onRegisterCustomer }: { onPick: (r: AppRole) => void; onRegisterCompany: () => void; onRegisterCustomer: () => void }) {
+function RoleGrid({
+  onPick,
+  onRegisterCompany,
+  onRegisterCustomer,
+}: {
+  onPick: (r: AppRole) => void;
+  onRegisterCompany: () => void;
+  onRegisterCustomer: () => void;
+}) {
   const groups: Array<[string, string, typeof ROLES]> = [
-    ["Platform", "Root-level control", ROLES.filter(r => r.group === "platform")],
-    ["Company", "Tenant administration", ROLES.filter(r => r.group === "company")],
-    ["Operations", "Plant & shop-floor", ROLES.filter(r => r.group === "operations")],
-    ["External", "Portals & compliance", ROLES.filter(r => r.group === "external")],
+    ["Platform", "Root-level control", ROLES.filter((r) => r.group === "platform")],
+    ["Company", "Tenant administration", ROLES.filter((r) => r.group === "company")],
+    ["Operations", "Plant & shop-floor", ROLES.filter((r) => r.group === "operations")],
+    ["External", "Portals & compliance", ROLES.filter((r) => r.group === "external")],
   ];
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mt-6">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className="mt-6"
+    >
       <div className="text-center max-w-2xl mx-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -615,7 +771,15 @@ function RoleGrid({ onPick, onRegisterCompany, onRegisterCustomer }: { onPick: (
   );
 }
 
-function RoleCard({ role, index, onClick }: { role: typeof ROLES[number]; index: number; onClick: () => void }) {
+function RoleCard({
+  role,
+  index,
+  onClick,
+}: {
+  role: (typeof ROLES)[number];
+  index: number;
+  onClick: () => void;
+}) {
   const tiltRef = useRef<HTMLButtonElement>(null);
 
   const handleMove = (e: React.MouseEvent) => {
@@ -628,7 +792,9 @@ function RoleCard({ role, index, onClick }: { role: typeof ROLES[number]; index:
   };
 
   const handleLeave = () => {
-    if (tiltRef.current) tiltRef.current.style.transform = "perspective(600px) rotateY(0deg) rotateX(0deg) translateY(0px)";
+    if (tiltRef.current)
+      tiltRef.current.style.transform =
+        "perspective(600px) rotateY(0deg) rotateX(0deg) translateY(0px)";
   };
 
   return (
@@ -645,10 +811,14 @@ function RoleCard({ role, index, onClick }: { role: typeof ROLES[number]; index:
       style={{ transition: "transform 0.15s ease-out" }}
     >
       {/* Gradient glow on hover */}
-      <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-br ${role.accent} opacity-[0.06] transition-opacity duration-300`} />
+      <div
+        className={`absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-br ${role.accent} opacity-[0.06] transition-opacity duration-300`}
+      />
 
       <div className="relative z-10">
-        <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${role.accent} grid place-items-center shadow-glow`}>
+        <div
+          className={`h-10 w-10 rounded-xl bg-gradient-to-br ${role.accent} grid place-items-center shadow-glow`}
+        >
           <role.icon className="h-5 w-5 text-white" />
         </div>
         <div className="mt-3 text-sm font-medium">{role.label}</div>
@@ -695,9 +865,15 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
 
   async function doSignIn(withEmail: string, withPassword: string) {
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: withEmail, password: withPassword });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: withEmail,
+      password: withPassword,
+    });
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success(`Welcome back to FactoryOS`);
     navigate({ to: redirect ?? "/dashboard" });
   }
@@ -707,23 +883,32 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
     await doSignIn(email, password);
   }
 
-
-
-
   async function signUp(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     const { error } = await supabase.auth.signUp({
-      email, password,
-      options: { data: { full_name: fullName || email.split("@")[0] }, emailRedirectTo: `${window.location.origin}/auth` },
+      email,
+      password,
+      options: {
+        data: { full_name: fullName || email.split("@")[0] },
+        emailRedirectTo: `${window.location.origin}/auth`,
+      },
     });
     setBusy(false);
     if (error) {
       const msg = error.message ?? "";
       if (msg.includes("whitelisted")) {
-        toast.error("Your email isn't whitelisted for this role. Ask your Company Admin for an invitation.");
-      } else if (msg.includes("rate limit") || msg.includes("429") || msg.includes("over_email_send")) {
-        toast.error("Too many sign-up attempts in a short window. Please wait a minute and try again.");
+        toast.error(
+          "Your email isn't whitelisted for this role. Ask your Company Admin for an invitation.",
+        );
+      } else if (
+        msg.includes("rate limit") ||
+        msg.includes("429") ||
+        msg.includes("over_email_send")
+      ) {
+        toast.error(
+          "Too many sign-up attempts in a short window. Please wait a minute and try again.",
+        );
       } else {
         toast.error(msg);
       }
@@ -741,14 +926,23 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
       className="mt-6 grid lg:grid-cols-2 gap-8 items-center max-w-6xl mx-auto"
     >
       {/* Left illustration — 3D depth */}
-      <div className="hidden lg:block relative" onMouseMove={handleMouse} onMouseLeave={() => { mouseX.set(0.5); mouseY.set(0.5); }}>
+      <div
+        className="hidden lg:block relative"
+        onMouseMove={handleMouse}
+        onMouseLeave={() => {
+          mouseX.set(0.5);
+          mouseY.set(0.5);
+        }}
+      >
         <motion.div
           style={{
             rotateX: useTransform(springY, [0, 1], [3, -3]),
             rotateY: useTransform(springX, [0, 1], [-3, 3]),
           }}
         >
-          <div className={`absolute -inset-6 rounded-3xl bg-gradient-to-br ${meta.accent} opacity-20 blur-3xl`} />
+          <div
+            className={`absolute -inset-6 rounded-3xl bg-gradient-to-br ${meta.accent} opacity-20 blur-3xl`}
+          />
           <div className="relative glass-strong rounded-3xl p-10 min-h-[420px] flex flex-col justify-between overflow-hidden group">
             {/* Animated border glow */}
             <div className="absolute inset-0 rounded-3xl p-[1px] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
@@ -759,28 +953,37 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
               className="relative"
               style={{ z: useTransform(springY, [0, 1], [15, -15]) }}
             >
-              <div className={`h-14 w-14 rounded-2xl bg-gradient-to-br ${meta.accent} grid place-items-center shadow-glow`}>
+              <div
+                className={`h-14 w-14 rounded-2xl bg-gradient-to-br ${meta.accent} grid place-items-center shadow-glow`}
+              >
                 <meta.icon className="h-7 w-7 text-white" />
               </div>
             </motion.div>
 
             <div className="relative">
-              <div className="text-xs uppercase tracking-widest text-muted-foreground">Signing in as</div>
+              <div className="text-xs uppercase tracking-widest text-muted-foreground">
+                Signing in as
+              </div>
               <motion.h2
                 style={{ z: useTransform(springY, [0, 1], [5, -5]) }}
                 className="mt-2 text-3xl font-semibold"
               >
                 {meta.label}
               </motion.h2>
-              <p className="mt-2 text-muted-foreground max-w-md">{meta.tagline}. Your workspace is scoped to the data your role is authorized to see.</p>
+              <p className="mt-2 text-muted-foreground max-w-md">
+                {meta.tagline}. Your workspace is scoped to the data your role is authorized to see.
+              </p>
             </div>
 
             <motion.div
               style={{ z: useTransform(springY, [0, 1], [-5, 5]) }}
               className="grid grid-cols-3 gap-2 text-xs"
             >
-              {["RLS enforced", "Audit-logged", "Realtime"].map(x => (
-                <div key={x} className="glass rounded-lg px-3 py-2 border border-border/30 flex items-center gap-1.5">
+              {["RLS enforced", "Audit-logged", "Realtime"].map((x) => (
+                <div
+                  key={x}
+                  className="glass rounded-lg px-3 py-2 border border-border/30 flex items-center gap-1.5"
+                >
                   <ShieldCheck className="h-3.5 w-3.5 text-success" /> {x}
                 </div>
               ))}
@@ -792,7 +995,10 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
       {/* Right — Login form */}
       <motion.div
         onMouseMove={handleMouse}
-        onMouseLeave={() => { mouseX.set(0.5); mouseY.set(0.5); }}
+        onMouseLeave={() => {
+          mouseX.set(0.5);
+          mouseY.set(0.5);
+        }}
         style={{
           rotateX: useTransform(springY, [0, 1], [1.5, -1.5]),
           rotateY: useTransform(springX, [0, 1], [-1.5, 1.5]),
@@ -806,17 +1012,32 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
 
         <div className="relative z-10">
           <div className="lg:hidden mb-4 flex items-center gap-3">
-            <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${meta.accent} grid place-items-center shadow-glow`}>
+            <div
+              className={`h-10 w-10 rounded-xl bg-gradient-to-br ${meta.accent} grid place-items-center shadow-glow`}
+            >
               <meta.icon className="h-5 w-5 text-white" />
             </div>
-            <div><div className="font-semibold">{meta.label}</div><div className="text-xs text-muted-foreground">{meta.tagline}</div></div>
+            <div>
+              <div className="font-semibold">{meta.label}</div>
+              <div className="text-xs text-muted-foreground">{meta.tagline}</div>
+            </div>
           </div>
 
           <Tabs value={tab} onValueChange={(v) => setTab(v as "signin" | "signup")}>
             <div className="relative">
               <TabsList className="grid grid-cols-2 w-full bg-muted/30 p-0.5 rounded-lg">
-                <TabsTrigger value="signin" className="relative z-10 data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent">Sign in</TabsTrigger>
-                <TabsTrigger value="signup" className="relative z-10 data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent">Register</TabsTrigger>
+                <TabsTrigger
+                  value="signin"
+                  className="relative z-10 data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+                >
+                  Sign in
+                </TabsTrigger>
+                <TabsTrigger
+                  value="signup"
+                  className="relative z-10 data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+                >
+                  Register
+                </TabsTrigger>
               </TabsList>
               {/* Animated pill indicator */}
               <motion.div
@@ -842,14 +1063,24 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
                   variants={formVariants}
                   animate={busy ? "success" : "initial"}
                 >
-                  <FloatingLabelField icon={Mail} label="Work email" value={email} onChange={setEmail} type="email" />
+                  <FloatingLabelField
+                    icon={Mail}
+                    label="Work email"
+                    value={email}
+                    onChange={setEmail}
+                    type="email"
+                  />
                   <PasswordStrengthField value={password} onChange={setPassword} />
                   <RippleButton
                     type="submit"
                     disabled={busy}
                     className="w-full h-11 rounded-lg bg-gradient-to-r from-primary via-primary/90 to-accent text-white font-medium shadow-glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : `Sign in as ${meta.label}`}
+                    {busy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      `Sign in as ${meta.label}`
+                    )}
                   </RippleButton>
                 </motion.form>
               </motion.div>
@@ -868,8 +1099,19 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
                   variants={formVariants}
                   animate={busy ? "success" : "initial"}
                 >
-                  <FloatingLabelField icon={Mail} label="Whitelisted email" value={email} onChange={setEmail} type="email" />
-                  <FloatingLabelField icon={ShieldCheck} label="Full name" value={fullName} onChange={setFullName} />
+                  <FloatingLabelField
+                    icon={Mail}
+                    label="Whitelisted email"
+                    value={email}
+                    onChange={setEmail}
+                    type="email"
+                  />
+                  <FloatingLabelField
+                    icon={ShieldCheck}
+                    label="Full name"
+                    value={fullName}
+                    onChange={setFullName}
+                  />
                   <PasswordStrengthField value={password} onChange={setPassword} />
                   <RippleButton
                     type="submit"
@@ -879,7 +1121,8 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
                     {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create account"}
                   </RippleButton>
                   <p className="text-xs text-muted-foreground">
-                    Registration succeeds only when your email is whitelisted for this role by a Root or Company Admin.
+                    Registration succeeds only when your email is whitelisted for this role by a
+                    Root or Company Admin.
                   </p>
                 </motion.form>
               </motion.div>
@@ -895,8 +1138,18 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
 /*  FLOATING LABEL FIELD — Animated Input               */
 /* ───────────────────────────────────────────────────── */
 function FloatingLabelField({
-  icon: Icon, label, value, onChange, type = "text",
-}: { icon: any; label: string; value: string; onChange: (v: string) => void; type?: string }) {
+  icon: Icon,
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  icon: any;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+}) {
   const [focused, setFocused] = useState(false);
   const hasValue = value.length > 0;
   const isUp = focused || hasValue;
@@ -906,7 +1159,10 @@ function FloatingLabelField({
   const springY = useSpring(labelY, { stiffness: 280, damping: 28 });
   const springS = useSpring(labelS, { stiffness: 280, damping: 28 });
 
-  useEffect(() => { labelY.set(isUp ? -18 : 0); labelS.set(isUp ? 0.78 : 1); }, [isUp, labelY, labelS]);
+  useEffect(() => {
+    labelY.set(isUp ? -18 : 0);
+    labelS.set(isUp ? 0.78 : 1);
+  }, [isUp, labelY, labelS]);
 
   return (
     <div className="space-y-1.5">
@@ -926,9 +1182,11 @@ function FloatingLabelField({
         )}
 
         <div className="relative z-10">
-          <Icon className={`h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 z-20 ${
-            focused ? "text-primary" : "text-muted-foreground"
-          }`} />
+          <Icon
+            className={`h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 z-20 ${
+              focused ? "text-primary" : "text-muted-foreground"
+            }`}
+          />
 
           {/* Floating label */}
           <motion.label
@@ -958,7 +1216,13 @@ function FloatingLabelField({
 /* ───────────────────────────────────────────────────── */
 /*  PASSWORD STRENGTH FIELD                             */
 /* ───────────────────────────────────────────────────── */
-function PasswordStrengthField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function PasswordStrengthField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
   const [focused, setFocused] = useState(false);
   const [visible, setVisible] = useState(false);
 
@@ -970,11 +1234,15 @@ function PasswordStrengthField({ value, onChange }: { value: string; onChange: (
   const springY = useSpring(labelY, { stiffness: 280, damping: 28 });
   const springS = useSpring(labelS, { stiffness: 280, damping: 28 });
 
-  useEffect(() => { labelY.set(isUp ? -18 : 0); labelS.set(isUp ? 0.78 : 1); }, [isUp, labelY, labelS]);
+  useEffect(() => {
+    labelY.set(isUp ? -18 : 0);
+    labelS.set(isUp ? 0.78 : 1);
+  }, [isUp, labelY, labelS]);
 
   // Strength calculation
   const strength = useMemo(() => {
-    if (value.length === 0) return { level: 0, label: "", color: "", checks: [false, false, false, false, false] };
+    if (value.length === 0)
+      return { level: 0, label: "", color: "", checks: [false, false, false, false, false] };
     const checks = [
       value.length >= 8,
       value.length >= 12,
@@ -1022,9 +1290,11 @@ function PasswordStrengthField({ value, onChange }: { value: string; onChange: (
         )}
 
         <div className="relative z-10">
-          <Lock className={`h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 z-20 ${
-            focused ? "text-primary" : "text-muted-foreground"
-          }`} />
+          <Lock
+            className={`h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 z-20 ${
+              focused ? "text-primary" : "text-muted-foreground"
+            }`}
+          />
 
           <motion.label
             style={{ y: springY, scale: springS, transformOrigin: "left center" }}
@@ -1048,7 +1318,7 @@ function PasswordStrengthField({ value, onChange }: { value: string; onChange: (
           {/* Toggle visibility */}
           <button
             type="button"
-            onClick={() => setVisible(v => !v)}
+            onClick={() => setVisible((v) => !v)}
             className="absolute right-3 top-1/2 -translate-y-1/2 z-20 text-muted-foreground hover:text-foreground transition-colors"
             tabIndex={-1}
           >
@@ -1081,9 +1351,7 @@ function PasswordStrengthField({ value, onChange }: { value: string; onChange: (
               <span style={{ color: strength.color }} className="font-medium">
                 {strength.label}
               </span>
-              <span className="text-muted-foreground">
-                {value.length} chars
-              </span>
+              <span className="text-muted-foreground">{value.length} chars</span>
             </div>
 
             {/* Requirement hints with animated checkmarks */}
@@ -1143,8 +1411,8 @@ function PhoneField({ value, onChange }: { value: string; onChange: (v: string) 
   const isValid = digits.length === 0 || digits.length === 10;
   const error = value.length > 0 && !isValid ? "Phone must be exactly 10 digits" : "";
 
-  const labelY = useMotionValue((focused || digits.length > 0) ? -18 : 0);
-  const labelS = useMotionValue((focused || digits.length > 0) ? 0.78 : 1);
+  const labelY = useMotionValue(focused || digits.length > 0 ? -18 : 0);
+  const labelS = useMotionValue(focused || digits.length > 0 ? 0.78 : 1);
   const springY = useSpring(labelY, { stiffness: 280, damping: 28 });
   const springS = useSpring(labelS, { stiffness: 280, damping: 28 });
 
@@ -1173,9 +1441,11 @@ function PhoneField({ value, onChange }: { value: string; onChange: (v: string) 
           />
         )}
         <div className="relative z-10">
-          <Globe className={`h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 z-20 ${
-            focused ? "text-primary" : "text-muted-foreground"
-          }`} />
+          <Globe
+            className={`h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 z-20 ${
+              focused ? "text-primary" : "text-muted-foreground"
+            }`}
+          />
           <motion.label
             style={{ y: springY, scale: springS, transformOrigin: "left center" }}
             className={`absolute left-9 top-3.5 text-sm pointer-events-none z-20 ${
@@ -1191,7 +1461,9 @@ function PhoneField({ value, onChange }: { value: string; onChange: (v: string) 
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             className={`pl-9 pt-4 pb-1.5 h-11 bg-background/40 border-border/60 focus:ring-1 transition-all duration-200 relative z-10 ${
-              error ? "border-red-500/50 focus:border-red-500/50 focus:ring-red-500/20" : "focus:border-primary/50 focus:ring-primary/20"
+              error
+                ? "border-red-500/50 focus:border-red-500/50 focus:ring-red-500/20"
+                : "focus:border-primary/50 focus:ring-primary/20"
             }`}
             placeholder=""
           />
@@ -1213,7 +1485,13 @@ function PhoneField({ value, onChange }: { value: string; onChange: (v: string) 
 /* ───────────────────────────────────────────────────── */
 /*  RIPPLE BUTTON                                      */
 /* ───────────────────────────────────────────────────── */
-function RippleButton({ children, className = "", disabled = false, onClick, type = "button" }: {
+function RippleButton({
+  children,
+  className = "",
+  disabled = false,
+  onClick,
+  type = "button",
+}: {
   children: React.ReactNode;
   className?: string;
   disabled?: boolean;
@@ -1223,16 +1501,19 @@ function RippleButton({ children, className = "", disabled = false, onClick, typ
   const [ripples, setRipples] = useState<Array<{ x: number; y: number; id: number }>>([]);
   const idRef = useRef(0);
 
-  const handleClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    if (disabled) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const id = ++idRef.current;
-    setRipples(prev => [...prev, { x, y, id }]);
-    setTimeout(() => setRipples(prev => prev.filter(r => r.id !== id)), 600);
-    onClick?.();
-  }, [disabled, onClick]);
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (disabled) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const id = ++idRef.current;
+      setRipples((prev) => [...prev, { x, y, id }]);
+      setTimeout(() => setRipples((prev) => prev.filter((r) => r.id !== id)), 600);
+      onClick?.();
+    },
+    [disabled, onClick],
+  );
 
   return (
     <motion.button
@@ -1245,7 +1526,7 @@ function RippleButton({ children, className = "", disabled = false, onClick, typ
     >
       {children}
       <AnimatePresence>
-        {ripples.map(r => (
+        {ripples.map((r) => (
           <motion.span
             key={r.id}
             initial={{ width: 0, height: 0, x: r.x, y: r.y, opacity: 0.4 }}
@@ -1264,7 +1545,13 @@ function RippleButton({ children, className = "", disabled = false, onClick, typ
 /* ───────────────────────────────────────────────────── */
 /*  FLOATING SELECT FIELD — Country etc.               */
 /* ───────────────────────────────────────────────────── */
-function FloatingSelectField({ icon: Icon, label, value, onChange, options }: {
+function FloatingSelectField({
+  icon: Icon,
+  label,
+  value,
+  onChange,
+  options,
+}: {
   icon: any;
   label: string;
   value: string;
@@ -1279,7 +1566,10 @@ function FloatingSelectField({ icon: Icon, label, value, onChange, options }: {
   const springY = useSpring(labelY, { stiffness: 280, damping: 28 });
   const springS = useSpring(labelS, { stiffness: 280, damping: 28 });
 
-  useEffect(() => { labelY.set(isUp ? -18 : 0); labelS.set(isUp ? 0.78 : 1); }, [isUp, labelY, labelS]);
+  useEffect(() => {
+    labelY.set(isUp ? -18 : 0);
+    labelS.set(isUp ? 0.78 : 1);
+  }, [isUp, labelY, labelS]);
 
   return (
     <div className="space-y-1.5">
@@ -1298,9 +1588,11 @@ function FloatingSelectField({ icon: Icon, label, value, onChange, options }: {
         )}
 
         <div className="relative z-10">
-          <Icon className={`h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 z-20 ${
-            focused ? "text-primary" : "text-muted-foreground"
-          }`} />
+          <Icon
+            className={`h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 z-20 ${
+              focused ? "text-primary" : "text-muted-foreground"
+            }`}
+          />
 
           <motion.label
             style={{ y: springY, scale: springS, transformOrigin: "left center" }}
@@ -1318,14 +1610,23 @@ function FloatingSelectField({ icon: Icon, label, value, onChange, options }: {
             onBlur={() => setFocused(false)}
             className="flex w-full rounded-md border border-input bg-background/40 px-3 py-2 text-sm h-11 pl-9 pt-4 pb-1.5 appearance-none cursor-pointer focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all duration-200 relative z-10"
           >
-            {options.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+            {options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
             ))}
           </select>
 
           {/* Custom dropdown arrow */}
           <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20 pointer-events-none text-muted-foreground">
-            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <svg
+              width="10"
+              height="6"
+              viewBox="0 0 10 6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
               <path d="M1 1l4 4 4-4" />
             </svg>
           </div>

@@ -19,7 +19,7 @@ export function LoadingScreen({ label = "Loading FactoryOS" }: { label?: string 
               animate={{ rotate: 360, scale: [1, 1.05, 1] }}
               transition={{
                 rotate: { duration: 6 + i * 2, repeat: Infinity, ease: "linear" },
-                scale:  { duration: 2, repeat: Infinity, ease: "easeInOut", delay: i * 0.3 },
+                scale: { duration: 2, repeat: Infinity, ease: "easeInOut", delay: i * 0.3 },
               }}
             >
               <div

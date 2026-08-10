@@ -39,9 +39,7 @@ export function RouteLoading({ label = "Loading..." }: { label?: string }) {
           />
         </div>
 
-        <div className="text-[10px] text-muted-foreground/50">
-          Switching modules...
-        </div>
+        <div className="text-[10px] text-muted-foreground/50">Switching modules...</div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 -- =============================================================
 -- FACTORYOS AI — DROP BACKUP-ERA PERMISSIVE POLICIES
--- The live DB was restored from an older Lovable backup which left
+-- The live DB was restored from an older schema backup which left
 -- generic permissive policies (named <table>_insert/_update/_delete/
 -- _select_scoped with `NOT is_auditor()` or `in_company()` checks)
 -- in place. RLS ORs all policies for a command together, so these

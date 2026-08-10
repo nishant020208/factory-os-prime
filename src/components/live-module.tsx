@@ -2,21 +2,31 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  Download, Loader2, Plus, RefreshCw, Search, Trash2, Sparkles,
-} from "lucide-react";
+import { Download, Loader2, Plus, RefreshCw, Search, Trash2, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { primaryRole } from "@/lib/route-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { PageHeader, Panel, Kpi, StatusBadge, EmptyState } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import type { ColumnDef, ModuleConfig } from "@/lib/module-registry";
 import type { FieldDef } from "@/lib/module-fields";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { notifyOnCreate } from "@/lib/module-notifications";
 
@@ -24,8 +34,9 @@ type Row = Record<string, unknown> & { id: string; company_id?: string };
 
 function fmt(kind: ColumnDef["kind"], v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
-  if (kind === "currency") return `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-  if (kind === "number")   return String(Number(v).toLocaleString());
+  if (kind === "currency")
+    return `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  if (kind === "number") return String(Number(v).toLocaleString());
   if (kind === "date") {
     const d = new Date(String(v));
     return isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
@@ -39,20 +50,32 @@ function fmt(kind: ColumnDef["kind"], v: unknown): string {
 }
 
 function toCsv(rows: Row[], cols: ColumnDef[]) {
-  const head = cols.map(c => `"${c.label}"`).join(",");
-  const body = rows.map(r => cols.map(c => {
-    const v = r[c.key];
-    const s = v == null ? "" : String(v).replace(/"/g, '""');
-    return `"${s}"`;
-  }).join(",")).join("\n");
+  const head = cols.map((c) => `"${c.label}"`).join(",");
+  const body = rows
+    .map((r) =>
+      cols
+        .map((c) => {
+          const v = r[c.key];
+          const s = v == null ? "" : String(v).replace(/"/g, '""');
+          return `"${s}"`;
+        })
+        .join(","),
+    )
+    .join("\n");
   return head + "\n" + body;
 }
 
 // Roles that are allowed to create/delete records via LiveModule
 const CREATE_ALLOWED_ROLES = [
-  "company_admin", "plant_admin", "production_manager",
-  "warehouse_manager", "procurement_manager", "quality_inspector",
-  "maintenance_engineer", "finance_manager", "hr_manager",
+  "company_admin",
+  "plant_admin",
+  "production_manager",
+  "warehouse_manager",
+  "procurement_manager",
+  "quality_inspector",
+  "maintenance_engineer",
+  "finance_manager",
+  "hr_manager",
   "customer_portal", // limited scope
 ];
 
@@ -61,8 +84,16 @@ const READ_ONLY_ROLES = ["auditor", "supplier_portal"];
 
 export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCreate?: boolean }) {
   const {
-    table, title, eyebrow, sub, columns, filter, orderBy,
-    createDefaults, titleField, singular = "Record",
+    table,
+    title,
+    eyebrow,
+    sub,
+    columns,
+    filter,
+    orderBy,
+    createDefaults,
+    titleField,
+    singular = "Record",
   } = config;
 
   const { companyId, roles, profile } = useAuth();
@@ -77,7 +108,6 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-
   const queryKey = useMemo(
     () => [table, companyId, filter ?? null, orderBy ?? null] as const,
     [table, companyId, filter, orderBy],
@@ -88,12 +118,18 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
     enabled: !!companyId,
     queryFn: async () => {
       try {
-        let query = supabase.from(table as never).select("*").limit(500);
+        let query = supabase
+          .from(table as never)
+          .select("*")
+          .limit(500);
         if (filter) {
-          for (const [k, v] of Object.entries(filter)) query = (query as never as ReturnType<typeof query.eq>).eq(k, v);
+          for (const [k, v] of Object.entries(filter))
+            query = (query as never as ReturnType<typeof query.eq>).eq(k, v);
         }
         if (orderBy) {
-          query = (query as never as ReturnType<typeof query.order>).order(orderBy.column, { ascending: orderBy.ascending ?? false });
+          query = (query as never as ReturnType<typeof query.order>).order(orderBy.column, {
+            ascending: orderBy.ascending ?? false,
+          });
         }
         const { data, error } = await query;
         if (error) {
@@ -133,7 +169,11 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
     return () => {
       cancelled = true;
       if (channel) {
-        try { void supabase.removeChannel(channel); } catch { /* ignore */ }
+        try {
+          void supabase.removeChannel(channel);
+        } catch {
+          /* ignore */
+        }
       }
     };
   }, [table, companyId, qc]);
@@ -142,21 +182,23 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
   const filtered = useMemo(() => {
     if (!q.trim()) return rows;
     const needle = q.toLowerCase();
-    return rows.filter(r =>
-      Object.values(r).some(v => v != null && String(v).toLowerCase().includes(needle))
+    return rows.filter((r) =>
+      Object.values(r).some((v) => v != null && String(v).toLowerCase().includes(needle)),
     );
   }, [rows, q]);
 
   const kpis = useMemo(() => {
     const total = rows.length;
     const statuses = rows
-      .map(r => (r["status"] ?? r["result"]) as string | undefined)
+      .map((r) => (r["status"] ?? r["result"]) as string | undefined)
       .filter(Boolean) as string[];
     const grouped = statuses.reduce<Record<string, number>>((acc, s) => {
       acc[s] = (acc[s] ?? 0) + 1;
       return acc;
     }, {});
-    const top = Object.entries(grouped).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const top = Object.entries(grouped)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
     return { total, top };
   }, [rows]);
 
@@ -174,14 +216,39 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
         placeholder: `Enter ${titleField.replace(/_/g, " ")}`,
       });
     }
-    if (columns.some(c => c.key === "status")) {
-      fields.push({ key: "status", label: "Status", type: "select", required: true, defaultValue: "pending",
-        options: ["pending","draft","active","in_progress","completed","approved","rejected"]
-          .map(v => ({ value: v, label: v.replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase()) })) });
+    if (columns.some((c) => c.key === "status")) {
+      fields.push({
+        key: "status",
+        label: "Status",
+        type: "select",
+        required: true,
+        defaultValue: "pending",
+        options: [
+          "pending",
+          "draft",
+          "active",
+          "in_progress",
+          "completed",
+          "approved",
+          "rejected",
+        ].map((v) => ({
+          value: v,
+          label: v.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        })),
+      });
     }
-    if (columns.some(c => c.key === "priority")) {
-      fields.push({ key: "priority", label: "Priority", type: "select", required: true, defaultValue: "medium",
-        options: ["low","medium","high","critical"].map(v => ({ value: v, label: v.replace(/\b\w/g, c => c.toUpperCase()) })) });
+    if (columns.some((c) => c.key === "priority")) {
+      fields.push({
+        key: "priority",
+        label: "Priority",
+        type: "select",
+        required: true,
+        defaultValue: "medium",
+        options: ["low", "medium", "high", "critical"].map((v) => ({
+          value: v,
+          label: v.replace(/\b\w/g, (c) => c.toUpperCase()),
+        })),
+      });
     }
     return fields;
   }, [config.fields, columns, titleField]);
@@ -195,12 +262,15 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
   }
 
   async function handleCreate() {
-    if (!companyId) { toast.error("No company context — cannot save."); return; }
+    if (!companyId) {
+      toast.error("No company context — cannot save.");
+      return;
+    }
 
     // Client-side required validation (DB not-null + RLS enforce it server-side too)
     const missing = formFields
-      .filter(f => f.required && !String(formData[f.key] ?? "").trim())
-      .map(f => f.label);
+      .filter((f) => f.required && !String(formData[f.key] ?? "").trim())
+      .map((f) => f.label);
     if (missing.length) {
       setFormError(`Required: ${missing.join(", ")}`);
       return;
@@ -218,18 +288,30 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
     }
 
     const label = titleField ? String(row[titleField] ?? "") : "";
-    if (columns.some(c => c.key === "title") && !row["title"]) row["title"] = label || `${singular} ${nowNum}`;
-    if (columns.some(c => c.key === "subject") && !row["subject"]) row["subject"] = label || `${singular} ${nowNum}`;
+    if (columns.some((c) => c.key === "title") && !row["title"])
+      row["title"] = label || `${singular} ${nowNum}`;
+    if (columns.some((c) => c.key === "subject") && !row["subject"])
+      row["subject"] = label || `${singular} ${nowNum}`;
 
     // Auto-fill document reference numbers where the table carries one
     const refCols: Record<string, string> = {
-      so_number: "SO", po_number: "PO", wo_number: "WO", invoice_number: "INV",
-      payment_number: "PAY", shipment_number: "SHP", ticket_number: "TKT",
-      order_number: "ORD", inspection_number: "QC", employee_code: "EMP",
-      pr_number: "PR", rfq_number: "RFQ", grn_number: "GRN", certificate_number: "QCERT",
+      so_number: "SO",
+      po_number: "PO",
+      wo_number: "WO",
+      invoice_number: "INV",
+      payment_number: "PAY",
+      shipment_number: "SHP",
+      ticket_number: "TKT",
+      order_number: "ORD",
+      inspection_number: "QC",
+      employee_code: "EMP",
+      pr_number: "PR",
+      rfq_number: "RFQ",
+      grn_number: "GRN",
+      certificate_number: "QCERT",
     };
     for (const [k, prefix] of Object.entries(refCols)) {
-      if (columns.some(c => c.key === k) && !(k in row)) row[k] = `${prefix}-${nowNum}`;
+      if (columns.some((c) => c.key === k) && !(k in row)) row[k] = `${prefix}-${nowNum}`;
     }
 
     const { data: created, error } = (await supabase
@@ -238,7 +320,11 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
       .select("*")
       .maybeSingle()) as any;
     setSaving(false);
-    if (error) { setFormError(error.message); toast.error(error.message); return; }
+    if (error) {
+      setFormError(error.message);
+      toast.error(error.message);
+      return;
+    }
     toast.success(`${singular} created`);
     setShowNew(false);
     // Cross-module notification triggers (fail-soft, never blocks the write)
@@ -251,11 +337,16 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
     void refetch();
   }
 
-
   async function handleDelete(id: string) {
     if (!confirm(`Delete this ${singular.toLowerCase()}?`)) return;
-    const { error } = await supabase.from(table as never).delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
+    const { error } = await supabase
+      .from(table as never)
+      .delete()
+      .eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success("Deleted");
     void refetch();
   }
@@ -265,7 +356,9 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `${table}.csv`; a.click();
+    a.href = url;
+    a.download = `${table}.csv`;
+    a.click();
     URL.revokeObjectURL(url);
     toast.success("Exported to CSV");
   }
@@ -273,9 +366,13 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
   function handleAiSummary() {
     const parts = [
       `${kpis.total} ${title.toLowerCase()} in view.`,
-      kpis.top.length ? "Top statuses: " + kpis.top.map(([s, n]) => `${s} (${n})`).join(", ") + "." : "",
+      kpis.top.length
+        ? "Top statuses: " + kpis.top.map(([s, n]) => `${s} (${n})`).join(", ") + "."
+        : "",
       "Copilot is monitoring realtime updates from related modules.",
-    ].filter(Boolean).join(" ");
+    ]
+      .filter(Boolean)
+      .join(" ");
     toast(parts, { icon: "✨", duration: 6000 });
   }
 
@@ -289,19 +386,39 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <ModuleCopilot moduleName={title.toLowerCase().replace(/\s+/g, "-")} />
-            <Button variant="outline" size="sm" className="hidden sm:inline-flex" onClick={handleAiSummary}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden sm:inline-flex"
+              onClick={handleAiSummary}
+            >
               <Sparkles className="h-4 w-4 mr-1" /> AI summary
             </Button>
             <Button variant="outline" size="sm" onClick={handleExport}>
               <Download className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Export</span>
             </Button>
-            <Button variant="outline" size="sm" className="hidden md:inline-flex" onClick={() => refetch()} disabled={isFetching}>
-              {isFetching ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden md:inline-flex"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              {isFetching ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-1" />
+              )}
               <span className="hidden lg:inline">Refresh</span>
             </Button>
             {userCanCreate && !isReadOnly && (
-              <Button size="sm" className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={openNew}>
-                <Plus className="h-4 w-4 mr-1" />New
+              <Button
+                size="sm"
+                className="bg-[image:var(--gradient-primary)] shadow-glow"
+                onClick={openNew}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                New
               </Button>
             )}
           </div>
@@ -315,13 +432,13 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
             <DialogTitle>New {singular}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {formFields.map(field => (
+            {formFields.map((field) => (
               <FieldControl
                 key={field.key}
                 field={field}
                 value={formData[field.key] ?? ""}
                 companyId={companyId ?? null}
-                onChange={(v) => setFormData(d => ({ ...d, [field.key]: v }))}
+                onChange={(v) => setFormData((d) => ({ ...d, [field.key]: v }))}
               />
             ))}
             {formFields.length === 0 && (
@@ -329,7 +446,7 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
                 <Label className="text-xs text-muted-foreground">Name / Reference</Label>
                 <Input
                   value={formData["_name"] ?? ""}
-                  onChange={e => setFormData(d => ({ ...d, _name: e.target.value }))}
+                  onChange={(e) => setFormData((d) => ({ ...d, _name: e.target.value }))}
                   placeholder={`Enter ${singular.toLowerCase()} name`}
                   className="h-9"
                 />
@@ -342,19 +459,31 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNew(false)} disabled={saving}>Cancel</Button>
-            <Button className="bg-[image:var(--gradient-primary)]" onClick={handleCreate} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plus className="h-4 w-4 mr-1.5" />}
+            <Button variant="outline" onClick={() => setShowNew(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-[image:var(--gradient-primary)]"
+              onClick={handleCreate}
+              disabled={saving}
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4 mr-1.5" />
+              )}
               Create {singular}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
         <Kpi label={`Total ${title.toLowerCase()}`} value={kpis.total.toLocaleString()} />
-        <Kpi label="Top status" value={kpis.top[0] ? `${kpis.top[0][0]} (${kpis.top[0][1]})` : "—"} />
+        <Kpi
+          label="Top status"
+          value={kpis.top[0] ? `${kpis.top[0][0]} (${kpis.top[0][1]})` : "—"}
+        />
         <Kpi label="Company scope" value="RLS on" />
       </div>
 
@@ -379,15 +508,21 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
         ) : filtered.length === 0 ? (
           <EmptyState
             title={`No ${title.toLowerCase()} yet`}
-            sub={userCanCreate ? `Click "New" to create your first ${singular.toLowerCase()}. Records are scoped to your company via RLS.` : `Records will appear here as they are created by authorized roles.`}
+            sub={
+              userCanCreate
+                ? `Click "New" to create your first ${singular.toLowerCase()}. Records are scoped to your company via RLS.`
+                : `Records will appear here as they are created by authorized roles.`
+            }
           />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border/60">
-                  {columns.map(c => (
-                    <th key={c.key} className="px-3 py-2 font-medium">{c.label}</th>
+                  {columns.map((c) => (
+                    <th key={c.key} className="px-3 py-2 font-medium">
+                      {c.label}
+                    </th>
                   ))}
                   <th className="px-3 py-2 font-medium text-right">Actions</th>
                 </tr>
@@ -401,13 +536,19 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
                     transition={{ delay: Math.min(i * 0.015, 0.4) }}
                     className="border-b border-border/40 hover:bg-muted/30"
                   >
-                    {columns.map(c => (
+                    {columns.map((c) => (
                       <td key={c.key} className="px-3 py-2.5 align-middle whitespace-nowrap">
-                        {c.kind === "status" || c.kind === "badge"
-                          ? <StatusBadge status={fmt("text", r[c.key])} />
-                          : <span className={c.kind === "currency" || c.kind === "number" ? "tabular-nums" : ""}>
-                              {fmt(c.kind, r[c.key])}
-                            </span>}
+                        {c.kind === "status" || c.kind === "badge" ? (
+                          <StatusBadge status={fmt("text", r[c.key])} />
+                        ) : (
+                          <span
+                            className={
+                              c.kind === "currency" || c.kind === "number" ? "tabular-nums" : ""
+                            }
+                          >
+                            {fmt(c.kind, r[c.key])}
+                          </span>
+                        )}
                       </td>
                     ))}
                     <td className="px-3 py-2.5 text-right">
@@ -436,7 +577,10 @@ export function LiveModule({ config, canCreate }: { config: ModuleConfig; canCre
    table, scoped to the caller's company_id (RLS enforces this server-side
    as well). No hardcoded entity lists.                                    */
 function FieldControl({
-  field, value, onChange, companyId,
+  field,
+  value,
+  onChange,
+  companyId,
 }: {
   field: FieldDef;
   value: string;
@@ -461,7 +605,7 @@ function FieldControl({
       if (ref.filterIn) query = query.in(ref.filterIn.column, ref.filterIn.values);
       const { data, error } = await query.order(ref.labelColumn, { ascending: true });
       if (error) return [];
-      return ((data ?? []) as Record<string, unknown>[]).map(r => ({
+      return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
         value: String(r[valueCol] ?? ""),
         label: String(r[ref.labelColumn] ?? "Untitled"),
       }));
@@ -470,7 +614,8 @@ function FieldControl({
 
   const label = (
     <Label className="text-xs text-muted-foreground">
-      {field.label}{field.required && <span className="text-destructive ml-0.5">*</span>}
+      {field.label}
+      {field.required && <span className="text-destructive ml-0.5">*</span>}
     </Label>
   );
 
@@ -482,15 +627,21 @@ function FieldControl({
         {label}
         <Select value={value} onValueChange={onChange} disabled={empty || refLoading}>
           <SelectTrigger className="h-9">
-            <SelectValue placeholder={
-              refLoading ? "Loading…"
-                : empty ? `No ${field.label.toLowerCase()} records yet`
-                : `Select ${field.label.toLowerCase()}`
-            } />
+            <SelectValue
+              placeholder={
+                refLoading
+                  ? "Loading…"
+                  : empty
+                    ? `No ${field.label.toLowerCase()} records yet`
+                    : `Select ${field.label.toLowerCase()}`
+              }
+            />
           </SelectTrigger>
           <SelectContent className="max-h-64">
-            {options.map(o => (
-              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            {options.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>

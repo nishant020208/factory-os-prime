@@ -44,8 +44,14 @@ interface NotificationInput {
  * Root admin actions are EXCLUDED from audit logs by passing null action.
  */
 export async function createNotification({
-  companyId, userId, title, body, severity = "info",
-  entity, entityId, action,
+  companyId,
+  userId,
+  title,
+  body,
+  severity = "info",
+  entity,
+  entityId,
+  action,
 }: NotificationInput) {
   try {
     await supabase.from("notifications").insert({
@@ -123,7 +129,14 @@ export async function updateSalesOrderStatus(
   if (error) throw error;
 
   // Record the transition
-  await recordTransition(companyId, orderId, "sales_order", currentStatus || null, newStatus, changedBy);
+  await recordTransition(
+    companyId,
+    orderId,
+    "sales_order",
+    currentStatus || null,
+    newStatus,
+    changedBy,
+  );
 }
 
 /**

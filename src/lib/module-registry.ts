@@ -32,24 +32,27 @@ export interface ModuleConfig {
   fields?: FieldDef[];
 }
 
-
 const COL = {
-  id:        { key: "id",              label: "ID",           kind: "text" as const },
-  createdAt: { key: "created_at",      label: "Created",      kind: "datetime" as const },
-  status:    { key: "status",          label: "Status",       kind: "status" as const },
-  priority:  { key: "priority",        label: "Priority",     kind: "badge" as const },
+  id: { key: "id", label: "ID", kind: "text" as const },
+  createdAt: { key: "created_at", label: "Created", kind: "datetime" as const },
+  status: { key: "status", label: "Status", kind: "status" as const },
+  priority: { key: "priority", label: "Priority", kind: "badge" as const },
 };
 
 export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
   // ── Sales / customer lifecycle ──────────────────────────────
   "/orders": {
-    table: "sales_orders", title: "Sales Orders", eyebrow: "Sales",
+    table: "sales_orders",
+    title: "Sales Orders",
+    eyebrow: "Sales",
     sub: "Customer purchase orders driving production, dispatch and invoicing.",
-    singular: "Sales Order", titleField: "so_number",
+    singular: "Sales Order",
+    titleField: "so_number",
     columns: [
       { key: "so_number", label: "SO #" },
       { key: "customer_id", label: "Customer", kind: "text" },
-      COL.status, COL.priority,
+      COL.status,
+      COL.priority,
       { key: "total_amount", label: "Total", kind: "currency" },
       { key: "order_date", label: "Ordered", kind: "date" },
       { key: "due_date", label: "Due", kind: "date" },
@@ -59,11 +62,16 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { status: "draft", priority: "medium", total_amount: 0, progress: 0 },
   },
   "/sales": {
-    table: "sales_orders", title: "Sales", eyebrow: "Sales",
+    table: "sales_orders",
+    title: "Sales",
+    eyebrow: "Sales",
     sub: "All sales orders across customers.",
-    singular: "Sales Order", titleField: "so_number",
+    singular: "Sales Order",
+    titleField: "so_number",
     columns: [
-      { key: "so_number", label: "SO #" }, COL.status, COL.priority,
+      { key: "so_number", label: "SO #" },
+      COL.status,
+      COL.priority,
       { key: "total_amount", label: "Amount", kind: "currency" },
       { key: "order_date", label: "Ordered", kind: "date" },
       { key: "progress", label: "%", kind: "number" },
@@ -73,12 +81,16 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
   },
 
   "/customer-invoices": {
-    table: "invoices", title: "Invoices", eyebrow: "Customer",
+    table: "invoices",
+    title: "Invoices",
+    eyebrow: "Customer",
     sub: "Invoices raised against your orders.",
-    singular: "Invoice", titleField: "invoice_number",
+    singular: "Invoice",
+    titleField: "invoice_number",
     columns: [
       { key: "invoice_number", label: "Invoice #" },
-      COL.status, { key: "total_amount", label: "Amount", kind: "currency" },
+      COL.status,
+      { key: "total_amount", label: "Amount", kind: "currency" },
       { key: "issue_date", label: "Issued", kind: "date" },
       { key: "due_date", label: "Due", kind: "date" },
       { key: "paid_date", label: "Paid", kind: "date" },
@@ -86,11 +98,15 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "issue_date", ascending: false },
   },
   "/invoices": {
-    table: "invoices", title: "Invoices", eyebrow: "Finance",
+    table: "invoices",
+    title: "Invoices",
+    eyebrow: "Finance",
     sub: "All customer invoices — AR aging, payments and dunning.",
-    singular: "Invoice", titleField: "invoice_number",
+    singular: "Invoice",
+    titleField: "invoice_number",
     columns: [
-      { key: "invoice_number", label: "Invoice #" }, COL.status,
+      { key: "invoice_number", label: "Invoice #" },
+      COL.status,
       { key: "total_amount", label: "Amount", kind: "currency" },
       { key: "tax_amount", label: "Tax", kind: "currency" },
       { key: "issue_date", label: "Issued", kind: "date" },
@@ -100,11 +116,15 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { status: "draft", total_amount: 0 },
   },
   "/payments": {
-    table: "payments", title: "Payments", eyebrow: "Finance",
+    table: "payments",
+    title: "Payments",
+    eyebrow: "Finance",
     sub: "Incoming customer payments applied against invoices.",
-    singular: "Payment", titleField: "payment_number",
+    singular: "Payment",
+    titleField: "payment_number",
     columns: [
-      { key: "payment_number", label: "Payment #" }, COL.status,
+      { key: "payment_number", label: "Payment #" },
+      COL.status,
       { key: "amount", label: "Amount", kind: "currency" },
       { key: "method", label: "Method" },
       { key: "reference", label: "Reference" },
@@ -115,11 +135,15 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
   },
 
   "/shipments": {
-    table: "shipments", title: "Shipments", eyebrow: "Logistics",
+    table: "shipments",
+    title: "Shipments",
+    eyebrow: "Logistics",
     sub: "Outbound shipments to customers — carrier, tracking and delivery status.",
-    singular: "Shipment", titleField: "shipment_number",
+    singular: "Shipment",
+    titleField: "shipment_number",
     columns: [
-      { key: "shipment_number", label: "Shipment #" }, COL.status,
+      { key: "shipment_number", label: "Shipment #" },
+      COL.status,
       { key: "carrier", label: "Carrier" },
       { key: "tracking_number", label: "Tracking" },
       { key: "destination", label: "Destination" },
@@ -130,11 +154,15 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { status: "pending" },
   },
   "/deliveries": {
-    table: "shipments", title: "Deliveries", eyebrow: "Supplier",
+    table: "shipments",
+    title: "Deliveries",
+    eyebrow: "Supplier",
     sub: "Deliveries you've made to the buyer.",
-    singular: "Delivery", titleField: "shipment_number",
+    singular: "Delivery",
+    titleField: "shipment_number",
     columns: [
-      { key: "shipment_number", label: "Delivery #" }, COL.status,
+      { key: "shipment_number", label: "Delivery #" },
+      COL.status,
       { key: "carrier", label: "Carrier" },
       { key: "destination", label: "Destination" },
       { key: "delivered_date", label: "Delivered", kind: "date" },
@@ -142,11 +170,15 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "created_at", ascending: false },
   },
   "/dispatch": {
-    table: "shipments", title: "Dispatch", eyebrow: "Warehouse",
+    table: "shipments",
+    title: "Dispatch",
+    eyebrow: "Warehouse",
     sub: "Prepare and dispatch finished goods to customers.",
-    singular: "Dispatch", titleField: "shipment_number",
+    singular: "Dispatch",
+    titleField: "shipment_number",
     columns: [
-      { key: "shipment_number", label: "Dispatch #" }, COL.status,
+      { key: "shipment_number", label: "Dispatch #" },
+      COL.status,
       { key: "destination", label: "Destination" },
       { key: "carrier", label: "Carrier" },
       { key: "shipped_date", label: "Shipped", kind: "date" },
@@ -156,12 +188,17 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
   },
 
   "/support": {
-    table: "support_tickets", title: "Support", eyebrow: "Customer",
+    table: "support_tickets",
+    title: "Support",
+    eyebrow: "Customer",
     sub: "Raise and track support tickets.",
-    singular: "Ticket", titleField: "subject",
+    singular: "Ticket",
+    titleField: "subject",
     columns: [
       { key: "ticket_number", label: "Ticket #" },
-      { key: "subject", label: "Subject" }, COL.status, COL.priority,
+      { key: "subject", label: "Subject" },
+      COL.status,
+      COL.priority,
       { key: "created_at", label: "Opened", kind: "datetime" },
       { key: "resolved_at", label: "Resolved", kind: "datetime" },
     ],
@@ -169,12 +206,17 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { status: "open", priority: "medium" },
   },
   "/issue-reporting": {
-    table: "support_tickets", title: "Report Issue", eyebrow: "Operator",
+    table: "support_tickets",
+    title: "Report Issue",
+    eyebrow: "Operator",
     sub: "Report shop-floor issues to plant management.",
-    singular: "Issue", titleField: "subject",
+    singular: "Issue",
+    titleField: "subject",
     columns: [
       { key: "ticket_number", label: "Issue #" },
-      { key: "subject", label: "Subject" }, COL.status, COL.priority,
+      { key: "subject", label: "Subject" },
+      COL.status,
+      COL.priority,
       { key: "created_at", label: "Reported", kind: "datetime" },
     ],
     orderBy: { column: "created_at", ascending: false },
@@ -182,26 +224,34 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
   },
 
   "/documents": {
-    table: "documents", title: "Documents", eyebrow: "Knowledge",
+    table: "documents",
+    title: "Documents",
+    eyebrow: "Knowledge",
     sub: "SOPs, manuals, policies, delivery notes and shared documents.",
-    singular: "Document", titleField: "title",
+    singular: "Document",
+    titleField: "title",
     columns: [
       { key: "title", label: "Title" },
       { key: "category", label: "Category" },
       { key: "file_type", label: "Type" },
-      { key: "version", label: "Version" }, COL.status,
+      { key: "version", label: "Version" },
+      COL.status,
       { key: "created_at", label: "Uploaded", kind: "date" },
     ],
     orderBy: { column: "created_at", ascending: false },
     createDefaults: { category: "general", file_type: "pdf", version: "v1", status: "published" },
   },
   "/knowledge": {
-    table: "knowledge_articles", title: "Knowledge Center", eyebrow: "AI Brain",
+    table: "knowledge_articles",
+    title: "Knowledge Center",
+    eyebrow: "AI Brain",
     sub: "Company knowledge base — SOPs, procedures and best practices.",
-    singular: "Article", titleField: "title",
+    singular: "Article",
+    titleField: "title",
     columns: [
       { key: "title", label: "Title" },
-      { key: "category", label: "Category" }, COL.status,
+      { key: "category", label: "Category" },
+      COL.status,
       { key: "views", label: "Views", kind: "number" },
       { key: "updated_at", label: "Updated", kind: "date" },
     ],
@@ -209,12 +259,15 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { category: "general", status: "published", views: 0 },
   },
   "/training": {
-    table: "trainings", title: "Training", eyebrow: "HR",
+    table: "trainings",
+    title: "Training",
+    eyebrow: "HR",
     sub: "Training records and certifications for the workforce.",
     singular: "Training Record",
     columns: [
       { key: "course_name", label: "Course" },
-      { key: "employee_id", label: "Employee" }, COL.status,
+      { key: "employee_id", label: "Employee" },
+      COL.status,
       { key: "completion_date", label: "Completed", kind: "date" },
       { key: "created_at", label: "Added", kind: "date" },
     ],
@@ -222,14 +275,18 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { status: "assigned" },
   },
 
-
   // ── Tasks, approvals, calendar ──────────────────────────────
   "/tasks": {
-    table: "tasks", title: "My Tasks", eyebrow: "Workflow",
+    table: "tasks",
+    title: "My Tasks",
+    eyebrow: "Workflow",
     sub: "Daily tasks and completion status.",
-    singular: "Task", titleField: "title",
+    singular: "Task",
+    titleField: "title",
     columns: [
-      { key: "title", label: "Task" }, COL.status, COL.priority,
+      { key: "title", label: "Task" },
+      COL.status,
+      COL.priority,
       { key: "due_date", label: "Due", kind: "date" },
       { key: "entity", label: "Linked to" },
     ],
@@ -237,12 +294,15 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { status: "todo", priority: "medium" },
   },
   "/schedules": {
-    table: "maintenance_schedules", title: "PM Schedules", eyebrow: "Maintenance",
+    table: "maintenance_schedules",
+    title: "PM Schedules",
+    eyebrow: "Maintenance",
     sub: "Preventive maintenance schedules per machine.",
     singular: "PM Schedule",
     columns: [
       { key: "machine_id", label: "Machine" },
-      { key: "recurrence", label: "Recurrence" }, COL.status,
+      { key: "recurrence", label: "Recurrence" },
+      COL.status,
       { key: "next_due", label: "Next Due", kind: "date" },
       { key: "last_done", label: "Last Done", kind: "date" },
     ],
@@ -250,12 +310,15 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { status: "scheduled", recurrence: "monthly" },
   },
   "/leaves": {
-    table: "leaves", title: "Leaves", eyebrow: "HR",
+    table: "leaves",
+    title: "Leaves",
+    eyebrow: "HR",
     sub: "Employee leave requests and approvals.",
     singular: "Leave Request",
     columns: [
       { key: "employee_id", label: "Employee" },
-      { key: "leave_type", label: "Type" }, COL.status,
+      { key: "leave_type", label: "Type" },
+      COL.status,
       { key: "start_date", label: "From", kind: "date" },
       { key: "end_date", label: "To", kind: "date" },
     ],
@@ -263,52 +326,65 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { status: "pending", leave_type: "casual" },
   },
 
-
   // ── HR ──────────────────────────────────────────────────────
   "/attendance": {
-    table: "attendance", title: "Attendance", eyebrow: "HR",
+    table: "attendance",
+    title: "Attendance",
+    eyebrow: "HR",
     sub: "Daily attendance across employees.",
-    singular: "Record", titleField: "employee_id",
+    singular: "Record",
+    titleField: "employee_id",
     columns: [
       { key: "employee_id", label: "Employee" },
       { key: "date", label: "Date", kind: "date" },
       { key: "check_in", label: "In", kind: "datetime" },
       { key: "check_out", label: "Out", kind: "datetime" },
-      { key: "hours_worked", label: "Hours", kind: "number" }, COL.status,
+      { key: "hours_worked", label: "Hours", kind: "number" },
+      COL.status,
     ],
     orderBy: { column: "date", ascending: false },
     createDefaults: { status: "present" },
   },
   "/payroll": {
-    table: "payroll", title: "Payroll", eyebrow: "HR / Finance",
+    table: "payroll",
+    title: "Payroll",
+    eyebrow: "HR / Finance",
     sub: "Payroll runs and disbursements.",
-    singular: "Payroll Item", titleField: "period",
+    singular: "Payroll Item",
+    titleField: "period",
     columns: [
       { key: "employee_id", label: "Employee" },
       { key: "period", label: "Period" },
       { key: "gross_amount", label: "Gross", kind: "currency" },
       { key: "deductions", label: "Deductions", kind: "currency" },
-      { key: "net_amount", label: "Net", kind: "currency" }, COL.status,
+      { key: "net_amount", label: "Net", kind: "currency" },
+      COL.status,
       { key: "paid_at", label: "Paid", kind: "date" },
     ],
     orderBy: { column: "period", ascending: false },
     createDefaults: { status: "pending" },
   },
   "/recruitment": {
-    table: "job_openings", title: "Recruitment", eyebrow: "HR",
+    table: "job_openings",
+    title: "Recruitment",
+    eyebrow: "HR",
     sub: "Open positions and hiring pipeline.",
-    singular: "Job Opening", titleField: "title",
+    singular: "Job Opening",
+    titleField: "title",
     columns: [
       { key: "title", label: "Title" },
       { key: "department_id", label: "Department" },
-      { key: "openings", label: "Openings", kind: "number" }, COL.status,
+      { key: "openings", label: "Openings", kind: "number" },
+      COL.status,
       { key: "created_at", label: "Posted", kind: "date" },
     ],
     orderBy: { column: "created_at", ascending: false },
     createDefaults: { status: "open", openings: 1 },
   },
   "/performance": {
-    table: "performance_reviews", title: "Performance", eyebrow: "HR",
+    table: "performance_reviews",
+    title: "Performance",
+    eyebrow: "HR",
     sub: "Performance reviews and ratings.",
     singular: "Review",
     columns: [
@@ -321,15 +397,17 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "created_at", ascending: false },
   },
 
-
   // ── Production execution ────────────────────────────────────
   "/bom": {
-    table: "bom", title: "Bill of Materials", eyebrow: "Engineering",
+    table: "bom",
+    title: "Bill of Materials",
+    eyebrow: "Engineering",
     sub: "BOMs — components and quantities per finished product.",
     singular: "BOM",
     columns: [
       { key: "product_id", label: "Product" },
-      { key: "version", label: "Version" }, COL.status,
+      { key: "version", label: "Version" },
+      COL.status,
       { key: "notes", label: "Notes" },
       { key: "updated_at", label: "Updated", kind: "date" },
     ],
@@ -337,12 +415,16 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { version: "v1", status: "active" },
   },
   "/work-orders": {
-    table: "work_orders", title: "Work Orders", eyebrow: "Production",
+    table: "work_orders",
+    title: "Work Orders",
+    eyebrow: "Production",
     sub: "Machine-level work orders under each production order.",
-    singular: "Work Order", titleField: "wo_number",
+    singular: "Work Order",
+    titleField: "wo_number",
     columns: [
       { key: "wo_number", label: "WO #" },
-      { key: "operation", label: "Operation" }, COL.status,
+      { key: "operation", label: "Operation" },
+      COL.status,
       { key: "quantity", label: "Qty", kind: "number" },
       { key: "start_time", label: "Start", kind: "datetime" },
       { key: "end_time", label: "End", kind: "datetime" },
@@ -351,23 +433,32 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { status: "pending", quantity: 0 },
   },
   "/assigned-work-orders": {
-    table: "work_orders", title: "My Work Orders", eyebrow: "Operator",
+    table: "work_orders",
+    title: "My Work Orders",
+    eyebrow: "Operator",
     sub: "Work orders assigned to you.",
-    singular: "Work Order", titleField: "wo_number",
+    singular: "Work Order",
+    titleField: "wo_number",
     columns: [
       { key: "wo_number", label: "WO #" },
-      { key: "operation", label: "Operation" }, COL.status,
+      { key: "operation", label: "Operation" },
+      COL.status,
       { key: "quantity", label: "Qty", kind: "number" },
       { key: "start_time", label: "Start", kind: "datetime" },
     ],
     orderBy: { column: "start_time", ascending: false },
   },
   "/production-planning": {
-    table: "production_orders", title: "Production Planning", eyebrow: "Production",
+    table: "production_orders",
+    title: "Production Planning",
+    eyebrow: "Production",
     sub: "Plan production against capacity and demand.",
-    singular: "Plan", titleField: "order_number",
+    singular: "Plan",
+    titleField: "order_number",
     columns: [
-      { key: "order_number", label: "Order #" }, COL.status, COL.priority,
+      { key: "order_number", label: "Order #" },
+      COL.status,
+      COL.priority,
       { key: "quantity", label: "Qty", kind: "number" },
       { key: "start_date", label: "Start", kind: "date" },
       { key: "due_date", label: "Due", kind: "date" },
@@ -377,47 +468,61 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { status: "planned", priority: "medium", progress: 0 },
   },
   "/production-logs": {
-    table: "work_orders", title: "Production Logs", eyebrow: "Operator",
+    table: "work_orders",
+    title: "Production Logs",
+    eyebrow: "Operator",
     sub: "Shift-level production activity.",
     singular: "Log Entry",
     columns: [
       { key: "wo_number", label: "WO #" },
-      { key: "operation", label: "Operation" }, COL.status,
+      { key: "operation", label: "Operation" },
+      COL.status,
       { key: "start_time", label: "Start", kind: "datetime" },
       { key: "end_time", label: "End", kind: "datetime" },
     ],
     orderBy: { column: "start_time", ascending: false },
   },
   "/capacity-planning": {
-    table: "machines", title: "Capacity Planning", eyebrow: "Production",
+    table: "machines",
+    title: "Capacity Planning",
+    eyebrow: "Production",
     sub: "Machine capacity and utilization.",
     singular: "Machine",
     columns: [
       { key: "name", label: "Machine" },
       { key: "code", label: "Code" },
-      { key: "type", label: "Type" }, COL.status,
+      { key: "type", label: "Type" },
+      COL.status,
       { key: "utilization", label: "Utilization %", kind: "number" },
     ],
     orderBy: { column: "utilization", ascending: false },
   },
   "/scheduling": {
-    table: "production_orders", title: "Scheduling", eyebrow: "Production",
+    table: "production_orders",
+    title: "Scheduling",
+    eyebrow: "Production",
     sub: "Schedule and sequence production orders.",
-    singular: "Order", titleField: "order_number",
+    singular: "Order",
+    titleField: "order_number",
     columns: [
-      { key: "order_number", label: "Order #" }, COL.status, COL.priority,
+      { key: "order_number", label: "Order #" },
+      COL.status,
+      COL.priority,
       { key: "start_date", label: "Start", kind: "date" },
       { key: "due_date", label: "Due", kind: "date" },
     ],
     orderBy: { column: "start_date", ascending: true },
   },
   "/assigned-machines": {
-    table: "machines", title: "My Machines", eyebrow: "Operator",
+    table: "machines",
+    title: "My Machines",
+    eyebrow: "Operator",
     sub: "Machines assigned to your shift.",
     singular: "Machine",
     columns: [
       { key: "name", label: "Machine" },
-      { key: "code", label: "Code" }, COL.status,
+      { key: "code", label: "Code" },
+      COL.status,
       { key: "utilization", label: "Utilization %", kind: "number" },
     ],
     orderBy: { column: "name", ascending: true },
@@ -425,9 +530,12 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
 
   // ── Quality ─────────────────────────────────────────────────
   "/incoming-inspection": {
-    table: "quality_inspections", title: "Incoming Inspection", eyebrow: "Quality",
+    table: "quality_inspections",
+    title: "Incoming Inspection",
+    eyebrow: "Quality",
     sub: "Inspect raw material and component receipts.",
-    singular: "Inspection", titleField: "inspection_number",
+    singular: "Inspection",
+    titleField: "inspection_number",
     filter: { inspection_type: "incoming" },
     columns: [
       { key: "inspection_number", label: "Inspection #" },
@@ -440,9 +548,12 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { inspection_type: "incoming", result: "pending", defects_found: 0 },
   },
   "/in-process-inspection": {
-    table: "quality_inspections", title: "In-Process Inspection", eyebrow: "Quality",
+    table: "quality_inspections",
+    title: "In-Process Inspection",
+    eyebrow: "Quality",
     sub: "Mid-production quality checks.",
-    singular: "Inspection", titleField: "inspection_number",
+    singular: "Inspection",
+    titleField: "inspection_number",
     filter: { inspection_type: "in_process" },
     columns: [
       { key: "inspection_number", label: "Inspection #" },
@@ -455,9 +566,12 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { inspection_type: "in_process", result: "pending", defects_found: 0 },
   },
   "/final-inspection": {
-    table: "quality_inspections", title: "Final Inspection", eyebrow: "Quality",
+    table: "quality_inspections",
+    title: "Final Inspection",
+    eyebrow: "Quality",
     sub: "Pre-dispatch quality gate.",
-    singular: "Inspection", titleField: "inspection_number",
+    singular: "Inspection",
+    titleField: "inspection_number",
     filter: { inspection_type: "final" },
     columns: [
       { key: "inspection_number", label: "Inspection #" },
@@ -470,7 +584,9 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { inspection_type: "final", result: "pending", defects_found: 0 },
   },
   "/defects": {
-    table: "quality_inspections", title: "Defects", eyebrow: "Quality",
+    table: "quality_inspections",
+    title: "Defects",
+    eyebrow: "Quality",
     sub: "Defect records identified during inspection.",
     singular: "Defect Record",
     columns: [
@@ -483,12 +599,16 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "defects_found", ascending: false },
   },
   "/capa": {
-    table: "approvals", title: "CAPA", eyebrow: "Quality",
+    table: "approvals",
+    title: "CAPA",
+    eyebrow: "Quality",
     sub: "Corrective and preventive actions.",
-    singular: "CAPA", titleField: "notes",
+    singular: "CAPA",
+    titleField: "notes",
     filter: { entity: "capa" },
     columns: [
-      { key: "entity", label: "Type" }, COL.status,
+      { key: "entity", label: "Type" },
+      COL.status,
       { key: "notes", label: "Description" },
       { key: "created_at", label: "Raised", kind: "date" },
       { key: "resolved_at", label: "Resolved", kind: "date" },
@@ -499,7 +619,9 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
 
   // ── Maintenance / spares ────────────────────────────────────
   "/breakdowns": {
-    table: "machine_breakdowns", title: "Breakdowns", eyebrow: "Maintenance",
+    table: "machine_breakdowns",
+    title: "Breakdowns",
+    eyebrow: "Maintenance",
     sub: "Logged machine breakdowns and downtime.",
     singular: "Breakdown",
     columns: [
@@ -511,7 +633,9 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "downtime_start", ascending: false },
   },
   "/machine-history": {
-    table: "machine_status_log", title: "Machine History", eyebrow: "Maintenance",
+    table: "machine_status_log",
+    title: "Machine History",
+    eyebrow: "Maintenance",
     sub: "Chronological status history per machine.",
     singular: "Entry",
     columns: [
@@ -524,9 +648,12 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "created_at", ascending: false },
   },
   "/spare-parts": {
-    table: "spare_parts", title: "Spare Parts", eyebrow: "Maintenance",
+    table: "spare_parts",
+    title: "Spare Parts",
+    eyebrow: "Maintenance",
     sub: "Spare parts inventory tied to machines.",
-    singular: "Part", titleField: "name",
+    singular: "Part",
+    titleField: "name",
     columns: [
       { key: "part_code", label: "Code" },
       { key: "name", label: "Name" },
@@ -537,15 +664,17 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "name", ascending: true },
   },
 
-
   // ── Warehouse ops ───────────────────────────────────────────
   "/cycle-count": {
-    table: "cycle_counts", title: "Cycle Count", eyebrow: "Warehouse",
+    table: "cycle_counts",
+    title: "Cycle Count",
+    eyebrow: "Warehouse",
     sub: "Physical stock counts and variance reconciliation.",
     singular: "Count",
     columns: [
       { key: "warehouse_id", label: "Warehouse" },
-      { key: "count_date", label: "Count Date", kind: "date" }, COL.status,
+      { key: "count_date", label: "Count Date", kind: "date" },
+      COL.status,
       { key: "created_at", label: "Created", kind: "datetime" },
     ],
     orderBy: { column: "count_date", ascending: false },
@@ -553,7 +682,9 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
   },
 
   "/stock-movement": {
-    table: "inventory", title: "Stock Movement", eyebrow: "Warehouse",
+    table: "inventory",
+    title: "Stock Movement",
+    eyebrow: "Warehouse",
     sub: "Realtime inventory levels by warehouse.",
     singular: "Movement",
     columns: [
@@ -565,14 +696,17 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "updated_at", ascending: false },
   },
   "/transfers": {
-    table: "stock_transfers", title: "Transfers", eyebrow: "Warehouse",
+    table: "stock_transfers",
+    title: "Transfers",
+    eyebrow: "Warehouse",
     sub: "Inter-warehouse stock transfers — atomic decrement/increment.",
     singular: "Transfer",
     columns: [
       { key: "from_warehouse_id", label: "From" },
       { key: "to_warehouse_id", label: "To" },
       { key: "material_id", label: "Material" },
-      { key: "quantity", label: "Qty", kind: "number" }, COL.status,
+      { key: "quantity", label: "Qty", kind: "number" },
+      COL.status,
       { key: "created_at", label: "Moved", kind: "datetime" },
     ],
     orderBy: { column: "created_at", ascending: false },
@@ -580,7 +714,9 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
   },
 
   "/receiving": {
-    table: "goods_receipts", title: "Receiving", eyebrow: "Warehouse",
+    table: "goods_receipts",
+    title: "Receiving",
+    eyebrow: "Warehouse",
     sub: "Goods receipt notes booked against accepted purchase orders.",
     singular: "Goods Receipt",
     columns: [
@@ -593,7 +729,9 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "created_at", ascending: false },
   },
   "/goods-receipt": {
-    table: "goods_receipts", title: "Goods Receipt", eyebrow: "Procurement",
+    table: "goods_receipts",
+    title: "Goods Receipt",
+    eyebrow: "Procurement",
     sub: "Read-only mirror of warehouse receipts against your POs.",
     singular: "Receipt",
     columns: [
@@ -608,26 +746,33 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
 
   // ── Procurement ─────────────────────────────────────────────
   "/purchase-requests": {
-    table: "purchase_requisitions", title: "Purchase Requests", eyebrow: "Procurement",
+    table: "purchase_requisitions",
+    title: "Purchase Requests",
+    eyebrow: "Procurement",
     sub: "Requisitions raised from failed inventory checks, pending PO conversion.",
     singular: "Requisition",
     columns: [
       { key: "pr_number", label: "PR #" },
       { key: "material_id", label: "Material" },
-      { key: "quantity", label: "Qty", kind: "number" }, COL.status,
+      { key: "quantity", label: "Qty", kind: "number" },
+      COL.status,
       { key: "created_at", label: "Raised", kind: "date" },
     ],
     orderBy: { column: "created_at", ascending: false },
     createDefaults: { status: "pending" },
   },
   "/rfq": {
-    table: "rfqs", title: "RFQ", eyebrow: "Procurement",
+    table: "rfqs",
+    title: "RFQ",
+    eyebrow: "Procurement",
     sub: "Requests for quotation issued to suppliers.",
-    singular: "RFQ", titleField: "title",
+    singular: "RFQ",
+    titleField: "title",
     columns: [
       { key: "rfq_number", label: "RFQ #" },
       { key: "title", label: "Title" },
-      { key: "quantity", label: "Qty", kind: "number" }, COL.status,
+      { key: "quantity", label: "Qty", kind: "number" },
+      COL.status,
       { key: "response_deadline", label: "Deadline", kind: "date" },
     ],
     orderBy: { column: "created_at", ascending: false },
@@ -635,53 +780,69 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
   },
 
   "/vendor-comparison": {
-    table: "suppliers", title: "Vendor Comparison", eyebrow: "Procurement",
+    table: "suppliers",
+    title: "Vendor Comparison",
+    eyebrow: "Procurement",
     sub: "Compare suppliers by price, quality and lead time.",
     singular: "Supplier",
     columns: [
       { key: "name", label: "Supplier" },
-      { key: "rating", label: "Rating", kind: "number" }, COL.status,
+      { key: "rating", label: "Rating", kind: "number" },
+      COL.status,
     ],
     orderBy: { column: "rating", ascending: false },
   },
 
   // ── Supplier portal ─────────────────────────────────────────
   "/supplier-pos": {
-    table: "purchase_orders", title: "Purchase Orders", eyebrow: "Supplier",
+    table: "purchase_orders",
+    title: "Purchase Orders",
+    eyebrow: "Supplier",
     sub: "POs you have received from the buyer.",
-    singular: "PO", titleField: "po_number",
+    singular: "PO",
+    titleField: "po_number",
     columns: [
-      { key: "po_number", label: "PO #" }, COL.status,
+      { key: "po_number", label: "PO #" },
+      COL.status,
       { key: "total_amount", label: "Amount", kind: "currency" },
       { key: "expected_date", label: "Expected", kind: "date" },
     ],
     orderBy: { column: "created_at", ascending: false },
   },
   "/supplier-invoices": {
-    table: "invoices", title: "Invoices", eyebrow: "Supplier",
+    table: "invoices",
+    title: "Invoices",
+    eyebrow: "Supplier",
     sub: "Invoices you have raised.",
-    singular: "Invoice", titleField: "invoice_number",
+    singular: "Invoice",
+    titleField: "invoice_number",
     columns: [
-      { key: "invoice_number", label: "Invoice #" }, COL.status,
+      { key: "invoice_number", label: "Invoice #" },
+      COL.status,
       { key: "total_amount", label: "Amount", kind: "currency" },
       { key: "issue_date", label: "Issued", kind: "date" },
     ],
     orderBy: { column: "issue_date", ascending: false },
   },
   "/supplier-performance": {
-    table: "suppliers", title: "Performance", eyebrow: "Supplier",
+    table: "suppliers",
+    title: "Performance",
+    eyebrow: "Supplier",
     sub: "Your on-time delivery and quality ratings.",
     singular: "Metric",
     columns: [
       { key: "name", label: "Supplier" },
-      { key: "rating", label: "Rating", kind: "number" }, COL.status,
+      { key: "rating", label: "Rating", kind: "number" },
+      COL.status,
     ],
     orderBy: { column: "rating", ascending: false },
   },
 
   // ── Finance extras ──────────────────────────────────────────
   "/expenses": {
-    table: "expenses", title: "Expenses", eyebrow: "Finance",
+    table: "expenses",
+    title: "Expenses",
+    eyebrow: "Finance",
     sub: "Operating expenses by category, with receipts.",
     singular: "Expense",
     columns: [
@@ -693,7 +854,9 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "expense_date", ascending: false },
   },
   "/taxes": {
-    table: "taxes", title: "Taxes", eyebrow: "Finance",
+    table: "taxes",
+    title: "Taxes",
+    eyebrow: "Finance",
     sub: "Tax obligations and filing status by period.",
     singular: "Tax Record",
     columns: [
@@ -707,7 +870,9 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     createDefaults: { filing_status: "pending" },
   },
   "/budgets": {
-    table: "budgets", title: "Budgets", eyebrow: "Finance",
+    table: "budgets",
+    title: "Budgets",
+    eyebrow: "Finance",
     sub: "Departmental budget allocations tracked against actual spend.",
     singular: "Budget",
     columns: [
@@ -720,11 +885,14 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
   },
 
   "/profit-loss": {
-    table: "invoices", title: "Profit & Loss", eyebrow: "Finance",
+    table: "invoices",
+    title: "Profit & Loss",
+    eyebrow: "Finance",
     sub: "Revenue and cost accumulation.",
     singular: "Entry",
     columns: [
-      { key: "invoice_number", label: "Invoice #" }, COL.status,
+      { key: "invoice_number", label: "Invoice #" },
+      COL.status,
       { key: "total_amount", label: "Amount", kind: "currency" },
       { key: "issue_date", label: "Date", kind: "date" },
     ],
@@ -733,11 +901,14 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
 
   // ── Reports (list a compact recent activity view) ───────────
   "/production-reports": {
-    table: "production_orders", title: "Production Reports", eyebrow: "Reports",
+    table: "production_orders",
+    title: "Production Reports",
+    eyebrow: "Reports",
     sub: "Production orders history and completion.",
     singular: "Report",
     columns: [
-      { key: "order_number", label: "Order #" }, COL.status,
+      { key: "order_number", label: "Order #" },
+      COL.status,
       { key: "quantity", label: "Qty", kind: "number" },
       { key: "progress", label: "%", kind: "number" },
       { key: "due_date", label: "Due", kind: "date" },
@@ -745,7 +916,9 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "due_date", ascending: false },
   },
   "/quality-reports": {
-    table: "quality_inspections", title: "Quality Reports", eyebrow: "Reports",
+    table: "quality_inspections",
+    title: "Quality Reports",
+    eyebrow: "Reports",
     sub: "Inspection results across your product portfolio.",
     singular: "Report",
     columns: [
@@ -758,58 +931,74 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
     orderBy: { column: "created_at", ascending: false },
   },
   "/maintenance-reports": {
-    table: "work_orders", title: "Maintenance Reports", eyebrow: "Reports",
+    table: "work_orders",
+    title: "Maintenance Reports",
+    eyebrow: "Reports",
     sub: "Maintenance activity across machines.",
     singular: "Report",
     columns: [
       { key: "wo_number", label: "WO #" },
-      { key: "operation", label: "Operation" }, COL.status,
+      { key: "operation", label: "Operation" },
+      COL.status,
       { key: "start_time", label: "Start", kind: "datetime" },
     ],
     orderBy: { column: "start_time", ascending: false },
   },
   "/finance-reports": {
-    table: "invoices", title: "Finance Reports", eyebrow: "Reports",
+    table: "invoices",
+    title: "Finance Reports",
+    eyebrow: "Reports",
     sub: "Revenue, invoicing and payment activity.",
     singular: "Report",
     columns: [
-      { key: "invoice_number", label: "Invoice #" }, COL.status,
+      { key: "invoice_number", label: "Invoice #" },
+      COL.status,
       { key: "total_amount", label: "Amount", kind: "currency" },
       { key: "issue_date", label: "Issued", kind: "date" },
     ],
     orderBy: { column: "issue_date", ascending: false },
   },
   "/hr-reports": {
-    table: "employees", title: "HR Reports", eyebrow: "Reports",
+    table: "employees",
+    title: "HR Reports",
+    eyebrow: "Reports",
     sub: "Workforce composition and status.",
     singular: "Employee",
     columns: [
       { key: "employee_code", label: "Code" },
       { key: "full_name", label: "Name" },
       { key: "department", label: "Dept" },
-      { key: "job_title", label: "Role" }, COL.status,
+      { key: "job_title", label: "Role" },
+      COL.status,
     ],
     orderBy: { column: "full_name", ascending: true },
   },
 
   // ── Plant management ────────────────────────────────────────
   "/plant-overview": {
-    table: "machines", title: "Plant Overview", eyebrow: "Plant",
+    table: "machines",
+    title: "Plant Overview",
+    eyebrow: "Plant",
     sub: "Machines and status across the plant floor.",
     singular: "Asset",
     columns: [
-      { key: "name", label: "Machine" }, { key: "code", label: "Code" },
-      { key: "type", label: "Type" }, COL.status,
+      { key: "name", label: "Machine" },
+      { key: "code", label: "Code" },
+      { key: "type", label: "Type" },
+      COL.status,
       { key: "utilization", label: "Utilization %", kind: "number" },
     ],
     orderBy: { column: "name", ascending: true },
   },
   "/plant-performance": {
-    table: "production_orders", title: "Plant Performance", eyebrow: "Plant",
+    table: "production_orders",
+    title: "Plant Performance",
+    eyebrow: "Plant",
     sub: "Output, on-time delivery and quality across shifts.",
     singular: "Order",
     columns: [
-      { key: "order_number", label: "Order #" }, COL.status,
+      { key: "order_number", label: "Order #" },
+      COL.status,
       { key: "progress", label: "%", kind: "number" },
       { key: "due_date", label: "Due", kind: "date" },
     ],
@@ -818,12 +1007,16 @@ export const MODULE_REGISTRY: Record<string, ModuleConfig> = {
 
   // ── Compliance ──────────────────────────────────────────────
   "/compliance": {
-    table: "compliance_records", title: "Compliance", eyebrow: "Auditor",
+    table: "compliance_records",
+    title: "Compliance",
+    eyebrow: "Auditor",
     sub: "Certification status, validity windows and compliance evidence.",
-    singular: "Compliance Record", titleField: "title",
+    singular: "Compliance Record",
+    titleField: "title",
     columns: [
       { key: "title", label: "Record" },
-      { key: "standard", label: "Standard" }, COL.status,
+      { key: "standard", label: "Standard" },
+      COL.status,
       { key: "valid_from", label: "Valid From", kind: "date" },
       { key: "expires_at", label: "Expires", kind: "date" },
     ],
@@ -837,4 +1030,3 @@ export function moduleForPath(path: string): ModuleConfig | null {
   if (!cfg) return null;
   return { ...cfg, path, fields: fieldsForPath(path) };
 }
-

@@ -49,61 +49,109 @@ function pick<T>(arr: T[]): T {
 /* ────────────────────────────────────────────────────────── */
 
 type Intent =
-  | "greeting" | "thanks" | "farewell" | "whoami" | "whichrole" | "action" | "help"
-  | "howareyou" | "math" | "howto" | "followup" | "data" | "unknown";
+  | "greeting"
+  | "thanks"
+  | "farewell"
+  | "whoami"
+  | "whichrole"
+  | "action"
+  | "help"
+  | "howareyou"
+  | "math"
+  | "howto"
+  | "followup"
+  | "data"
+  | "unknown";
 
 function detectIntent(raw: string): { intent: Intent; payload?: string } {
   const q = raw.trim().toLowerCase();
 
   // Greeting — ONLY if the rest of the message is empty or social.
   // "hi, show me my orders" must reach the data layer, not a hello.
-  const greetingRe = /^(hi|hello|hey|hola|namaste|yo|sup|good\s*(morning|afternoon|evening))[,\s!]*/i;
+  const greetingRe =
+    /^(hi|hello|hey|hola|namaste|yo|sup|good\s*(morning|afternoon|evening))[,\s!]*/i;
   const gm = q.match(greetingRe);
   if (gm) {
     const rest = q.slice(gm[0].length).trim();
     // A rest that carries a real question is never a greeting
-    const carriesQuestion = /\b(order|production|inventory|stock|machine|status|invoice|supplier|quality|show|what|how|can|any|my|the|report|employee|shipment)\b/.test(rest);
-    if (!rest || /^(there|how\s*are\s*you|hows\s*it\s*going|whats?\s*up|and\s*you)\b/.test(rest) || (!carriesQuestion && rest.split(/\s+/).length <= 3)) {
+    const carriesQuestion =
+      /\b(order|production|inventory|stock|machine|status|invoice|supplier|quality|show|what|how|can|any|my|the|report|employee|shipment)\b/.test(
+        rest,
+      );
+    if (
+      !rest ||
+      /^(there|how\s*are\s*you|hows\s*it\s*going|whats?\s*up|and\s*you)\b/.test(rest) ||
+      (!carriesQuestion && rest.split(/\s+/).length <= 3)
+    ) {
       return { intent: "greeting" };
     }
   }
 
   // Thanks — whole message, never mid-sentence ("awesome" alone is not thanks)
-  if (/^(thanks|thank\s*(you|u)|thx|ty|tysm|appreciate\s*it|much\s*appreciated|that\s*helps|great\s*,?\s*thanks|awesome\s*,?\s*thanks|cheers|(ok|okay|alright|sure)[,!.\s]+thanks)[!.,\s]*$/i.test(q))
+  if (
+    /^(thanks|thank\s*(you|u)|thx|ty|tysm|appreciate\s*it|much\s*appreciated|that\s*helps|great\s*,?\s*thanks|awesome\s*,?\s*thanks|cheers|(ok|okay|alright|sure)[,!.\s]+thanks)[!.,\s]*$/i.test(
+      q,
+    )
+  )
     return { intent: "thanks" };
 
   // Farewell — whole message only (bare "later" must not swallow data questions)
-  if (/^(bye|goodbye|cya|good\s*night|see\s*you|later|that'?s\s*all|no\s*more|done|okay?\s*bye|talk\s*soon)[!.,\s]*$/i.test(q))
+  if (
+    /^(bye|goodbye|cya|good\s*night|see\s*you|later|that'?s\s*all|no\s*more|done|okay?\s*bye|talk\s*soon)[!.,\s]*$/i.test(
+      q,
+    )
+  )
     return { intent: "farewell" };
 
   // Role identity — "you are copilot for which role?", "what's my role?",
   // "what can I access?", "which company am I scoped to?". Checked BEFORE
   // whoami so the answer always names the exact role.
-  if (/(which|what)\s*(role|roles)|copil?ot\s*for\s*(which|what)|for\s*which\s*role|my\s*role|am\s*i\s*scoped|role\s*am\s*i|what\s*(is|are)\s*my\s*(role|permission|access|scope)|who\s*do\s*you\s*work\s*for|whose\s*copil?ot/.test(q))
+  if (
+    /(which|what)\s*(role|roles)|copil?ot\s*for\s*(which|what)|for\s*which\s*role|my\s*role|am\s*i\s*scoped|role\s*am\s*i|what\s*(is|are)\s*my\s*(role|permission|access|scope)|who\s*do\s*you\s*work\s*for|whose\s*copil?ot/.test(
+      q,
+    )
+  )
     return { intent: "whichrole" };
 
   // Write/action attempts — Copilot is advisory, never mutates data.
-  if (/^\s*(please\s*)?(create|add|insert|delete|remove|approve|reject|update|edit|change|cancel|assign|dispatch|pay|issue|generate)\b/.test(q) ||
-      /\b(for me|on my behalf|do it|go ahead and)\b/.test(q))
+  if (
+    /^\s*(please\s*)?(create|add|insert|delete|remove|approve|reject|update|edit|change|cancel|assign|dispatch|pay|issue|generate)\b/.test(
+      q,
+    ) ||
+    /\b(for me|on my behalf|do it|go ahead and)\b/.test(q)
+  )
     return { intent: "action" };
 
   if (/(who\s*are\s*you|what\s*are\s*you|your\s*name|about\s*you|introduce\s*yourself)/.test(q))
     return { intent: "whoami" };
 
-  if (/(what\s*can\s*you\s*(do|help|answer)|how\s*can\s*you\s*help|help\s*me|capabilities|what\s*do\s*you\s*do|what\s*are\s*you\s*(good|able|capable)\s*at|features)/.test(q))
+  if (
+    /(what\s*can\s*you\s*(do|help|answer)|how\s*can\s*you\s*help|help\s*me|capabilities|what\s*do\s*you\s*do|what\s*are\s*you\s*(good|able|capable)\s*at|features)/.test(
+      q,
+    )
+  )
     return { intent: "help" };
 
-  if (/(how\s*are\s*you|how'?s\s*it\s*going|how\s*do\s*you\s*feel|what'?s\s*up|hows\s*it\s*going)/.test(q))
+  if (
+    /(how\s*are\s*you|how'?s\s*it\s*going|how\s*do\s*you\s*feel|what'?s\s*up|hows\s*it\s*going)/.test(
+      q,
+    )
+  )
     return { intent: "howareyou" };
 
   // Math — e.g. "what is 15 * 4", "calculate 2500 + 800", "5% of 2000"
   const mathRe = /([\d.,]+\s*[+\-*/x%^]\s*[\d.,]+)|(?:what\s*is\s*|=)\s*[\d.,]+\s*[+\-*/x%]/;
   const calcRe = /(?:calculate|compute|what\s*is|what'?s)\b/;
-  if (mathRe.test(q) && (calcRe.test(q) || /[+\-*/x%]/.test(q))) return { intent: "math", payload: q };
+  if (mathRe.test(q) && (calcRe.test(q) || /[+\-*/x%]/.test(q)))
+    return { intent: "math", payload: q };
 
   // UI how-to — "how do I create/export/filter/approve/delete"
-  if (/(how\s*do\s*i|how\s*to|steps?\s*to|guide|walk\s*me\s*through|can\s*i\s*create|can\s*you\s*create|need\s*to\s*(create|add|export|filter))/.test(q) &&
-    /(create|add|new|export|download|filter|search|delete|approve|edit|update|upload)/.test(q))
+  if (
+    /(how\s*do\s*i|how\s*to|steps?\s*to|guide|walk\s*me\s*through|can\s*i\s*create|can\s*you\s*create|need\s*to\s*(create|add|export|filter))/.test(
+      q,
+    ) &&
+    /(create|add|new|export|download|filter|search|delete|approve|edit|update|upload)/.test(q)
+  )
     return { intent: "howto" };
 
   // Follow-up / referential questions — "and production?", "what about inventory?"
@@ -220,7 +268,10 @@ function evaluateMath(raw: string): string | null {
   }
   // general expression — strip words, keep digits + operators
   let expr = q
-    .replace(/what\s*is|what'?s|calculate|compute|equals?|times|multiplied\s*by|divided\s*by|\bof\b|\bto\b|\bthe\b|\bresult\b|\?|\!/g, " ")
+    .replace(
+      /what\s*is|what'?s|calculate|compute|equals?|times|multiplied\s*by|divided\s*by|\bof\b|\bto\b|\bthe\b|\bresult\b|\?|\!/g,
+      " ",
+    )
     .replace(/\bx\b/g, "*")
     .replace(/plus/g, "+")
     .replace(/minus/g, "-")
@@ -247,9 +298,14 @@ function evaluateMath(raw: string): string | null {
 /*  ENTITY LOOKUP — a specific order / machine / PO            */
 /* ────────────────────────────────────────────────────────── */
 
-async function findEntity(ref: string, role: string | null, userId: string | null): Promise<string | null> {
+async function findEntity(
+  ref: string,
+  role: string | null,
+  userId: string | null,
+): Promise<string | null> {
   const upper = ref.toUpperCase();
-  const isCode = /^(SO|WO|PO|PR|INV|N-08|PUR|ORD|RFQ)[-\s]*[\w.-]+/i.test(upper) ||
+  const isCode =
+    /^(SO|WO|PO|PR|INV|N-08|PUR|ORD|RFQ)[-\s]*[\w.-]+/i.test(upper) ||
     /\b(N-08|SO-|WO-|PO-|PUR-|INV-)\b/i.test(upper);
   if (!isCode) return null;
 
@@ -262,9 +318,23 @@ async function findEntity(ref: string, role: string | null, userId: string | nul
   // Which tables might hold this reference, based on the role's scope
   const allowed = new Set(ROLE_DOMAIN_MAP[role ?? ""] ?? []);
   const probes: Array<{ table: string; columns: string[]; domain: string; owner?: string }> = [
-    { table: "sales_orders", columns: ["so_number", "order_number"], domain: "orders", owner: "customer_id" },
-    { table: "production_orders", columns: ["order_number", "po_number", "production_order_number"], domain: "production" },
-    { table: "purchase_orders", columns: ["po_number"], domain: "procurement", owner: "supplier_id" },
+    {
+      table: "sales_orders",
+      columns: ["so_number", "order_number"],
+      domain: "orders",
+      owner: "customer_id",
+    },
+    {
+      table: "production_orders",
+      columns: ["order_number", "po_number", "production_order_number"],
+      domain: "production",
+    },
+    {
+      table: "purchase_orders",
+      columns: ["po_number"],
+      domain: "procurement",
+      owner: "supplier_id",
+    },
     { table: "work_orders", columns: ["wo_number"], domain: "production", owner: "operator_id" },
     { table: "invoices", columns: ["invoice_number"], domain: "finance", owner: "customer_id" },
     { table: "machines", columns: ["name", "machine_code", "code"], domain: "maintenance" },
@@ -279,19 +349,28 @@ async function findEntity(ref: string, role: string | null, userId: string | nul
     for (const col of probe.columns) {
       try {
         const q: any = scoped(
-          supabase.from(probe.table as never).select("*").ilike(col as never, `%${upper}%`).limit(1),
+          supabase
+            .from(probe.table as never)
+            .select("*")
+            .ilike(col as never, `%${upper}%`)
+            .limit(1),
         );
         if (customerId) q.eq("customer_id", customerId);
         if (supplierId) q.eq("supplier_id", supplierId);
-        if (role === "production_operator" && probe.table === "work_orders") q.eq("operator_id", userId);
+        if (role === "production_operator" && probe.table === "work_orders")
+          q.eq("operator_id", userId);
         const res: any = await q;
         const row = res?.data?.[0];
         if (row) {
           const status = label(row.status ?? row.state);
-          const pct = row.progress != null || row.progress_percent != null ? ` · ${row.progress ?? row.progress_percent ?? 0}%` : "";
-          const amount = row.total_amount != null || row.amount != null
-            ? ` · $${Number(row.total_amount ?? row.amount ?? 0).toLocaleString()}`
-            : "";
+          const pct =
+            row.progress != null || row.progress_percent != null
+              ? ` · ${row.progress ?? row.progress_percent ?? 0}%`
+              : "";
+          const amount =
+            row.total_amount != null || row.amount != null
+              ? ` · $${Number(row.total_amount ?? row.amount ?? 0).toLocaleString()}`
+              : "";
           const due = row.due_date ? ` · due ${new Date(row.due_date).toLocaleDateString()}` : "";
           return `🔎 Found it — **${row[col] ?? probe.table}** (${probe.table.replace(/_/g, " ")}): status **${status}**${pct}${amount}${due}.`;
         }
@@ -310,7 +389,8 @@ async function findEntity(ref: string, role: string | null, userId: string | nul
 /** Detect which domain a follow-up like "and production?" is asking about */
 function detectFollowupDomain(q: string): string | null {
   const s = q.toLowerCase();
-  if (/(production|manufactur|oee|throughput|batch|work order|production order)/.test(s)) return "production";
+  if (/(production|manufactur|oee|throughput|batch|work order|production order)/.test(s))
+    return "production";
   if (/(inventory|stock|warehouse|sku|reorder)/.test(s)) return "inventory";
   if (/(machine|equipment|cnc|robot|asset|downtime)/.test(s)) return "machines";
   if (/(quality|inspection|defect|yield|ncr|capa|pass rate)/.test(s)) return "quality";
@@ -403,57 +483,97 @@ async function focusedDomainAnswer(
     switch (domain) {
       case "production": {
         const rows = await listRows("production_orders", 6);
-        const inProg = rows.filter((p: any) => ["in_progress", "in-production"].includes(p.status)).length;
-        return `🏭 **Production** — ${rows.length} order(s), ${inProg} in progress.\n\n${rows.slice(0, 3).map((p: any) => `- ${p.order_number ?? p.id?.slice(0, 8)} · ${label(p.status)}`).join("\n")}`;
+        const inProg = rows.filter((p: any) =>
+          ["in_progress", "in-production"].includes(p.status),
+        ).length;
+        return `🏭 **Production** — ${rows.length} order(s), ${inProg} in progress.\n\n${rows
+          .slice(0, 3)
+          .map((p: any) => `- ${p.order_number ?? p.id?.slice(0, 8)} · ${label(p.status)}`)
+          .join("\n")}`;
       }
       case "inventory": {
         const rows = await listRows("inventory", 6);
-        const low = rows.filter((i: any) => Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0));
-        return `📦 **Inventory** — ${rows.length} SKU(s), ${low.length} at/below reorder level.\n\n${rows.slice(0, 4).map((i: any) => `- ${i.sku ?? i.product_name ?? i.id?.slice(0, 8)} · ${i.quantity ?? 0}`).join("\n")}`;
+        const low = rows.filter(
+          (i: any) => Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0),
+        );
+        return `📦 **Inventory** — ${rows.length} SKU(s), ${low.length} at/below reorder level.\n\n${rows
+          .slice(0, 4)
+          .map((i: any) => `- ${i.sku ?? i.product_name ?? i.id?.slice(0, 8)} · ${i.quantity ?? 0}`)
+          .join("\n")}`;
       }
       case "machines": {
         const rows = await listRows("machines", 6);
         const down = rows.filter((m: any) => ["down", "maintenance"].includes(m.status));
-        return `⚙️ **Machines** — ${rows.length} total, ${down.length} down/in maintenance.\n\n${rows.slice(0, 4).map((m: any) => `- ${m.name ?? "—"} · ${label(m.status)}`).join("\n")}`;
+        return `⚙️ **Machines** — ${rows.length} total, ${down.length} down/in maintenance.\n\n${rows
+          .slice(0, 4)
+          .map((m: any) => `- ${m.name ?? "—"} · ${label(m.status)}`)
+          .join("\n")}`;
       }
       case "quality": {
         const rows = await listRows("quality_inspections", 6);
         const passed = rows.filter((i: any) => ["pass", "passed"].includes(i.result)).length;
-        return `✅ **Quality** — ${rows.length} inspection(s), ${passed} passed.\n\n${rows.slice(0, 3).map((i: any) => `- ${i.inspection_number ?? i.id?.slice(0, 8)} · ${label(i.result)}`).join("\n")}`;
+        return `✅ **Quality** — ${rows.length} inspection(s), ${passed} passed.\n\n${rows
+          .slice(0, 3)
+          .map((i: any) => `- ${i.inspection_number ?? i.id?.slice(0, 8)} · ${label(i.result)}`)
+          .join("\n")}`;
       }
       case "finance": {
         const rows = await listRows("invoices", 6);
         const out = rows.filter((i: any) => ["pending", "partial", "unpaid"].includes(i.status));
-        return `💰 **Finance** — ${rows.length} invoice(s), ${out.length} outstanding.\n\n${rows.slice(0, 3).map((i: any) => `- ${i.invoice_number ?? "INV"} · ${label(i.status)}`).join("\n")}`;
+        return `💰 **Finance** — ${rows.length} invoice(s), ${out.length} outstanding.\n\n${rows
+          .slice(0, 3)
+          .map((i: any) => `- ${i.invoice_number ?? "INV"} · ${label(i.status)}`)
+          .join("\n")}`;
       }
       case "suppliers": {
         const sq: any = scoped(
-          supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }).limit(6),
+          supabase
+            .from("purchase_orders")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(6),
         );
         if (supplierId) sq.eq("supplier_id", supplierId);
         const { data } = await sq;
         const rows = (data as any[]) ?? [];
-        return `📋 **Procurement** — ${rows.length} PO(s).\n\n${rows.slice(0, 3).map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`).join("\n")}`;
+        return `📋 **Procurement** — ${rows.length} PO(s).\n\n${rows
+          .slice(0, 3)
+          .map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`)
+          .join("\n")}`;
       }
       case "orders": {
         // Suppliers never see sales orders — their "orders" are purchase orders.
         if (role === "supplier_portal") {
           const pq: any = scoped(
-            supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }).limit(6),
+            supabase
+              .from("purchase_orders")
+              .select("*")
+              .order("created_at", { ascending: false })
+              .limit(6),
           ).eq("supplier_id", supplierId);
           const { data } = await pq;
           const rows = (data as any[]) ?? [];
-          return `📋 **Your Purchase Orders** — ${rows.length} on record.\n\n${rows.slice(0, 3).map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`).join("\n")}`;
+          return `📋 **Your Purchase Orders** — ${rows.length} on record.\n\n${rows
+            .slice(0, 3)
+            .map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`)
+            .join("\n")}`;
         }
         // Customers read their own customer_orders; internal roles see the
         // customer order book (source of truth for the order lifecycle).
         const q: any = scoped(
-          supabase.from("customer_orders").select("*").order("created_at", { ascending: false }).limit(6),
+          supabase
+            .from("customer_orders")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(6),
         );
         if (customerId) q.eq("customer_id", customerId);
         const { data } = await q;
         const rows = (data as any[]) ?? [];
-        return `📋 **Orders** — ${rows.length} on record.\n\n${rows.slice(0, 3).map((o: any) => `- ${o.order_number ?? "ORD"} · ${label(o.status)}`).join("\n")}`;
+        return `📋 **Orders** — ${rows.length} on record.\n\n${rows
+          .slice(0, 3)
+          .map((o: any) => `- ${o.order_number ?? "ORD"} · ${label(o.status)}`)
+          .join("\n")}`;
       }
       case "employees": {
         const rows = await listRows("employees", 5);
@@ -466,7 +586,10 @@ async function focusedDomainAnswer(
         if (customerId) q.eq("customer_id", customerId);
         const { data } = await q;
         const rows = (data as any[]) ?? [];
-        return `🚚 **Dispatch** — ${rows.length} shipment(s).\n\n${rows.slice(0, 3).map((s: any) => `- ${s.tracking_number ?? s.id?.slice(0, 8)} · ${label(s.status)}`).join("\n")}`;
+        return `🚚 **Dispatch** — ${rows.length} shipment(s).\n\n${rows
+          .slice(0, 3)
+          .map((s: any) => `- ${s.tracking_number ?? s.id?.slice(0, 8)} · ${label(s.status)}`)
+          .join("\n")}`;
       }
       default:
         return null;
@@ -480,7 +603,12 @@ async function focusedDomainAnswer(
 /*  ROLE DATA ANSWERS                                          */
 /* ────────────────────────────────────────────────────────── */
 
-async function roleDataAnswer(role: string | null, companyId: string | null, userId: string | null, topic: string): Promise<CopilotAnswer> {
+async function roleDataAnswer(
+  role: string | null,
+  companyId: string | null,
+  userId: string | null,
+  topic: string,
+): Promise<CopilotAnswer> {
   switch (role) {
     case "customer_portal": {
       const customerId = await resolveCustomerId(userId);
@@ -488,15 +616,20 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
       if (!customerId) return { text: UNLINKED_PORTAL_MSG("customer"), conf: 100 };
       // customer_orders is the source of truth for customer-placed orders
       const q: any = scoped(
-        supabase.from("customer_orders").select("*").order("created_at", { ascending: false }).limit(6),
+        supabase
+          .from("customer_orders")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(6),
       ).eq("customer_id", customerId);
       const { data: orders } = await q;
       const myOrders = (orders as any[]) ?? [];
 
       // Specific order lookup when the question names one
-      const asked = myOrders.find((o: any) =>
-        (o.order_number ?? "").toLowerCase().includes(topic) ||
-        (o.product ?? "").toLowerCase().includes(topic),
+      const asked = myOrders.find(
+        (o: any) =>
+          (o.order_number ?? "").toLowerCase().includes(topic) ||
+          (o.product ?? "").toLowerCase().includes(topic),
       );
       if (asked) {
         return {
@@ -505,9 +638,14 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
         };
       }
       if (myOrders.length === 0) {
-        return { text: "You have **no orders yet**. Place your first order from the **Orders** tab — the company admin reviews it before production starts.", conf: 95 };
+        return {
+          text: "You have **no orders yet**. Place your first order from the **Orders** tab — the company admin reviews it before production starts.",
+          conf: 95,
+        };
       }
-      const open = myOrders.filter((o: any) => !["delivered", "completed", "cancelled", "rejected"].includes(o.status));
+      const open = myOrders.filter(
+        (o: any) => !["delivered", "completed", "cancelled", "rejected"].includes(o.status),
+      );
       const latest = myOrders[0];
       return {
         text: `You have **${myOrders.length} order(s)**, ${open.length} currently open.\n\nMost recent: **${latest?.order_number ?? "—"}** — ${label(latest?.status)}.\n\nWant the status of a specific one? Just say the order number.`,
@@ -520,12 +658,19 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
       // Fail closed — a supplier must never see another supplier's POs.
       if (!supplierId) return { text: UNLINKED_PORTAL_MSG("supplier"), conf: 100 };
       const { data } = await scoped(
-        supabase.from("purchase_orders").select("*").order("created_at", { ascending: false }).limit(6),
+        supabase
+          .from("purchase_orders")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(6),
       ).eq("supplier_id", supplierId);
       const pos = (data as any[]) ?? [];
       const open = pos.filter((p: any) => !["received", "fulfilled"].includes(p.status)).length;
       return {
-        text: `You have **${pos.length} purchase order(s)** from this company, ${open} currently open.\n\n${pos.slice(0, 3).map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`).join("\n")}\n\nAccept or modify POs in the **Purchase Orders** tab.`,
+        text: `You have **${pos.length} purchase order(s)** from this company, ${open} currently open.\n\n${pos
+          .slice(0, 3)
+          .map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`)
+          .join("\n")}\n\nAccept or modify POs in the **Purchase Orders** tab.`,
         conf: 94,
       };
     }
@@ -533,16 +678,25 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
     case "production_manager": {
       const prodOrders = await listRows("production_orders", 8);
       const approved = await listRows("customer_orders", 8);
-      const inProgress = prodOrders.filter((p: any) => ["in_progress", "in-production"].includes(p.status)).length;
+      const inProgress = prodOrders.filter((p: any) =>
+        ["in_progress", "in-production"].includes(p.status),
+      ).length;
       return {
-        text: `🏭 **Production**\n\n- Production orders: **${prodOrders.length}** (${inProgress} in progress)\n- Approved customer orders ready to plan: **${approved.filter((s: any) => s.status === "approved").length}**\n\n${prodOrders.slice(0, 3).map((p: any) => `- ${p.order_number ?? p.id?.slice(0, 8)} · ${label(p.status)}`).join("\n")}\n\nStart production from **Approved Orders** → create production planning → the inventory auto-check runs.`,
+        text: `🏭 **Production**\n\n- Production orders: **${prodOrders.length}** (${inProgress} in progress)\n- Approved customer orders ready to plan: **${approved.filter((s: any) => s.status === "approved").length}**\n\n${prodOrders
+          .slice(0, 3)
+          .map((p: any) => `- ${p.order_number ?? p.id?.slice(0, 8)} · ${label(p.status)}`)
+          .join(
+            "\n",
+          )}\n\nStart production from **Approved Orders** → create production planning → the inventory auto-check runs.`,
         conf: 95,
       };
     }
 
     case "warehouse_manager": {
       const inv = await listRows("inventory", 8);
-      const low = inv.filter((i: any) => Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0)).length;
+      const low = inv.filter(
+        (i: any) => Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0),
+      ).length;
       const shipments = await listRows("shipments", 5);
       return {
         text: `📦 **Warehouse**\n\n- Inventory SKUs: **${inv.length}** (${low} at/below reorder level)\n- Shipments: **${shipments.length}**\n\n${low > 0 ? `⚠️ ${low} low-stock item(s) need reordering.` : "Stock levels are healthy."}\n\nManage stock in **Inventory**, dispatch in **Dispatch**.`,
@@ -555,7 +709,10 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
       const suppliers = await listRows("suppliers", 5);
       const open = pos.filter((p: any) => !["received", "fulfilled"].includes(p.status)).length;
       return {
-        text: `📋 **Procurement**\n\n- Purchase orders: **${pos.length}** (${open} open)\n- Suppliers: **${suppliers.length}**\n\n${pos.slice(0, 3).map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`).join("\n")}\n\nCreate POs in **Purchase Orders** — suppliers respond in real time.`,
+        text: `📋 **Procurement**\n\n- Purchase orders: **${pos.length}** (${open} open)\n- Suppliers: **${suppliers.length}**\n\n${pos
+          .slice(0, 3)
+          .map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`)
+          .join("\n")}\n\nCreate POs in **Purchase Orders** — suppliers respond in real time.`,
         conf: 94,
       };
     }
@@ -564,7 +721,12 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
       const insp = await listRows("quality_inspections", 8);
       const passed = insp.filter((i: any) => ["pass", "passed"].includes(i.result)).length;
       return {
-        text: `✅ **Quality**\n\n- Inspections: **${insp.length}** (${passed} passed)\n\n${insp.slice(0, 3).map((i: any) => `- ${i.inspection_number ?? i.id?.slice(0, 8)} · ${label(i.result)}`).join("\n")}\n\nPassed batches release as finished goods; failures route back to production with rejection notes.`,
+        text: `✅ **Quality**\n\n- Inspections: **${insp.length}** (${passed} passed)\n\n${insp
+          .slice(0, 3)
+          .map((i: any) => `- ${i.inspection_number ?? i.id?.slice(0, 8)} · ${label(i.result)}`)
+          .join(
+            "\n",
+          )}\n\nPassed batches release as finished goods; failures route back to production with rejection notes.`,
         conf: 94,
       };
     }
@@ -573,17 +735,27 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
       const machines = await listRows("machines", 8);
       const down = machines.filter((m: any) => ["down", "maintenance"].includes(m.status)).length;
       return {
-        text: `🔧 **Maintenance**\n\n- Machines: **${machines.length}** (${down} down/in maintenance)\n\n${machines.slice(0, 4).map((m: any) => `- ${m.name ?? "—"} · ${label(m.status)}`).join("\n")}\n\nFlag machines "under maintenance" to block new work-order assignment.`,
+        text: `🔧 **Maintenance**\n\n- Machines: **${machines.length}** (${down} down/in maintenance)\n\n${machines
+          .slice(0, 4)
+          .map((m: any) => `- ${m.name ?? "—"} · ${label(m.status)}`)
+          .join("\n")}\n\nFlag machines "under maintenance" to block new work-order assignment.`,
         conf: 94,
       };
     }
 
     case "finance_manager": {
       const invoices = await listRows("invoices", 8);
-      const outstanding = invoices.filter((i: any) => ["pending", "partial", "unpaid"].includes(i.status)).length;
+      const outstanding = invoices.filter((i: any) =>
+        ["pending", "partial", "unpaid"].includes(i.status),
+      ).length;
       const totalOut = invoices.reduce((s: number, i: any) => s + Number(i.total_amount ?? 0), 0);
       return {
-        text: `💰 **Finance**\n\n- Invoices: **${invoices.length}** (${outstanding} outstanding)\n- Outstanding value: **$${totalOut.toLocaleString()}**\n\n${invoices.slice(0, 3).map((i: any) => `- ${i.invoice_number ?? "INV"} · ${label(i.status)}`).join("\n")}\n\nInvoices auto-generate at dispatch-ready; balance due = order total minus advance paid.`,
+        text: `💰 **Finance**\n\n- Invoices: **${invoices.length}** (${outstanding} outstanding)\n- Outstanding value: **$${totalOut.toLocaleString()}**\n\n${invoices
+          .slice(0, 3)
+          .map((i: any) => `- ${i.invoice_number ?? "INV"} · ${label(i.status)}`)
+          .join(
+            "\n",
+          )}\n\nInvoices auto-generate at dispatch-ready; balance due = order total minus advance paid.`,
         conf: 95,
       };
     }
@@ -591,7 +763,14 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
     case "hr_manager": {
       const employees = await listRows("employees", 6);
       return {
-        text: `👥 **HR**\n\n- Employees on record: **${employees.length}**\n\n${employees.slice(0, 3).map((e: any) => `- ${e.full_name ?? e.name ?? e.id?.slice(0, 8)} · ${label(e.department)}`).join("\n")}\n\nManage records in **Employees** — onboarding and department assignments flow to Company Admin for whitelist approval.`,
+        text: `👥 **HR**\n\n- Employees on record: **${employees.length}**\n\n${employees
+          .slice(0, 3)
+          .map(
+            (e: any) => `- ${e.full_name ?? e.name ?? e.id?.slice(0, 8)} · ${label(e.department)}`,
+          )
+          .join(
+            "\n",
+          )}\n\nManage records in **Employees** — onboarding and department assignments flow to Company Admin for whitelist approval.`,
         conf: 92,
       };
     }
@@ -602,32 +781,51 @@ async function roleDataAnswer(role: string | null, companyId: string | null, use
       let wos: any[] = [];
       if (userId) {
         const { data } = (await scoped(
-          supabase.from("work_orders").select("*").order("created_at", { ascending: false }).limit(8),
+          supabase
+            .from("work_orders")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(8),
         ).eq("operator_id" as never, userId)) as any;
         wos = (data as any[]) ?? [];
       }
       if (!userId) {
-        return { text: "I can't identify your operator account right now, so I won't show any work orders. Try signing out and back in.", conf: 100 };
+        return {
+          text: "I can't identify your operator account right now, so I won't show any work orders. Try signing out and back in.",
+          conf: 100,
+        };
       }
       if (wos.length === 0) {
-        return { text: "🔧 You have **no work orders assigned** right now. Your Production Manager assigns them — they'll appear here and in **Assigned Work Orders** the moment they do.", conf: 96 };
+        return {
+          text: "🔧 You have **no work orders assigned** right now. Your Production Manager assigns them — they'll appear here and in **Assigned Work Orders** the moment they do.",
+          conf: 96,
+        };
       }
       return {
-        text: `🔧 **Your Work Orders**\n\n- Assigned to you: **${wos.length}**\n\n${wos.slice(0, 4).map((w: any) => `- ${w.wo_number ?? "WO"} · ${label(w.status)} · ${w.progress_percent ?? w.progress ?? 0}%`).join("\n")}\n\nUpdate progress (25/50/75/100%) — it pushes live to the customer's tracking page.`,
+        text: `🔧 **Your Work Orders**\n\n- Assigned to you: **${wos.length}**\n\n${wos
+          .slice(0, 4)
+          .map(
+            (w: any) =>
+              `- ${w.wo_number ?? "WO"} · ${label(w.status)} · ${w.progress_percent ?? w.progress ?? 0}%`,
+          )
+          .join(
+            "\n",
+          )}\n\nUpdate progress (25/50/75/100%) — it pushes live to the customer's tracking page.`,
         conf: 94,
       };
     }
 
     case "company_admin": {
-      const [pendingApproval, prodOrders, machines, lowStock, employees, customers, materialReq] = await Promise.all([
-        countWhere("customer_orders", "status", "pending_approval"),
-        countWhere("production_orders", "status", "in_progress"),
-        countWhere("machines", "status", "operational"),
-        countWhere("inventory", "status", "low_stock"),
-        countWhere("employees", "company_id", companyId ?? ""),
-        countWhere("customers", "company_id", companyId ?? ""),
-        countWhere("customer_requests", "status", "pending"),
-      ]);
+      const [pendingApproval, prodOrders, machines, lowStock, employees, customers, materialReq] =
+        await Promise.all([
+          countWhere("customer_orders", "status", "pending_approval"),
+          countWhere("production_orders", "status", "in_progress"),
+          countWhere("machines", "status", "operational"),
+          countWhere("inventory", "status", "low_stock"),
+          countWhere("employees", "company_id", companyId ?? ""),
+          countWhere("customers", "company_id", companyId ?? ""),
+          countWhere("customer_requests", "status", "pending"),
+        ]);
       return {
         text: `📊 **Company Overview**\n\n- Orders pending approval: **${pendingApproval}**\n- Customer access requests pending: **${materialReq}**\n- Production in progress: **${prodOrders}**\n- Machines operational: **${machines}**\n- Employees: **${employees}** · Customers: **${customers}**\n\nReview pending items in **Order Approvals** and **Customer Requests** (bolded in your sidebar).`,
         conf: 96,
@@ -707,15 +905,21 @@ export async function answerCopilot(opts: {
     };
   }
 
-  if (intent === "greeting" || intent === "thanks" || intent === "farewell" || intent === "whoami" || intent === "howareyou") {
+  if (
+    intent === "greeting" ||
+    intent === "thanks" ||
+    intent === "farewell" ||
+    intent === "whoami" ||
+    intent === "howareyou"
+  ) {
     return { text: socialReply(intent, role), conf: 100 };
   }
 
   if (intent === "help") {
     const allowed = getAllowedLabels(role);
     const examples = pick([
-      "Try: \"what's the status of my orders?\", \"show production\", \"any low stock?\"",
-      "You could ask: \"latest invoice?\", \"machines that need maintenance?\", \"open purchase orders\"",
+      'Try: "what\'s the status of my orders?", "show production", "any low stock?"',
+      'You could ask: "latest invoice?", "machines that need maintenance?", "open purchase orders"',
     ]);
     return {
       text: `I'm your **role-scoped** data assistant. I can answer with live numbers about: **${allowed.join(", ")}**.\n\n${examples}\n\nI also understand follow-ups like "and production?" and quick math like "15% of 2000". If a question touches data outside your role, I'll tell you honestly.`,
@@ -747,8 +951,15 @@ export async function answerCopilot(opts: {
   // 3. Entity lookup FIRST — a named code (SO-2026-0001, WO-0042, PO-1234) is
   //    more specific than math or the generic role summary. The regex requires
   //    a code prefix so words like "production" never match.
-  const entityMatch = question.match(/\b(?:N-08|SO|WO|PO|PR|INV|PUR|ORD|RFQ)[-\s]*[\w.\-]*\d[\w.\-]*\b/i);
-  if (entityMatch && (intent === "data" || intent === "math" || /status|where|track|find|check|about|detail/.test(lower))) {
+  const entityMatch = question.match(
+    /\b(?:N-08|SO|WO|PO|PR|INV|PUR|ORD|RFQ)[-\s]*[\w.\-]*\d[\w.\-]*\b/i,
+  );
+  if (
+    entityMatch &&
+    (intent === "data" ||
+      intent === "math" ||
+      /status|where|track|find|check|about|detail/.test(lower))
+  ) {
     const ref = entityMatch[0].trim();
     const found = await findEntity(ref, role, userId);
     if (found) return { text: found, conf: 90 };

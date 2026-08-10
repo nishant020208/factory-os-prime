@@ -11,30 +11,102 @@
 export const ROLE_DOMAIN_MAP: Record<string, string[]> = {
   root_super_admin: ["platform", "settings", "audit", "companies"],
   company_admin: [
-    "production", "inventory", "quality", "maintenance", "finance", "hr",
-    "customers", "suppliers", "orders", "procurement", "dispatch", "documents",
-    "crm", "analytics", "plants", "departments", "products", "bom", "settings",
-    "whitelist", "capa", "defects", "leaves", "training", "performance",
-    "payroll", "attendance", "recruitment",
+    "production",
+    "inventory",
+    "quality",
+    "maintenance",
+    "finance",
+    "hr",
+    "customers",
+    "suppliers",
+    "orders",
+    "procurement",
+    "dispatch",
+    "documents",
+    "crm",
+    "analytics",
+    "plants",
+    "departments",
+    "products",
+    "bom",
+    "settings",
+    "whitelist",
+    "capa",
+    "defects",
+    "leaves",
+    "training",
+    "performance",
+    "payroll",
+    "attendance",
+    "recruitment",
   ],
-  plant_admin: ["production", "inventory", "quality", "maintenance", "machines", "orders", "plants", "departments"],
+  plant_admin: [
+    "production",
+    "inventory",
+    "quality",
+    "maintenance",
+    "machines",
+    "orders",
+    "plants",
+    "departments",
+  ],
   plant_manager: ["production", "inventory", "quality", "maintenance", "machines", "orders"],
-  production_manager: ["production", "orders", "machines", "inventory", "maintenance", "quality", "products", "bom"],
+  production_manager: [
+    "production",
+    "orders",
+    "machines",
+    "inventory",
+    "maintenance",
+    "quality",
+    "products",
+    "bom",
+  ],
   production_operator: ["orders", "machines", "maintenance"],
   warehouse_manager: ["inventory", "dispatch", "products"],
   procurement_manager: ["procurement", "suppliers", "inventory"],
   quality_inspector: ["quality", "defects", "capa", "incoming-inspection", "final-inspection"],
   maintenance_engineer: ["maintenance", "machines", "breakdowns", "spare-parts"],
-  finance_manager: ["finance", "invoices", "payments", "expenses", "budgets", "taxes", "profit-loss", "suppliers"],
+  finance_manager: [
+    "finance",
+    "invoices",
+    "payments",
+    "expenses",
+    "budgets",
+    "taxes",
+    "profit-loss",
+    "suppliers",
+  ],
   hr_manager: ["hr", "leaves", "training", "performance", "payroll", "attendance", "recruitment"],
   customer_portal: ["orders", "dispatch", "finance", "documents", "crm", "support"],
   supplier_portal: ["suppliers", "inventory", "dispatch", "finance"],
   auditor: [
-    "production", "inventory", "quality", "maintenance", "finance", "hr",
-    "customers", "suppliers", "orders", "procurement", "dispatch", "documents",
-    "crm", "analytics", "plants", "departments", "products", "bom", "audit",
-    "capa", "defects", "leaves", "training", "performance", "payroll",
-    "attendance", "recruitment",
+    "production",
+    "inventory",
+    "quality",
+    "maintenance",
+    "finance",
+    "hr",
+    "customers",
+    "suppliers",
+    "orders",
+    "procurement",
+    "dispatch",
+    "documents",
+    "crm",
+    "analytics",
+    "plants",
+    "departments",
+    "products",
+    "bom",
+    "audit",
+    "capa",
+    "defects",
+    "leaves",
+    "training",
+    "performance",
+    "payroll",
+    "attendance",
+    "recruitment",
   ],
 };
 
@@ -66,8 +138,7 @@ export const ROLE_BLOCKED_MESSAGE: Record<string, string> = {
     "I can show employee, leave, training, performance, payroll, attendance, and recruitment data only.",
   customer_portal:
     "You can view your own orders, shipments, invoices, payments, documents, and support tickets only.",
-  supplier_portal:
-    "You can view your received POs, shipments, invoices, and payments only.",
+  supplier_portal: "You can view your received POs, shipments, invoices, and payments only.",
   auditor:
     "You have read-only access to all modules. No create/edit/delete actions are available for any data.",
 };
@@ -136,11 +207,36 @@ export function checkRoleScope(role: string | null, question: string): string | 
   // we prefer a safe block over an accidental data leak across roles.
   const domainKeywords: Record<string, string[]> = {
     production: ["production", "manufacturing", "batch", "oee", "throughput", "work order"],
-    inventory: ["inventory", "stock", "warehouse", "sku", "reorder level", "bin location", "material"],
+    inventory: [
+      "inventory",
+      "stock",
+      "warehouse",
+      "sku",
+      "reorder level",
+      "bin location",
+      "material",
+    ],
     quality: ["quality", "inspection", "defect", "yield", "ncr", "capa", "pass rate", "rejection"],
-    maintenance: ["maintenance", "repair", "breakdown", "mtbf", "mttr", "machine downtime", "spare part"],
+    maintenance: [
+      "maintenance",
+      "repair",
+      "breakdown",
+      "mtbf",
+      "mttr",
+      "machine downtime",
+      "spare part",
+    ],
     finance: ["revenue", "invoice", "payment", "budget", "cash flow", "profit", "expense", "tax"],
-    hr: ["employee", "headcount", "payroll", "leave", "training", "attendance", "recruitment", "onboarding"],
+    hr: [
+      "employee",
+      "headcount",
+      "payroll",
+      "leave",
+      "training",
+      "attendance",
+      "recruitment",
+      "onboarding",
+    ],
     customers: ["customer", "client"],
     suppliers: ["supplier", "vendor"],
     orders: ["sales order", "so-", "wo-", "purchase order"],
@@ -204,29 +300,48 @@ export const ROLE_LABELS: Record<string, string> = {
 
 /** One-line description of what each role's Copilot is for */
 export const ROLE_SCOPE_SUMMARY: Record<string, string> = {
-  root_super_admin: "the platform console only — companies, registrations, whitelisting and platform audit. I never see any company's operational ERP data.",
-  company_admin: "your own company's full operational picture across every module — but only your company, never another tenant.",
+  root_super_admin:
+    "the platform console only — companies, registrations, whitelisting and platform audit. I never see any company's operational ERP data.",
+  company_admin:
+    "your own company's full operational picture across every module — but only your company, never another tenant.",
   plant_admin: "your plant's production, inventory, quality, maintenance and machines.",
-  plant_manager: "day-to-day plant operations: production, inventory, quality, maintenance and machines.",
-  production_manager: "production planning, work orders, machines, material availability, maintenance and quality feedback.",
-  production_operator: "the work orders assigned to you, the machines you run, and maintenance flags you raise.",
+  plant_manager:
+    "day-to-day plant operations: production, inventory, quality, maintenance and machines.",
+  production_manager:
+    "production planning, work orders, machines, material availability, maintenance and quality feedback.",
+  production_operator:
+    "the work orders assigned to you, the machines you run, and maintenance flags you raise.",
   warehouse_manager: "inventory, stock movement, products and dispatch/shipments.",
   procurement_manager: "purchase orders, requisitions, RFQs, suppliers and material stock levels.",
   quality_inspector: "inspections, defects, CAPA and incoming/final inspection records.",
   maintenance_engineer: "maintenance tickets, machine status, breakdowns and spare parts.",
   finance_manager: "invoices, payments, expenses, budgets, taxes, P&L and supplier payments.",
   hr_manager: "employees, leaves, training, performance, payroll, attendance and recruitment.",
-  customer_portal: "your own orders, shipments, invoices, payments, documents and support tickets — never another customer's.",
-  supplier_portal: "the purchase orders sent to you, your deliveries, invoices and payments — never another supplier's.",
-  auditor: "read-only visibility across every module in your company, plus the audit trail. I can never create, edit or delete anything.",
+  customer_portal:
+    "your own orders, shipments, invoices, payments, documents and support tickets — never another customer's.",
+  supplier_portal:
+    "the purchase orders sent to you, your deliveries, invoices and payments — never another supplier's.",
+  auditor:
+    "read-only visibility across every module in your company, plus the audit trail. I can never create, edit or delete anything.",
 };
 
 /** Domains a role explicitly cannot ask about (everything outside its map) */
 export function getBlockedLabels(role: string | null): string[] {
   const allowed = new Set(ROLE_DOMAIN_MAP[role ?? ""] ?? []);
   const core = [
-    "production", "inventory", "quality", "maintenance", "finance", "hr",
-    "suppliers", "procurement", "orders", "dispatch", "customers", "audit", "platform",
+    "production",
+    "inventory",
+    "quality",
+    "maintenance",
+    "finance",
+    "hr",
+    "suppliers",
+    "procurement",
+    "orders",
+    "dispatch",
+    "customers",
+    "audit",
+    "platform",
   ];
   return core.filter((d) => !allowed.has(d)).map((d) => DOMAIN_LABELS[d] ?? d);
 }
@@ -249,11 +364,12 @@ export function getRoleIdentityCard(role: string | null, companyName?: string | 
   const allowed = getAllowedLabels(role);
   const blocked = getBlockedLabels(role);
   const scope = ROLE_SCOPE_SUMMARY[key] ?? "your assigned modules.";
-  const tenant = key === "root_super_admin"
-    ? "Platform scope (no company ERP data)"
-    : companyName
-      ? `Company scope: ${companyName} only`
-      : "Company scope: your own company only";
+  const tenant =
+    key === "root_super_admin"
+      ? "Platform scope (no company ERP data)"
+      : companyName
+        ? `Company scope: ${companyName} only`
+        : "Company scope: your own company only";
 
   return [
     `🤖 I am the Copilot for exactly one role: **${label}**.`,
@@ -268,4 +384,3 @@ export function getRoleIdentityCard(role: string | null, companyName?: string | 
     `No God-mode: I don't switch roles, and I can't read another role's or another company's records.`,
   ].join("\n");
 }
-

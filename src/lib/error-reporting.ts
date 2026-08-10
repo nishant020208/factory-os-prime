@@ -51,6 +51,3 @@ export function reportRuntimeError(error: unknown, context: Record<string, unkno
     filename: window.location.pathname,
   });
 }
-
-export const reportLovableError = reportRuntimeError;
-export const reportError = reportRuntimeError;

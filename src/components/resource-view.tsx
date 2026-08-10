@@ -1,13 +1,44 @@
 import { useMemo, useState, useCallback, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, SlidersHorizontal, Download, Plus, X, Check, Trash2, Edit3, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Search,
+  SlidersHorizontal,
+  Download,
+  Plus,
+  X,
+  Check,
+  Trash2,
+  Edit3,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { PageHeader, Panel, StatusBadge } from "@/components/ui-parts";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
@@ -49,13 +80,15 @@ export interface ResourceViewProps<T extends Record<string, any>> {
 }
 
 function exportToCSV<T>(rows: T[], columns: Column<T>[]) {
-  const headers = columns.map(c => c.header).join(",");
-  const data = rows.map(row =>
-    columns.map(c => {
-      const val = (row as any)[c.key];
-      const str = String(val ?? "");
-      return str.includes(",") || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
-    }).join(",")
+  const headers = columns.map((c) => c.header).join(",");
+  const data = rows.map((row) =>
+    columns
+      .map((c) => {
+        const val = (row as any)[c.key];
+        const str = String(val ?? "");
+        return str.includes(",") || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+      })
+      .join(","),
   );
   const csv = [headers, ...data].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -69,8 +102,19 @@ function exportToCSV<T>(rows: T[], columns: Column<T>[]) {
 }
 
 export function ResourceView<T extends Record<string, any>>({
-  eyebrow, title, sub, moduleName, rows, columns, searchKeys, kpis, extraActions,
-  formFields, onRowClick, onDelete, onSubmit,
+  eyebrow,
+  title,
+  sub,
+  moduleName,
+  rows,
+  columns,
+  searchKeys,
+  kpis,
+  extraActions,
+  formFields,
+  onRowClick,
+  onDelete,
+  onSubmit,
 }: ResourceViewProps<T>) {
   const [q, setQ] = useState("");
   const [showNewDialog, setShowNewDialog] = useState(false);
@@ -87,7 +131,13 @@ export function ResourceView<T extends Record<string, any>>({
     let result = rows ?? [];
     if (q.trim()) {
       const s = q.toLowerCase();
-      result = result.filter((r) => searchKeys.some((k) => String(r[k] ?? "").toLowerCase().includes(s)));
+      result = result.filter((r) =>
+        searchKeys.some((k) =>
+          String(r[k] ?? "")
+            .toLowerCase()
+            .includes(s),
+        ),
+      );
     }
     if (sortKey) {
       result = [...result].sort((a, b) => {
@@ -102,7 +152,7 @@ export function ResourceView<T extends Record<string, any>>({
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
-      setSortDir(d => d === "asc" ? "desc" : "asc");
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
       setSortDir("asc");
@@ -111,7 +161,9 @@ export function ResourceView<T extends Record<string, any>>({
 
   const handleNew = () => {
     const defaults: Record<string, string> = {};
-    formFields?.forEach(f => { defaults[f.key] = f.defaultValue ?? ""; });
+    formFields?.forEach((f) => {
+      defaults[f.key] = f.defaultValue ?? "";
+    });
     setFormData(defaults);
     setShowNewDialog(true);
   };
@@ -119,7 +171,9 @@ export function ResourceView<T extends Record<string, any>>({
   const handleEdit = (row: T) => {
     setSelectedRow(row);
     const data: Record<string, string> = {};
-    formFields?.forEach(f => { data[f.key] = String(row[f.key] ?? ""); });
+    formFields?.forEach((f) => {
+      data[f.key] = String(row[f.key] ?? "");
+    });
     setFormData(data);
     setShowEditDialog(true);
   };
@@ -127,8 +181,9 @@ export function ResourceView<T extends Record<string, any>>({
   const handleDeleteClick = (row: T) => {
     setSelectedRow(row);
     setShowDeleteDialog(true);
-  };  const handleFormSubmit = async () => {
-    if (formFields?.some(f => f.required && !formData[f.key])) {
+  };
+  const handleFormSubmit = async () => {
+    if (formFields?.some((f) => f.required && !formData[f.key])) {
       toast.error("Please fill all required fields");
       return;
     }
@@ -161,7 +216,7 @@ export function ResourceView<T extends Record<string, any>>({
 
   const visibleColumns = useMemo(() => {
     if (!isMobile) return columns;
-    return columns.filter(c => !c.hideOnMobile);
+    return columns.filter((c) => !c.hideOnMobile);
   }, [columns, isMobile]);
 
   return (
@@ -174,14 +229,22 @@ export function ResourceView<T extends Record<string, any>>({
         actions={
           <>
             {moduleName && <ModuleCopilot moduleName={moduleName} />}
-            <Button variant="outline" className="glass border-white/5" onClick={() => exportToCSV(filtered, columns)}>
+            <Button
+              variant="outline"
+              className="glass border-white/5"
+              onClick={() => exportToCSV(filtered, columns)}
+            >
               <Download className="h-4 w-4 mr-1.5" />
               {isMobile ? "Export" : "Export CSV"}
             </Button>
             {extraActions}
             {formFields && (
-              <Button className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={handleNew}>
-                <Plus className="h-4 w-4 mr-1.5" />New
+              <Button
+                className="bg-[image:var(--gradient-primary)] shadow-glow"
+                onClick={handleNew}
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                New
               </Button>
             )}
           </>
@@ -194,9 +257,17 @@ export function ResourceView<T extends Record<string, any>>({
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="h-8 pl-8 w-56 bg-background/40" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search…"
+                className="h-8 pl-8 w-56 bg-background/40"
+              />
             </div>
-            <Button variant="ghost" size="sm" className="h-8"><SlidersHorizontal className="h-3.5 w-3.5 mr-1.5" />Filters</Button>
+            <Button variant="ghost" size="sm" className="h-8">
+              <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5" />
+              Filters
+            </Button>
           </div>
         }
       >
@@ -207,7 +278,7 @@ export function ResourceView<T extends Record<string, any>>({
               const rowId = String(row.id ?? i);
               const isExpanded = expandedRow === rowId;
               const primaryCol = columns[0];
-              const statusCol = columns.find(c => c.key === "status");
+              const statusCol = columns.find((c) => c.key === "status");
               return (
                 <motion.div
                   key={rowId}
@@ -222,7 +293,9 @@ export function ResourceView<T extends Record<string, any>>({
                   >
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">
-                        {primaryCol?.render ? primaryCol.render(row) : (row as any)[primaryCol?.key]}
+                        {primaryCol?.render
+                          ? primaryCol.render(row)
+                          : (row as any)[primaryCol?.key]}
                       </div>
                       {statusCol && (
                         <div className="mt-1">
@@ -232,16 +305,36 @@ export function ResourceView<T extends Record<string, any>>({
                     </div>
                     <div className="flex items-center gap-1 ml-2">
                       {formFields && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleEdit(row); }}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(row);
+                          }}
+                        >
                           <Edit3 className="h-3.5 w-3.5" />
                         </Button>
                       )}
                       {onDelete && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClick(row); }}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(row);
+                          }}
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}
-                      {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                      {isExpanded ? (
+                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      )}
                     </div>
                   </div>
                   <AnimatePresence>
@@ -254,7 +347,7 @@ export function ResourceView<T extends Record<string, any>>({
                         className="overflow-hidden"
                       >
                         <div className="mt-3 pt-3 border-t border-white/5 grid grid-cols-2 gap-2">
-                          {columns.slice(1).map(c => (
+                          {columns.slice(1).map((c) => (
                             <div key={c.key} className="text-xs">
                               <div className="text-muted-foreground">{c.header}</div>
                               <div className="mt-0.5 text-sm">
@@ -264,11 +357,21 @@ export function ResourceView<T extends Record<string, any>>({
                           ))}
                         </div>
                         <div className="flex gap-2 mt-3">
-                          <Button variant="outline" size="sm" className="flex-1 h-8" onClick={() => onRowClick?.(row)}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 h-8"
+                            onClick={() => onRowClick?.(row)}
+                          >
                             View Details
                           </Button>
                           {formFields && (
-                            <Button variant="outline" size="sm" className="h-8" onClick={() => handleEdit(row)}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => handleEdit(row)}
+                            >
                               <Edit3 className="h-3.5 w-3.5" />
                             </Button>
                           )}
@@ -297,11 +400,20 @@ export function ResourceView<T extends Record<string, any>>({
                     >
                       <span className="inline-flex items-center gap-1">
                         {c.header}
-                        {sortKey === c.key && (sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                        {sortKey === c.key &&
+                          (sortDir === "asc" ? (
+                            <ChevronUp className="h-3 w-3" />
+                          ) : (
+                            <ChevronDown className="h-3 w-3" />
+                          ))}
                       </span>
                     </TableHead>
                   ))}
-                  {(formFields || onDelete) && <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground w-24">Actions</TableHead>}
+                  {(formFields || onDelete) && (
+                    <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground w-24">
+                      Actions
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -323,12 +435,28 @@ export function ResourceView<T extends Record<string, any>>({
                       <TableCell>
                         <div className="flex items-center gap-1">
                           {formFields && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleEdit(row); }}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(row);
+                              }}
+                            >
                               <Edit3 className="h-3.5 w-3.5" />
                             </Button>
                           )}
                           {onDelete && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClick(row); }}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(row);
+                              }}
+                            >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           )}
@@ -338,7 +466,14 @@ export function ResourceView<T extends Record<string, any>>({
                   </motion.tr>
                 ))}
                 {filtered.length === 0 && (
-                  <TableRow className="border-white/5"><TableCell colSpan={visibleColumns.length + 1} className="text-center text-muted-foreground py-8 text-sm">No records found</TableCell></TableRow>
+                  <TableRow className="border-white/5">
+                    <TableCell
+                      colSpan={visibleColumns.length + 1}
+                      className="text-center text-muted-foreground py-8 text-sm"
+                    >
+                      No records found
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -347,33 +482,51 @@ export function ResourceView<T extends Record<string, any>>({
       </Panel>
 
       {/* New / Edit Dialog */}
-      <Dialog open={showNewDialog || showEditDialog} onOpenChange={(open) => { if (!open) { setShowNewDialog(false); setShowEditDialog(false); setSelectedRow(null); } }}>
+      <Dialog
+        open={showNewDialog || showEditDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowNewDialog(false);
+            setShowEditDialog(false);
+            setSelectedRow(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[480px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{showEditDialog ? "Edit Record" : "New Record"}</DialogTitle>
-            <DialogDescription>{showEditDialog ? "Update the record details below." : "Fill in the details to create a new record."}</DialogDescription>
+            <DialogDescription>
+              {showEditDialog
+                ? "Update the record details below."
+                : "Fill in the details to create a new record."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {formFields?.map(field => (
+            {formFields?.map((field) => (
               <div key={field.key} className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">
                   {field.label} {field.required && <span className="text-destructive">*</span>}
                 </Label>
                 {field.type === "select" ? (
-                  <Select value={formData[field.key] ?? ""} onValueChange={(v) => setFormData(d => ({ ...d, [field.key]: v }))}>
+                  <Select
+                    value={formData[field.key] ?? ""}
+                    onValueChange={(v) => setFormData((d) => ({ ...d, [field.key]: v }))}
+                  >
                     <SelectTrigger className="h-9">
                       <SelectValue placeholder={field.placeholder ?? `Select ${field.label}`} />
                     </SelectTrigger>
                     <SelectContent>
-                      {field.options?.map(opt => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      {field.options?.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 ) : field.type === "textarea" ? (
                   <textarea
                     value={formData[field.key] ?? ""}
-                    onChange={(e) => setFormData(d => ({ ...d, [field.key]: e.target.value }))}
+                    onChange={(e) => setFormData((d) => ({ ...d, [field.key]: e.target.value }))}
                     placeholder={field.placeholder}
                     className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[80px]"
                   />
@@ -381,7 +534,7 @@ export function ResourceView<T extends Record<string, any>>({
                   <Input
                     type={field.type}
                     value={formData[field.key] ?? ""}
-                    onChange={(e) => setFormData(d => ({ ...d, [field.key]: e.target.value }))}
+                    onChange={(e) => setFormData((d) => ({ ...d, [field.key]: e.target.value }))}
                     placeholder={field.placeholder}
                     className="h-9"
                   />
@@ -390,7 +543,16 @@ export function ResourceView<T extends Record<string, any>>({
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowNewDialog(false); setShowEditDialog(false); setSelectedRow(null); }}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowNewDialog(false);
+                setShowEditDialog(false);
+                setSelectedRow(null);
+              }}
+            >
+              Cancel
+            </Button>
             <Button className="bg-[image:var(--gradient-primary)]" onClick={handleFormSubmit}>
               <Check className="h-4 w-4 mr-1.5" />
               {showEditDialog ? "Save Changes" : "Create Record"}
@@ -400,14 +562,32 @@ export function ResourceView<T extends Record<string, any>>({
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={(open) => { if (!open) { setShowDeleteDialog(false); setSelectedRow(null); } }}>
+      <Dialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowDeleteDialog(false);
+            setSelectedRow(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Delete Record</DialogTitle>
-            <DialogDescription>Are you sure you want to delete this record? This action cannot be undone.</DialogDescription>
+            <DialogDescription>
+              Are you sure you want to delete this record? This action cannot be undone.
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowDeleteDialog(false); setSelectedRow(null); }}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setSelectedRow(null);
+              }}
+            >
+              Cancel
+            </Button>
             <Button variant="destructive" onClick={handleConfirmDelete}>
               <Trash2 className="h-4 w-4 mr-1.5" />
               Delete

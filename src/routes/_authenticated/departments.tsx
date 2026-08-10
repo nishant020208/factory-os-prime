@@ -8,15 +8,23 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/departments")({
-  head: () => ({ meta: [
-    { title: "Departments — FactoryOS AI" },
-    { name: "description", content: "Departments, hierarchy and reporting structure." },
-  ]}),
+  head: () => ({
+    meta: [
+      { title: "Departments — FactoryOS AI" },
+      { name: "description", content: "Departments, hierarchy and reporting structure." },
+    ],
+  }),
   component: DepartmentsPage,
 });
 
 const DEPT_FORM_FIELDS: FormField[] = [
-  { key: "name", label: "Department Name", type: "text", placeholder: "Production", required: true },
+  {
+    key: "name",
+    label: "Department Name",
+    type: "text",
+    placeholder: "Production",
+    required: true,
+  },
   { key: "code", label: "Department Code", type: "text", placeholder: "DEPT-PROD" },
 ];
 
@@ -43,19 +51,28 @@ function DepartmentsPage() {
       });
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["departments"] }); toast.success("Department created"); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
+      toast.success("Department created");
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data: d }: { id: string; data: Record<string, string> }) => {
-      const { error } = await supabase.from("departments").update({
-        name: d.name,
-        code: d.code || null,
-      }).eq("id", id);
+      const { error } = await supabase
+        .from("departments")
+        .update({
+          name: d.name,
+          code: d.code || null,
+        })
+        .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["departments"] }); toast.success("Department updated"); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
+      toast.success("Department updated");
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
@@ -64,7 +81,10 @@ function DepartmentsPage() {
       const { error } = await supabase.from("departments").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["departments"] }); toast.success("Department deleted"); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
+      toast.success("Department deleted");
+    },
     onError: (err: any) => toast.error(err.message),
   });
 
@@ -84,17 +104,66 @@ function DepartmentsPage() {
       onDelete={(row) => deleteMutation.mutateAsync(row.id)}
       kpis={
         <>
-          <Kpi label="Departments" value={String(data?.length ?? 0)} icon={Building2} tone="primary" />
-          <Kpi label="With Code" value={String(data?.filter((d: any) => d.code).length ?? 0)} icon={Hash} tone="info" />
-          <Kpi label="Employees" value={String(profiles?.length ?? 0)} icon={Users} tone="success" />
-          <Kpi label="Plants" value={String(new Set(data?.map((d: any) => d.plant_id).filter(Boolean)).size)} icon={Building2} tone="warning" />
+          <Kpi
+            label="Departments"
+            value={String(data?.length ?? 0)}
+            icon={Building2}
+            tone="primary"
+          />
+          <Kpi
+            label="With Code"
+            value={String(data?.filter((d: any) => d.code).length ?? 0)}
+            icon={Hash}
+            tone="info"
+          />
+          <Kpi
+            label="Employees"
+            value={String(profiles?.length ?? 0)}
+            icon={Users}
+            tone="success"
+          />
+          <Kpi
+            label="Plants"
+            value={String(new Set(data?.map((d: any) => d.plant_id).filter(Boolean)).size)}
+            icon={Building2}
+            tone="warning"
+          />
         </>
       }
       columns={[
-        { key: "code", header: "Code", render: (r) => r.code ? <span className="font-mono text-xs">{r.code}</span> : <span className="text-muted-foreground">—</span> },
-        { key: "name", header: "Department", render: (r) => <span className="font-medium">{r.name}</span> },
-        { key: "plant_id", header: "Plant", render: (r) => <span className="text-muted-foreground text-xs">{r.plant_id ? "Linked" : "Company-wide"}</span> },
-        { key: "created_at", header: "Created", render: (r) => <span className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</span> },
+        {
+          key: "code",
+          header: "Code",
+          render: (r) =>
+            r.code ? (
+              <span className="font-mono text-xs">{r.code}</span>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            ),
+        },
+        {
+          key: "name",
+          header: "Department",
+          render: (r) => <span className="font-medium">{r.name}</span>,
+        },
+        {
+          key: "plant_id",
+          header: "Plant",
+          render: (r) => (
+            <span className="text-muted-foreground text-xs">
+              {r.plant_id ? "Linked" : "Company-wide"}
+            </span>
+          ),
+        },
+        {
+          key: "created_at",
+          header: "Created",
+          render: (r) => (
+            <span className="text-xs text-muted-foreground">
+              {new Date(r.created_at).toLocaleDateString()}
+            </span>
+          ),
+        },
       ]}
     />
   );

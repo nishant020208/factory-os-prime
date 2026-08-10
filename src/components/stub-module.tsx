@@ -11,8 +11,14 @@ import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
  * header — no more "Scaffolded / Interconnection / Copilot" placeholder cards.
  */
 export function StubModule({
-  eyebrow, title, sub,
-}: { eyebrow: string; title: string; sub?: string }) {
+  eyebrow,
+  title,
+  sub,
+}: {
+  eyebrow: string;
+  title: string;
+  sub?: string;
+}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const cfg = moduleForPath(pathname);
   if (cfg) return <LiveModule config={cfg} />;
@@ -23,8 +29,12 @@ export function StubModule({
   return (
     <div className="max-w-[1600px] mx-auto">
       <ModuleStatusBar moduleName={slug} />
-      <PageHeader eyebrow={eyebrow} title={title} sub={sub}
-        actions={<ModuleCopilot moduleName={slug} />} />
+      <PageHeader
+        eyebrow={eyebrow}
+        title={title}
+        sub={sub}
+        actions={<ModuleCopilot moduleName={slug} />}
+      />
       <Panel title={title}>
         <EmptyState
           title="Nothing here yet"
