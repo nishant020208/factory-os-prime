@@ -65,6 +65,8 @@ import {
 import { ROLES } from "@/lib/roles";
 import { useTheme, type ThemeMode } from "@/hooks/use-theme";
 import { supabase } from "@/integrations/supabase/client";
+import { FactoryHalftoneBackdrop } from "@/components/factory-halftone-backdrop";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
