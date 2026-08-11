@@ -10,7 +10,13 @@ export interface AuthState {
   roles: AppRole[];
   companyId: string | null;
   isMainAdmin: boolean;
-  profile: { full_name: string | null; email: string; avatar_url: string | null } | null;
+  profile: {
+    full_name: string | null;
+    email: string;
+    avatar_url: string | null;
+    phone: string | null;
+    job_title: string | null;
+  } | null;
 }
 
 export function useAuth(): AuthState {
@@ -45,7 +51,7 @@ export function useAuth(): AuthState {
           supabase.from("user_roles").select("role,company_id").eq("user_id", session.user.id),
           supabase
             .from("profiles")
-            .select("full_name,email,avatar_url,company_id,is_main_admin")
+            .select("full_name,email,avatar_url,company_id,is_main_admin,phone,job_title")
             .eq("id", session.user.id)
             .maybeSingle(),
         ]);
@@ -65,8 +71,20 @@ export function useAuth(): AuthState {
             null,
           isMainAdmin: profile?.is_main_admin === true,
           profile: profile
-            ? { full_name: profile.full_name, email: profile.email, avatar_url: profile.avatar_url }
-            : { full_name: null, email: session.user.email ?? "", avatar_url: null },
+            ? {
+                full_name: profile.full_name,
+                email: profile.email,
+                avatar_url: profile.avatar_url,
+                phone: profile.phone,
+                job_title: profile.job_title,
+              }
+            : {
+                full_name: null,
+                email: session.user.email ?? "",
+                avatar_url: null,
+                phone: null,
+                job_title: null,
+              },
         });
       } catch {
         // Graceful degradation — if queries fail (table missing, RLS issue),
@@ -79,7 +97,13 @@ export function useAuth(): AuthState {
           roles: [],
           companyId: null,
           isMainAdmin: false,
-          profile: { full_name: null, email: session.user.email ?? "", avatar_url: null },
+          profile: {
+            full_name: null,
+            email: session.user.email ?? "",
+            avatar_url: null,
+            phone: null,
+            job_title: null,
+          },
         });
       }
     }

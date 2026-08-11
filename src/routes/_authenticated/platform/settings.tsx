@@ -114,7 +114,11 @@ function PlatformSettings() {
     const merged: Record<string, any> = {};
     for (const [key, def] of Object.entries(DEFAULT_SETTINGS)) {
       const dbVal = dbSettings?.find((s: any) => s.key === key);
-      merged[key] = dbVal ? dbVal.value : def.value;
+      let val = dbVal ? dbVal.value : def.value;
+      if (val && typeof val === "object" && "value" in val) {
+        val = val.value;
+      }
+      merged[key] = val;
     }
     setSettings(merged);
   }, [dbSettings]);
@@ -135,7 +139,7 @@ function PlatformSettings() {
     }
   };
 
-  const SettingToggle = ({ key: k, label }: { key: string; label: string }) => {
+  const SettingToggle = ({ settingKey: k, label }: { settingKey: string; label: string }) => {
     const desc = DEFAULT_SETTINGS[k]?.description ?? "";
     return (
       <div className="flex items-center justify-between py-3 border-b border-white/5">
@@ -185,10 +189,10 @@ function PlatformSettings() {
 
         <TabsContent value="general">
           <Panel title="General Settings">
-            <SettingToggle key="invoice_qr_at_approval" label="Invoice QR at Approval" />
-            <SettingToggle key="auto_notify_next_role" label="Auto Notify Next Role" />
-            <SettingToggle key="company_auto_approve" label="Auto-Approve Companies" />
-            <SettingToggle key="allow_self_registration" label="Allow Self-Registration" />
+            <SettingToggle settingKey="invoice_qr_at_approval" label="Invoice QR at Approval" />
+            <SettingToggle settingKey="auto_notify_next_role" label="Auto Notify Next Role" />
+            <SettingToggle settingKey="company_auto_approve" label="Auto-Approve Companies" />
+            <SettingToggle settingKey="allow_self_registration" label="Allow Self-Registration" />
             <div className="flex items-center justify-between py-3 border-b border-white/5">
               <div>
                 <div className="text-sm font-medium">Max Companies Per Admin</div>
@@ -212,7 +216,7 @@ function PlatformSettings() {
 
         <TabsContent value="security">
           <Panel title="Security Settings">
-            <SettingToggle key="require_mfa" label="Require Multi-Factor Authentication" />
+            <SettingToggle settingKey="require_mfa" label="Require Multi-Factor Authentication" />
             <div className="flex items-center justify-between py-3 border-b border-white/5">
               <div>
                 <div className="text-sm font-medium">Session Timeout</div>
@@ -269,7 +273,7 @@ function PlatformSettings() {
 
         <TabsContent value="notifications">
           <Panel title="Notification Defaults">
-            <SettingToggle key="auto_notify_next_role" label="Auto Notify Next Role" />
+            <SettingToggle settingKey="auto_notify_next_role" label="Auto Notify Next Role" />
             <div className="text-xs text-muted-foreground mt-4 p-3 bg-card/30 rounded-lg">
               Notification channels (email, SMS, Slack) will be configurable in a future update.
               Currently, all notifications appear in-app and in the audit log.

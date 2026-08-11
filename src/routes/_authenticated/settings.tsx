@@ -79,8 +79,8 @@ function SettingsPage() {
       setProfileForm({
         full_name: profile.full_name ?? "",
         email: profile.email ?? "",
-        phone: "",
-        job_title: "",
+        phone: profile.phone ?? "",
+        job_title: profile.job_title ?? "",
         avatar_url: profile.avatar_url ?? "",
       });
     }
