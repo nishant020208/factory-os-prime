@@ -180,14 +180,12 @@ function SettingsPage() {
       if (!req) return;
 
       if (action === "approved") {
-        // Apply the change to the profile
-        // @ts-expect-error — Supabase types reject computed keys
+        // Apply the change to the profile (computed key — cast for Supabase types)
         await supabase
           .from("profiles")
-          .update({
-            [req.field_name]: req.requested_value,
-          })
+          .update({ [req.field_name]: req.requested_value } as never)
           .eq("id", req.user_id);
+
       }
 
       // Update the change request status
