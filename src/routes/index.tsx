@@ -65,23 +65,29 @@ import {
 import { ROLES } from "@/lib/roles";
 import { useTheme, type ThemeMode } from "@/hooks/use-theme";
 import { supabase } from "@/integrations/supabase/client";
+import { FactoryHalftoneBackdrop } from "@/components/factory-halftone-backdrop";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "FactoryOS AI — Intelligent Manufacturing Platform" },
+      { title: "FactoryOS AI — ERP for Custom Furniture Manufacturers" },
       {
         name: "description",
         content:
-          "AI-powered Smart Manufacturing ERP. Production, inventory, quality, maintenance, finance, HR and AI in one platform.",
+          "AI-powered ERP built for custom furniture makers. Carpentry, upholstery, polishing, quality, dispatch, payments and AI in one platform.",
       },
-      { property: "og:title", content: "FactoryOS AI — Intelligent Manufacturing Platform" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: "FactoryOS AI — ERP for Custom Furniture Manufacturers" },
       {
         property: "og:description",
-        content: "AI-powered Smart Manufacturing ERP built for modern enterprise operations.",
+        content:
+          "Run the whole workshop floor: teak orders, work orders, QC, dispatch and invoicing.",
       },
     ],
   }),
+
   component: LandingPage,
 });
 
@@ -942,11 +948,17 @@ function Hero() {
       }}
       className="relative pb-16 sm:pb-24 max-w-7xl mx-auto px-4 sm:px-6"
     >
+      {/* Furniture factory halftone backdrop (WebGL loupe on desktop) */}
+      <div className="absolute -inset-x-4 sm:-inset-x-6 -top-24 bottom-0 -z-0">
+        <FactoryHalftoneBackdrop />
+      </div>
+
       {/* Drifting gradient orbs */}
       <GradientOrbs />
 
       {/* Floating particles */}
       <FloatingParticles />
+
 
       <div className="relative z-10" style={{ transformStyle: "preserve-3d" }}>
         {/* Layer 1 — Version badge (moves 18px, deepest) */}
@@ -964,25 +976,27 @@ function Hero() {
 
         {/* Layer 2 — Main title (moves 10px, mid-depth) */}
         <motion.div style={{ x: layer2X, y: layer2Y }}>
-          <motion.h1 className="mt-6 text-[32px] sm:text-[44px] lg:text-[52px] font-semibold tracking-tight leading-[1.08] text-foreground">
+          <motion.h1 className="mt-6 text-[30px] sm:text-[44px] lg:text-[52px] font-semibold tracking-tight leading-[1.08] text-foreground">
             <span className="inline-flex flex-wrap gap-x-[0.3em]">
-              {["Every", "Operation.", "One", "Intelligent", "Platform."].map((word, i) => (
-                <motion.span
-                  key={word}
-                  className="inline-block"
-                  initial={{ opacity: 0, rotateX: 85, y: 30, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, rotateX: 0, y: 0, filter: "blur(0px)" }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 180,
-                    damping: 16,
-                    delay: 0.15 + i * 0.09,
-                  }}
-                  style={{ perspective: 400 }}
-                >
-                  {i >= 2 ? <span className="text-muted-foreground">{word}</span> : word}
-                </motion.span>
-              ))}
+              {["The", "operating", "system", "for", "custom", "furniture", "manufacturers."].map(
+                (word, i) => (
+                  <motion.span
+                    key={word}
+                    className="inline-block"
+                    initial={{ opacity: 0, rotateX: 85, y: 30, filter: "blur(4px)" }}
+                    animate={{ opacity: 1, rotateX: 0, y: 0, filter: "blur(0px)" }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 180,
+                      damping: 16,
+                      delay: 0.15 + i * 0.07,
+                    }}
+                    style={{ perspective: 400 }}
+                  >
+                    {i >= 3 ? <span className="text-muted-foreground">{word}</span> : word}
+                  </motion.span>
+                ),
+              )}
             </span>
           </motion.h1>
 
@@ -990,12 +1004,14 @@ function Hero() {
             initial={{ opacity: 0, y: 16, filter: "blur(3px)" }}
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             transition={{ type: "spring", stiffness: 150, damping: 18, delay: 0.55 }}
-            className="mt-4 text-[15px] text-muted-foreground max-w-xl leading-relaxed"
+            className="mt-4 text-[14px] sm:text-[15px] text-muted-foreground max-w-xl leading-relaxed"
           >
-            AI-powered Smart Manufacturing ERP built for modern enterprise operations. Production,
-            inventory, quality, maintenance, finance, HR and AI — unified.
+            From a teak dining-table order to carpentry, upholstery, polishing, QC and dispatch —
+            FactoryOS AI runs the whole workshop floor. Materials, work orders, quality, payments
+            and AI, unified.
           </motion.p>
         </motion.div>
+
 
         {/* Layer 3 — Buttons & CTA (moves 6px, closer) */}
         <motion.div
