@@ -944,11 +944,17 @@ function Hero() {
       }}
       className="relative pb-16 sm:pb-24 max-w-7xl mx-auto px-4 sm:px-6"
     >
+      {/* Furniture factory halftone backdrop (WebGL loupe on desktop) */}
+      <div className="absolute -inset-x-4 sm:-inset-x-6 -top-24 bottom-0 -z-0">
+        <FactoryHalftoneBackdrop />
+      </div>
+
       {/* Drifting gradient orbs */}
       <GradientOrbs />
 
       {/* Floating particles */}
       <FloatingParticles />
+
 
       <div className="relative z-10" style={{ transformStyle: "preserve-3d" }}>
         {/* Layer 1 — Version badge (moves 18px, deepest) */}
