@@ -26,6 +26,13 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated/platform/whitelist")({
   head: () => ({ meta: [{ title: "Company Admin Whitelist — FactoryOS AI" }] }),
@@ -49,13 +56,26 @@ function WhitelistPage() {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [legalName, setLegalName] = useState("");
+  const [industry, setIndustry] = useState("Custom Furniture Manufacturing");
+  const [country, setCountry] = useState("India");
+  const [currency, setCurrency] = useState("INR");
+  const [timezone, setTimezone] = useState("Asia/Kolkata");
 
   const invite = useMutation({
     mutationFn: async () => {
       // Create the tenant company first so the admin lands into an isolated tenant.
       const { data: co, error: coErr } = await supabase
         .from("companies")
-        .insert({ name: companyName, status: "pending" })
+        .insert({
+          name: companyName,
+          legal_name: legalName || null,
+          industry,
+          country: country || null,
+          currency,
+          timezone,
+          status: "pending",
+        })
         .select("id")
         .single();
       if (coErr) throw coErr;
@@ -72,6 +92,11 @@ function WhitelistPage() {
       setOpen(false);
       setEmail("");
       setCompanyName("");
+      setLegalName("");
+      setIndustry("Custom Furniture Manufacturing");
+      setCountry("India");
+      setCurrency("INR");
+      setTimezone("Asia/Kolkata");
       qc.invalidateQueries({ queryKey: ["platform-whitelist"] });
       qc.invalidateQueries({ queryKey: ["p-companies"] });
     },
@@ -97,28 +122,94 @@ function WhitelistPage() {
                   Whitelist Company Admin
                 </Button>
               </DialogTrigger>
-              <DialogContent className="glass-strong border-white/10">
+              <DialogContent className="glass-strong border-white/10 max-w-[500px]">
                 <DialogHeader>
                   <DialogTitle>Whitelist a new Company Admin</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label>Company Name</Label>
-                    <Input
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      placeholder="ACME Manufacturing"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Company Name</Label>
+                      <Input
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        placeholder="Artisan Woodworks"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Legal Name</Label>
+                      <Input
+                        value={legalName}
+                        onChange={(e) => setLegalName(e.target.value)}
+                        placeholder="Artisan Woodworks Pvt Ltd"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Admin Email</Label>
                     <Input
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@acme.com"
+                      placeholder="admin@artisanwood.com"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <div className="space-y-1.5">
+                    <Label>Industry</Label>
+                    <Input
+                      value={industry}
+                      onChange={(e) => setIndustry(e.target.value)}
+                      placeholder="Custom Furniture Manufacturing"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Country</Label>
+                    <Input
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      placeholder="India"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Currency</Label>
+                      <Select value={currency} onValueChange={setCurrency}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["INR", "USD", "EUR", "GBP", "JPY"].map((curr) => (
+                            <SelectItem key={curr} value={curr}>
+                              {curr}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Timezone</Label>
+                      <Select value={timezone} onValueChange={setTimezone}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[200px]">
+                          {[
+                            "Asia/Kolkata",
+                            "UTC",
+                            "America/New_York",
+                            "America/Los_Angeles",
+                            "Europe/London",
+                            "Asia/Tokyo",
+                            "Asia/Singapore",
+                          ].map((tz) => (
+                            <SelectItem key={tz} value={tz}>
+                              {tz}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground pt-1">
                     A new isolated tenant will be created. The admin can sign up with this email and
                     takes full control of their company only.
                   </p>
@@ -127,7 +218,7 @@ function WhitelistPage() {
                   <Button
                     onClick={() => invite.mutate()}
                     disabled={!email || !companyName || invite.isPending}
-                    className="bg-[image:var(--gradient-primary)]"
+                    className="bg-[image:var(--gradient-primary)] w-full sm:w-auto"
                   >
                     {invite.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Whitelist"}
                   </Button>
