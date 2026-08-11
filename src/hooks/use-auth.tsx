@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { AppRole } from "@/lib/roles";
@@ -19,118 +20,123 @@ export interface AuthState {
   } | null;
 }
 
-export function useAuth(): AuthState {
-  const [state, setState] = useState<AuthState>({
-    session: null,
-    user: null,
-    loading: true,
-    roles: [],
-    companyId: null,
-    isMainAdmin: false,
-    profile: null,
-  });
+const EMPTY_AUTH: AuthState = {
+  session: null,
+  user: null,
+  loading: true,
+  roles: [],
+  companyId: null,
+  isMainAdmin: false,
+  profile: null,
+};
 
-  useEffect(() => {
-    let mounted = true;
-    async function hydrate(session: Session | null) {
-      if (!session?.user) {
-        if (mounted)
-          setState({
-            session: null,
-            user: null,
-            loading: false,
-            roles: [],
-            companyId: null,
-            isMainAdmin: false,
-            profile: null,
-          });
-        return;
-      }
-      try {
-        const [rolesRes, profileRes] = await Promise.all([
-          supabase.from("user_roles").select("role,company_id").eq("user_id", session.user.id),
-          supabase
-            .from("profiles")
-            .select("full_name,email,avatar_url,company_id,is_main_admin,phone,job_title")
-            .eq("id", session.user.id)
-            .maybeSingle(),
-        ]);
-        if (!mounted) return;
-        const rolesData = rolesRes.data ?? [];
-        const profile = profileRes.data;
-        setState({
-          session,
-          user: session.user,
-          loading: false,
-          roles: rolesData.length
-            ? (rolesData as Array<{ role: string }>).map((r) => r.role as AppRole)
-            : [],
-          companyId:
-            profile?.company_id ??
-            (rolesData as Array<{ company_id?: string }>)?.[0]?.company_id ??
-            null,
-          isMainAdmin: profile?.is_main_admin === true,
-          profile: profile
-            ? {
-                full_name: profile.full_name,
-                email: profile.email,
-                avatar_url: profile.avatar_url,
-                phone: profile.phone,
-                job_title: profile.job_title,
-              }
-            : {
-                full_name: null,
-                email: session.user.email ?? "",
-                avatar_url: null,
-                phone: null,
-                job_title: null,
-              },
-        });
-      } catch {
-        // Graceful degradation — if queries fail (table missing, RLS issue),
-        // still reflect the authenticated user without roles/company data
-        if (!mounted) return;
-        setState({
-          session,
-          user: session.user,
-          loading: false,
-          roles: [],
-          companyId: null,
-          isMainAdmin: false,
-          profile: {
+async function fetchAuthState(): Promise<AuthState> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData?.session ?? null;
+
+  if (!session?.user) {
+    return { ...EMPTY_AUTH, loading: false };
+  }
+
+  try {
+    const [rolesRes, profileRes] = await Promise.all([
+      supabase.from("user_roles").select("role,company_id").eq("user_id", session.user.id),
+      supabase
+        .from("profiles")
+        .select("full_name,email,avatar_url,company_id,is_main_admin,phone,job_title")
+        .eq("id", session.user.id)
+        .maybeSingle(),
+    ]);
+
+    const rolesData = rolesRes.data ?? [];
+    const profile = profileRes.data;
+
+    return {
+      session,
+      user: session.user,
+      loading: false,
+      roles: rolesData.map((r) => r.role as AppRole),
+      companyId:
+        profile?.company_id ??
+        (rolesData as Array<{ company_id?: string }>)?.[0]?.company_id ??
+        null,
+      isMainAdmin: profile?.is_main_admin === true,
+      profile: profile
+        ? {
+            full_name: profile.full_name,
+            email: profile.email,
+            avatar_url: profile.avatar_url,
+            phone: profile.phone,
+            job_title: profile.job_title,
+          }
+        : {
             full_name: null,
             email: session.user.email ?? "",
             avatar_url: null,
             phone: null,
             job_title: null,
           },
-        });
-      }
-    }
+    };
+  } catch {
+    // Graceful degradation
+    return {
+      session,
+      user: session.user,
+      loading: false,
+      roles: [],
+      companyId: null,
+      isMainAdmin: false,
+      profile: {
+        full_name: null,
+        email: session.user.email ?? "",
+        avatar_url: null,
+        phone: null,
+        job_title: null,
+      },
+    };
+  }
+}
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => hydrate(data.session))
-      .catch(() => {
-        if (mounted) setState((s) => ({ ...s, loading: false }));
-      });
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+export function useAuth(): AuthState {
+  const queryClient = useQueryClient();
+  const [sessionKey, setSessionKey] = useState(0);
+
+  // Listen for auth state changes and invalidate the cache
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (
         event === "SIGNED_IN" ||
         event === "SIGNED_OUT" ||
         event === "USER_UPDATED" ||
         event === "INITIAL_SESSION"
       ) {
-        hydrate(session);
+        // Invalidate to trigger a fresh fetch with the new session
+        queryClient.invalidateQueries({ queryKey: ["auth-state"] });
+        setSessionKey((k) => k + 1);
       }
     });
     return () => {
-      mounted = false;
       try {
         sub.subscription.unsubscribe();
       } catch {}
     };
-  }, []);
+  }, [queryClient]);
 
-  return state;
+  const { data, isLoading } = useQuery({
+    queryKey: ["auth-state", sessionKey],
+    queryFn: fetchAuthState,
+    // Cache auth data for 10 minutes — no re-fetch on every tab switch
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    // Never retry auth failures in a loop
+    retry: 0,
+    // Start immediately, even on first render
+    refetchOnWindowFocus: false,
+  });
+
+  if (isLoading || !data) {
+    return EMPTY_AUTH;
+  }
+
+  return data;
 }

@@ -14,8 +14,9 @@ export const Route = createFileRoute("/_authenticated")({
       <RouteLoading label="Loading module..." />
     </AppShell>
   ),
-  pendingMs: 100,
-  pendingMinMs: 200,
+  // Only show loading UI if route takes > 300ms; dismiss it instantly when ready
+  pendingMs: 300,
+  pendingMinMs: 0,
   beforeLoad: async ({ location }) => {
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) {

@@ -362,8 +362,12 @@ function useLiveStats(companyId: string | null) {
       };
     },
     enabled: !!companyId,
+    // Cache for 3 minutes — 18 queries don't re-run on every tab switch
+    staleTime: 3 * 60_000,
+    gcTime: 15 * 60_000,
   });
 }
+
 
 /** Honest fallback when a metric has no real data source yet */
 function na(): string {

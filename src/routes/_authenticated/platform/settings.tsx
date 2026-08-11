@@ -95,6 +95,26 @@ const DEFAULT_SETTINGS: Record<string, PlatformSetting> = {
   },
 };
 
+interface SettingToggleProps {
+  settingKey: string;
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}
+
+const SettingToggle = ({ settingKey, label, checked, onCheckedChange }: SettingToggleProps) => {
+  const desc = DEFAULT_SETTINGS[settingKey]?.description ?? "";
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-white/5">
+      <div>
+        <div className="text-sm font-medium">{label}</div>
+        <div className="text-xs text-muted-foreground">{desc}</div>
+      </div>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
+  );
+};
+
 function PlatformSettings() {
   const queryClient = useQueryClient();
   const { companyId } = useAuth();
@@ -139,25 +159,6 @@ function PlatformSettings() {
     }
   };
 
-  const SettingToggle = ({ settingKey: k, label }: { settingKey: string; label: string }) => {
-    const desc = DEFAULT_SETTINGS[k]?.description ?? "";
-    return (
-      <div className="flex items-center justify-between py-3 border-b border-white/5">
-        <div>
-          <div className="text-sm font-medium">{label}</div>
-          <div className="text-xs text-muted-foreground">{desc}</div>
-        </div>
-        <Switch
-          checked={!!settings[k]}
-          onCheckedChange={(v) => {
-            setSettings((s) => ({ ...s, [k]: v }));
-            updateSetting(k, v);
-          }}
-        />
-      </div>
-    );
-  };
-
   return (
     <div className="max-w-[1000px] mx-auto space-y-4">
       <PageHeader
@@ -189,10 +190,42 @@ function PlatformSettings() {
 
         <TabsContent value="general">
           <Panel title="General Settings">
-            <SettingToggle settingKey="invoice_qr_at_approval" label="Invoice QR at Approval" />
-            <SettingToggle settingKey="auto_notify_next_role" label="Auto Notify Next Role" />
-            <SettingToggle settingKey="company_auto_approve" label="Auto-Approve Companies" />
-            <SettingToggle settingKey="allow_self_registration" label="Allow Self-Registration" />
+            <SettingToggle
+              settingKey="invoice_qr_at_approval"
+              label="Invoice QR at Approval"
+              checked={!!settings.invoice_qr_at_approval}
+              onCheckedChange={(v) => {
+                setSettings((s) => ({ ...s, invoice_qr_at_approval: v }));
+                updateSetting("invoice_qr_at_approval", v);
+              }}
+            />
+            <SettingToggle
+              settingKey="auto_notify_next_role"
+              label="Auto Notify Next Role"
+              checked={!!settings.auto_notify_next_role}
+              onCheckedChange={(v) => {
+                setSettings((s) => ({ ...s, auto_notify_next_role: v }));
+                updateSetting("auto_notify_next_role", v);
+              }}
+            />
+            <SettingToggle
+              settingKey="company_auto_approve"
+              label="Auto-Approve Companies"
+              checked={!!settings.company_auto_approve}
+              onCheckedChange={(v) => {
+                setSettings((s) => ({ ...s, company_auto_approve: v }));
+                updateSetting("company_auto_approve", v);
+              }}
+            />
+            <SettingToggle
+              settingKey="allow_self_registration"
+              label="Allow Self-Registration"
+              checked={!!settings.allow_self_registration}
+              onCheckedChange={(v) => {
+                setSettings((s) => ({ ...s, allow_self_registration: v }));
+                updateSetting("allow_self_registration", v);
+              }}
+            />
             <div className="flex items-center justify-between py-3 border-b border-white/5">
               <div>
                 <div className="text-sm font-medium">Max Companies Per Admin</div>
@@ -216,7 +249,15 @@ function PlatformSettings() {
 
         <TabsContent value="security">
           <Panel title="Security Settings">
-            <SettingToggle settingKey="require_mfa" label="Require Multi-Factor Authentication" />
+            <SettingToggle
+              settingKey="require_mfa"
+              label="Require Multi-Factor Authentication"
+              checked={!!settings.require_mfa}
+              onCheckedChange={(v) => {
+                setSettings((s) => ({ ...s, require_mfa: v }));
+                updateSetting("require_mfa", v);
+              }}
+            />
             <div className="flex items-center justify-between py-3 border-b border-white/5">
               <div>
                 <div className="text-sm font-medium">Session Timeout</div>
@@ -273,7 +314,15 @@ function PlatformSettings() {
 
         <TabsContent value="notifications">
           <Panel title="Notification Defaults">
-            <SettingToggle settingKey="auto_notify_next_role" label="Auto Notify Next Role" />
+            <SettingToggle
+              settingKey="auto_notify_next_role"
+              label="Auto Notify Next Role"
+              checked={!!settings.auto_notify_next_role}
+              onCheckedChange={(v) => {
+                setSettings((s) => ({ ...s, auto_notify_next_role: v }));
+                updateSetting("auto_notify_next_role", v);
+              }}
+            />
             <div className="text-xs text-muted-foreground mt-4 p-3 bg-card/30 rounded-lg">
               Notification channels (email, SMS, Slack) will be configurable in a future update.
               Currently, all notifications appear in-app and in the audit log.
