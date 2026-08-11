@@ -26,7 +26,7 @@ const PRODUCT_FORM_FIELDS: FormField[] = [
     key: "name",
     label: "Product Name",
     type: "text",
-    placeholder: "Titanium Bracket TB-600",
+    placeholder: "Dining Table — Teak",
     required: true,
   },
   {
