@@ -71,19 +71,23 @@ import { FactoryHalftoneBackdrop } from "@/components/factory-halftone-backdrop"
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "FactoryOS AI — Intelligent Manufacturing Platform" },
+      { title: "FactoryOS AI — ERP for Custom Furniture Manufacturers" },
       {
         name: "description",
         content:
-          "AI-powered Smart Manufacturing ERP. Production, inventory, quality, maintenance, finance, HR and AI in one platform.",
+          "AI-powered ERP built for custom furniture makers. Carpentry, upholstery, polishing, quality, dispatch, payments and AI in one platform.",
       },
-      { property: "og:title", content: "FactoryOS AI — Intelligent Manufacturing Platform" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: "FactoryOS AI — ERP for Custom Furniture Manufacturers" },
       {
         property: "og:description",
-        content: "AI-powered Smart Manufacturing ERP built for modern enterprise operations.",
+        content:
+          "Run the whole workshop floor: teak orders, work orders, QC, dispatch and invoicing.",
       },
     ],
   }),
+
   component: LandingPage,
 });
 
