@@ -7,7 +7,9 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, lazy, Suspense, type ReactNode } from "react";
+
+const TargetCursor = lazy(() => import('../components/TargetCursor'));
 
 import appCss from "../styles.css?url";
 import { reportRuntimeError } from "../lib/lovable-error-reporting";
@@ -283,6 +285,17 @@ function RootComponent() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
+        {/* Global target cursor — desktop only, returns null on touch/mobile automatically */}
+        <Suspense fallback={null}>
+          <TargetCursor
+            targetSelector=".cursor-target"
+            spinDuration={2}
+            hideDefaultCursor={true}
+            parallaxOn={true}
+            cursorColor="#ffffff"
+            cursorColorOnTarget="oklch(0.72 0.19 145)"
+          />
+        </Suspense>
         <Outlet />
         <Toaster position="top-right" richColors closeButton />
       </QueryClientProvider>
