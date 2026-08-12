@@ -44,54 +44,78 @@ export const Route = createFileRoute("/_authenticated/orders")({
   component: OrdersPage,
 });
 
-// Dynamic order form fields - customer dropdown is populated from DB
-function getOrderFormFields(customers: any[]): FormField[] {
-  return [
-    {
+// Dynamic order form fields
+// Customers: only product + quantity + notes (admin sets priority/due_date after approval)
+// Admins: full form including priority and due_date
+function getOrderFormFields(customers: any[], products: any[], isCustomer: boolean): FormField[] {
+  const fields: FormField[] = [];
+
+  // Auto-generate SO number so customers don't need to fill it
+  if (!isCustomer) {
+    fields.push({
       key: "so_number",
       label: "Order Number",
       type: "text",
-      placeholder: "SO-2026-001",
-      required: true,
-    },
-    {
+      placeholder: "SO-2026-001 (auto-generated if blank)",
+    });
+  }
+
+  // Non-customer: pick customer from dropdown
+  if (!isCustomer) {
+    fields.push({
       key: "customer_id",
       label: "Customer",
       type: "select",
       placeholder: "Select customer",
       required: true,
       options: (customers ?? []).map((c: any) => ({ value: c.id, label: c.name })),
-    },
-    {
-      key: "product_name",
-      label: "Product / Description",
-      type: "text",
-      placeholder: "Product name or description",
-      required: true,
-    },
-    { key: "quantity", label: "Quantity", type: "number", placeholder: "100", required: true },
-    {
-      key: "total_amount",
-      label: "Total Amount ($)",
-      type: "number",
-      placeholder: "5000",
-      required: true,
-    },
-    {
-      key: "priority",
-      label: "Priority",
-      type: "select",
-      defaultValue: "medium",
-      options: [
-        { value: "low", label: "Low" },
-        { value: "medium", label: "Medium" },
-        { value: "high", label: "High" },
-        { value: "critical", label: "Critical" },
-      ],
-    },
-    { key: "due_date", label: "Delivery Date", type: "date" },
-    { key: "notes", label: "Notes", type: "textarea" },
-  ];
+    });
+  }
+
+  // Product dropdown (from company's product catalog)
+  fields.push({
+    key: "product_id",
+    label: "Product",
+    type: "select",
+    placeholder: "Select product",
+    required: true,
+    options: (products ?? []).map((p: any) => ({
+      value: p.id,
+      label: `${p.name} — $${Number(p.unit_price).toLocaleString()} / unit`,
+    })),
+  });
+
+  fields.push({
+    key: "quantity",
+    label: "Quantity",
+    type: "number",
+    placeholder: "1",
+    required: true,
+  });
+
+  // Total amount is AUTO-CALCULATED (qty × unit_price) — not entered by customer or admin in this form
+  // Priority and due_date are set by Company Admin / Production Admin at approval time
+  if (!isCustomer) {
+    fields.push(
+      {
+        key: "priority",
+        label: "Priority",
+        type: "select",
+        defaultValue: "medium",
+        options: [
+          { value: "low", label: "Low" },
+          { value: "medium", label: "Medium" },
+          { value: "high", label: "High" },
+          { value: "critical", label: "Critical" },
+        ],
+      },
+      { key: "due_date", label: "Due Date", type: "date" },
+    );
+  }
+
+  fields.push({ key: "notes", label: "Notes / Special Instructions", type: "textarea" });
+
+  return fields;
 }
 
 function OrdersPage() {
@@ -104,12 +128,28 @@ function OrdersPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [approving, setApproving] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
+  // Approve dialog: admin sets priority + due date before confirming
+  const [approveDialog, setApproveDialog] = useState<{ open: boolean; orderId: string }>({
+    open: false,
+    orderId: "",
+  });
+  const [approvePriority, setApprovePriority] = useState("medium");
+  const [approveDueDate, setApproveDueDate] = useState("");
 
   // Fetch customers for dropdown
   const { data: customerList } = useQuery({
     queryKey: ["order-customers", companyId],
     queryFn: async () =>
       (await supabase.from("customers").select("id,name").eq("status", "active").order("name"))
+        .data ?? [],
+    enabled: !!companyId,
+  });
+
+  // Fetch products for dropdown
+  const { data: productList } = useQuery({
+    queryKey: ["order-products", companyId],
+    queryFn: async () =>
+      (await supabase.from("products").select("id,name,unit_price").eq("status", "active").order("name"))
         .data ?? [],
     enabled: !!companyId,
   });
@@ -150,7 +190,17 @@ function OrdersPage() {
   const { data: salesOrders } = useQuery({
     queryKey: ["orders-sales", companyId, isCustomer ? myCustomerId : "all"],
     queryFn: async () => {
-      let query = supabase.from("sales_orders").select("*, customers!inner(name, contact_email)");
+      let query = supabase.from("sales_orders").select(`
+        *,
+        customers!inner(name, contact_email),
+        sales_order_items(
+          id,
+          quantity,
+          unit_price,
+          product_id,
+          products(name)
+        )
+      `);
 
       // DATA ISOLATION: Customer portal users only see their own orders
       if (isCustomer && myCustomerId) {
@@ -158,12 +208,18 @@ function OrdersPage() {
       }
 
       const { data } = await query.order("created_at", { ascending: false });
-      return (data ?? []).map((so: any) => ({
-        ...so,
-        customer_name: so.customers?.name ?? "Unknown Customer",
-        customer_email: so.customers?.contact_email ?? "",
-        product_name: so.id?.slice(0, 8) ?? "—",
-      }));
+      return (data ?? []).map((so: any) => {
+        const item = so.sales_order_items?.[0];
+        const productName = item?.products?.name ?? "Custom Furniture Order";
+        const quantity = item?.quantity ?? 0;
+        return {
+          ...so,
+          customer_name: so.customers?.name ?? "Unknown Customer",
+          customer_email: so.customers?.contact_email ?? "",
+          product_name: productName,
+          quantity: quantity,
+        };
+      });
     },
     enabled: !!companyId && (!isCustomer || myCustomerId !== undefined),
   });
@@ -211,15 +267,27 @@ function OrdersPage() {
       (await supabase.from("invoices").select("*").order("issue_date", { ascending: false }))
         .data ?? [],
     enabled: !!companyId,
-  }); // Create order mutation
+  });
+
+  // Create order mutation
+  // Total amount is auto-calculated from quantity × unit_price; never taken from form input
   const createMutation = useMutation({
     mutationFn: async (formData: Record<string, string>) => {
       const now = new Date().toISOString();
-      const customerId = formData.customer_id;
-      if (!customerId) throw new Error("Please select a customer");
+      const customerId = isCustomer ? myCustomerId : formData.customer_id;
+      if (!customerId) throw new Error("No customer associated with this account.");
 
-      const soNumber = formData.so_number || `SO-${Date.now().toString().slice(-6)}`;
+      if (!formData.product_id) throw new Error("Please select a product.");
+      const qty = parseFloat(formData.quantity) || 1;
 
+      // Resolve unit price from product catalog
+      const selectedProd = productList?.find((p: any) => p.id === formData.product_id);
+      const unitPrice = selectedProd ? Number(selectedProd.unit_price) : 0;
+      const calculatedTotal = qty * unitPrice;
+
+      const soNumber = formData.so_number?.trim() || `SO-${Date.now().toString().slice(-6)}`;
+
+      // Customers submit with pending_approval and no priority/due_date (admin sets those)
       const { data: inserted, error } = await supabase
         .from("sales_orders")
         .insert({
@@ -227,10 +295,11 @@ function OrdersPage() {
           so_number: soNumber,
           customer_id: customerId,
           status: "pending_approval",
-          priority: formData.priority || "medium",
-          total_amount: parseFloat(formData.total_amount) || 0,
+          // Priority + due_date: admins set at approval; customers default to medium/null
+          priority: isCustomer ? "medium" : (formData.priority || "medium"),
+          total_amount: calculatedTotal,           // ← auto-calculated
           order_date: now,
-          due_date: formData.due_date || null,
+          due_date: isCustomer ? null : (formData.due_date || null),
           progress: 0,
           notes: formData.notes || null,
         })
@@ -239,7 +308,22 @@ function OrdersPage() {
 
       if (error) throw error;
 
-      // Fire notification to Company Admin
+      // Insert order line item
+      if (inserted) {
+        const { error: itemErr } = await supabase
+          .from("sales_order_items")
+          .insert({
+            company_id: companyId!,
+            sales_order_id: inserted.id,
+            product_id: formData.product_id,
+            quantity: qty,
+            unit_price: unitPrice,
+            line_total: calculatedTotal,
+          });
+        if (itemErr) throw itemErr;
+      }
+
+      // Notify Company Admin of new order
       if (inserted && companyId) {
         const customerName =
           customerList?.find((c: any) => c.id === customerId)?.name ?? "Customer";
@@ -248,31 +332,53 @@ function OrdersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders-sales"] });
-      toast.success("Order submitted for approval");
+      toast.success("Order submitted for approval!");
     },
     onError: (err: any) => toast.error(err.message),
   });
 
-  // Approve order mutation (Company Admin action)
+  // Approve order mutation (Company Admin / Production Admin)
+  // Sets priority + due_date on the order before approving
   const approveMutation = useMutation({
-    mutationFn: async (orderId: string) => {
+    mutationFn: async ({
+      orderId,
+      priority,
+      dueDate,
+    }: {
+      orderId: string;
+      priority: string;
+      dueDate: string;
+    }) => {
       if (!companyId || !user) throw new Error("Not authenticated");
       setApproving(orderId);
       const order = salesOrders?.find((o: any) => o.id === orderId);
       if (!order) throw new Error("Order not found");
 
-      // Update status + record history (preserves order_status_history tracking)
+      // Write priority + due_date set by admin before approving
+      const { error: updateErr } = await supabase
+        .from("sales_orders")
+        .update({
+          priority,
+          due_date: dueDate || null,
+        })
+        .eq("id", orderId);
+      if (updateErr) throw updateErr;
+
+      // Update status + record history
       await approveCustomerOrder(orderId, companyId, user.id, order.customer_id);
 
-      // Fire role-targeted notifications: Customer + Production Manager
+      // Notify Customer + Production Manager
       const customerUserId = await getCustomerUserId(order.customer_id);
       await notifyOrderApproved(companyId, order.so_number, customerUserId ?? "", orderId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders-sales"] });
       queryClient.invalidateQueries({ queryKey: ["orders-history"] });
-      toast.success("Order approved — Customer & Production Manager notified");
+      toast.success("Order approved — priority & due date set, customer notified.");
       setApproving(null);
+      setApproveDialog({ open: false, orderId: "" });
+      setApprovePriority("medium");
+      setApproveDueDate("");
     },
     onError: (err: any) => {
       toast.error(err.message);
@@ -358,7 +464,11 @@ function OrdersPage() {
         moduleName="orders"
         rows={rows}
         searchKeys={["so_number", "customer_name", "status", "priority"]}
-        formFields={isCustomer ? getOrderFormFields(customerList ?? []) : undefined}
+        formFields={
+          isCustomer
+            ? getOrderFormFields(customerList ?? [], productList ?? [], isCustomer)
+            : undefined
+        }
         onSubmit={async (formData) => {
           await createMutation.mutateAsync(formData);
         }}
@@ -416,6 +526,11 @@ function OrdersPage() {
             render: (r: any) => <span className="text-sm">{r.customer_name ?? "—"}</span>,
           },
           {
+            key: "product_name",
+            header: "Product",
+            render: (r: any) => <span className="text-sm">{r.product_name ?? "—"}</span>,
+          },
+          {
             key: "total_amount",
             header: "Amount",
             hideOnMobile: true,
@@ -436,7 +551,7 @@ function OrdersPage() {
             render: (r: any) => (
               <div className="flex items-center gap-2">
                 <StatusBadge status={r.status} />
-                {r.status === "pending_approval" && isCompanyAdmin && (
+                {r.status === "pending_approval" && (isCompanyAdmin || isProductionManager) && (
                   <div className="flex gap-1">
                     <Button
                       size="sm"
@@ -444,7 +559,7 @@ function OrdersPage() {
                       className="h-6 w-6 p-0 text-success"
                       onClick={(e) => {
                         e.stopPropagation();
-                        approveMutation.mutate(r.id);
+                        setApproveDialog({ open: true, orderId: r.id });
                       }}
                       disabled={approving === r.id}
                     >
@@ -520,6 +635,65 @@ function OrdersPage() {
               disabled={!rejectReason.trim() || rejecting === rejectDialog.orderId}
             >
               {rejecting === rejectDialog.orderId ? "Rejecting..." : "Reject Order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approve Dialog — Admin sets priority + due date before confirming */}
+      <Dialog
+        open={approveDialog.open}
+        onOpenChange={(o) => setApproveDialog((d) => ({ ...d, open: o }))}
+      >
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Approve Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Set the <strong>priority</strong> and <strong>due date</strong> before approving.
+              The total amount has been auto-calculated from product price × quantity.
+            </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="approve-priority">Priority *</Label>
+              <select
+                id="approve-priority"
+                className="w-full rounded-md border border-white/10 bg-background px-3 py-2 text-sm"
+                value={approvePriority}
+                onChange={(e) => setApprovePriority(e.target.value)}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="approve-due-date">Due Date *</Label>
+              <Input
+                id="approve-due-date"
+                type="date"
+                value={approveDueDate}
+                onChange={(e) => setApproveDueDate(e.target.value)}
+                min={new Date().toISOString().split("T")[0]}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApproveDialog({ open: false, orderId: "" })}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                approveMutation.mutate({
+                  orderId: approveDialog.orderId,
+                  priority: approvePriority,
+                  dueDate: approveDueDate,
+                })
+              }
+              disabled={!approveDueDate || approving === approveDialog.orderId}
+            >
+              {approving === approveDialog.orderId ? "Approving..." : "Approve Order"}
             </Button>
           </DialogFooter>
         </DialogContent>
