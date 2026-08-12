@@ -51,13 +51,13 @@ BEGIN
   WHERE id = _company;
 
   -- Get default warehouses
-  SELECT id INTO _wh_main FROM public.warehouses WHERE company_id = _company AND is_active = true LIMIT 1;
+  SELECT id INTO _wh_main FROM public.warehouses WHERE company_id = _company LIMIT 1;
   SELECT id INTO _wh_raw FROM public.warehouses WHERE company_id = _company AND (name ILIKE '%raw%' OR name ILIKE '%material%') LIMIT 1;
   SELECT id INTO _wh_fg FROM public.warehouses WHERE company_id = _company AND (name ILIKE '%finished%' OR name ILIKE '%fg%') LIMIT 1;
 
   IF _wh_main IS NULL THEN
-    INSERT INTO public.warehouses (company_id, name, code, is_active)
-    VALUES (_company, 'Main Furniture Warehouse', 'WH-FRN-MAIN', true)
+    INSERT INTO public.warehouses (company_id, name, code)
+    VALUES (_company, 'Main Furniture Warehouse', 'WH-FRN-MAIN')
     RETURNING id INTO _wh_main;
   END IF;
   IF _wh_raw IS NULL THEN _wh_raw := _wh_main; END IF;
@@ -125,55 +125,55 @@ BEGIN
   -- 5. MATERIALS
   DELETE FROM public.materials WHERE company_id = _company;
 
-  INSERT INTO public.materials (company_id, name, unit, unit_cost, is_active, description)
-  VALUES (_company, 'Teak Wood', 'cubic feet', 1200, true, 'Grade A Malabar Teak Wood timber')
+  INSERT INTO public.materials (company_id, name, unit, unit_cost, description)
+  VALUES (_company, 'Teak Wood', 'cubic feet', 1200, 'Grade A Malabar Teak Wood timber')
   RETURNING id INTO _mat_teak;
 
-  INSERT INTO public.materials (company_id, name, unit, unit_cost, is_active, description)
-  VALUES (_company, 'Plywood Sheet', 'pcs', 450, true, '18mm Commercial Hardwood Plywood 8x4 ft')
+  INSERT INTO public.materials (company_id, name, unit, unit_cost, description)
+  VALUES (_company, 'Plywood Sheet', 'pcs', 450, '18mm Commercial Hardwood Plywood 8x4 ft')
   RETURNING id INTO _mat_ply;
 
-  INSERT INTO public.materials (company_id, name, unit, unit_cost, is_active, description)
-  VALUES (_company, 'Upholstery Fabric', 'meters', 350, true, 'High durability velvet upholstery fabric')
+  INSERT INTO public.materials (company_id, name, unit, unit_cost, description)
+  VALUES (_company, 'Upholstery Fabric', 'meters', 350, 'High durability velvet upholstery fabric')
   RETURNING id INTO _mat_fab;
 
-  INSERT INTO public.materials (company_id, name, unit, unit_cost, is_active, description)
-  VALUES (_company, 'High-Density Foam', 'sq ft', 180, true, '40-density cushion foam for seating')
+  INSERT INTO public.materials (company_id, name, unit, unit_cost, description)
+  VALUES (_company, 'High-Density Foam', 'sq ft', 180, '40-density cushion foam for seating')
   RETURNING id INTO _mat_foam;
 
-  INSERT INTO public.materials (company_id, name, unit, unit_cost, is_active, description)
-  VALUES (_company, 'Hinges', 'pcs', 25, true, '3D adjustable soft-close cabinet hinges')
+  INSERT INTO public.materials (company_id, name, unit, unit_cost, description)
+  VALUES (_company, 'Hinges', 'pcs', 25, '3D adjustable soft-close cabinet hinges')
   RETURNING id INTO _mat_hng;
 
-  INSERT INTO public.materials (company_id, name, unit, unit_cost, is_active, description)
-  VALUES (_company, 'Wood Screws', 'box', 150, true, 'Zinc-plated counter-sunk wood screws 500/box')
+  INSERT INTO public.materials (company_id, name, unit, unit_cost, description)
+  VALUES (_company, 'Wood Screws', 'box', 150, 'Zinc-plated counter-sunk wood screws 500/box')
   RETURNING id INTO _mat_scrw;
 
-  INSERT INTO public.materials (company_id, name, unit, unit_cost, is_active, description)
-  VALUES (_company, 'Polish/Varnish', 'liters', 500, true, 'Clear polyurethane wood polish & varnish')
+  INSERT INTO public.materials (company_id, name, unit, unit_cost, description)
+  VALUES (_company, 'Polish/Varnish', 'liters', 500, 'Clear polyurethane wood polish & varnish')
   RETURNING id INTO _mat_pol;
 
-  INSERT INTO public.materials (company_id, name, unit, unit_cost, is_active, description)
-  VALUES (_company, 'Drawer Slides', 'pairs', 220, true, 'Full extension ball-bearing drawer slides 18 inch')
+  INSERT INTO public.materials (company_id, name, unit, unit_cost, description)
+  VALUES (_company, 'Drawer Slides', 'pairs', 220, 'Full extension ball-bearing drawer slides 18 inch')
   RETURNING id INTO _mat_sld;
 
-  INSERT INTO public.materials (company_id, name, unit, unit_cost, is_active, description)
-  VALUES (_company, 'Fevicol/Wood Adhesive', 'liters', 280, true, 'High strength synthetic resin wood adhesive')
+  INSERT INTO public.materials (company_id, name, unit, unit_cost, description)
+  VALUES (_company, 'Fevicol/Wood Adhesive', 'liters', 280, 'High strength synthetic resin wood adhesive')
   RETURNING id INTO _mat_adh;
 
   -- 6. CUSTOMERS
   DELETE FROM public.customers WHERE company_id = _company;
 
-  INSERT INTO public.customers (company_id, name, business_name, email, contact_email, phone, contact_phone, segment, status, is_active)
-  VALUES (_company, 'Urban Living Furniture Retail', 'Urban Living Furniture Retail', 'procurement@urbanliving.com', 'procurement@urbanliving.com', '+91 98765 43210', '+91 98765 43210', 'Bulk Furniture Retail', 'active', true)
+  INSERT INTO public.customers (company_id, name, contact_email, contact_phone, segment, status)
+  VALUES (_company, 'Urban Living Furniture Retail', 'procurement@urbanliving.com', '+91 98765 43210', 'Bulk Furniture Retail', 'active')
   RETURNING id INTO _cust_urban;
 
-  INSERT INTO public.customers (company_id, name, business_name, email, contact_email, phone, contact_phone, segment, status, is_active)
-  VALUES (_company, 'Home Decor Interiors Pvt Ltd', 'Home Decor Interiors Pvt Ltd', 'orders@homedecorinteriors.com', 'orders@homedecorinteriors.com', '+91 98765 43211', '+91 98765 43211', 'Interior Design Firm', 'active', true)
+  INSERT INTO public.customers (company_id, name, contact_email, contact_phone, segment, status)
+  VALUES (_company, 'Home Decor Interiors Pvt Ltd', 'orders@homedecorinteriors.com', '+91 98765 43211', 'Interior Design Firm', 'active')
   RETURNING id INTO _cust_decor;
 
-  INSERT INTO public.customers (company_id, name, business_name, email, contact_email, phone, contact_phone, segment, status, is_active)
-  VALUES (_company, 'Ananya Sharma (Individual Customer)', 'Ananya Sharma', 'ananya.sharma@gmail.com', 'ananya.sharma@gmail.com', '+91 98765 43212', '+91 98765 43212', 'Individual Customer', 'active', true)
+  INSERT INTO public.customers (company_id, name, contact_email, contact_phone, segment, status)
+  VALUES (_company, 'Ananya Sharma (Individual Customer)', 'ananya.sharma@gmail.com', '+91 98765 43212', 'Individual Customer', 'active')
   RETURNING id INTO _cust_indiv;
 
   -- 7. SUPPLIER
