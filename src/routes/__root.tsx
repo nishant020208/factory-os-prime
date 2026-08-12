@@ -288,7 +288,7 @@ function RootComponent() {
         {/* Global target cursor — desktop only, returns null on touch/mobile automatically */}
         <Suspense fallback={null}>
           <TargetCursor
-            targetSelector=".cursor-target"
+            targetSelector='a, button, [role="button"], input, select, label, .cursor-target'
             spinDuration={2}
             hideDefaultCursor={true}
             parallaxOn={true}
