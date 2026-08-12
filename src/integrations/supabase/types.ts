@@ -596,6 +596,10 @@ export type Database = {
       customers: {
         Row: {
           billing_address: string | null
+          billing_city: string | null
+          billing_country: string | null
+          billing_postal: string | null
+          billing_state: string | null
           business_name: string | null
           company_id: string
           contact_email: string | null
@@ -616,6 +620,10 @@ export type Database = {
         }
         Insert: {
           billing_address?: string | null
+          billing_city?: string | null
+          billing_country?: string | null
+          billing_postal?: string | null
+          billing_state?: string | null
           business_name?: string | null
           company_id: string
           contact_email?: string | null
@@ -636,6 +644,10 @@ export type Database = {
         }
         Update: {
           billing_address?: string | null
+          billing_city?: string | null
+          billing_country?: string | null
+          billing_postal?: string | null
+          billing_state?: string | null
           business_name?: string | null
           company_id?: string
           contact_email?: string | null
@@ -2730,8 +2742,14 @@ export type Database = {
           entity_type: string
           expires_at: string | null
           id: string
+          label: string | null
           qr_data: string
           qr_url: string | null
+          status: string
+          sub_label: string | null
+          token: string
+          type: string
+          used_at: string | null
         }
         Insert: {
           company_id: string
@@ -2740,8 +2758,14 @@ export type Database = {
           entity_type: string
           expires_at?: string | null
           id?: string
+          label?: string | null
           qr_data: string
           qr_url?: string | null
+          status?: string
+          sub_label?: string | null
+          token?: string
+          type?: string
+          used_at?: string | null
         }
         Update: {
           company_id?: string
@@ -2750,8 +2774,14 @@ export type Database = {
           entity_type?: string
           expires_at?: string | null
           id?: string
+          label?: string | null
           qr_data?: string
           qr_url?: string | null
+          status?: string
+          sub_label?: string | null
+          token?: string
+          type?: string
+          used_at?: string | null
         }
         Relationships: []
       }
@@ -3359,6 +3389,41 @@ export type Database = {
           },
         ]
       }
+      support_ticket_replies: {
+        Row: {
+          created_at: string
+          id: string
+          is_admin: boolean
+          message: string
+          ticket_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_admin?: boolean
+          message: string
+          ticket_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_admin?: boolean
+          message?: string
+          ticket_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_replies_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_tickets: {
         Row: {
           assignee_id: string | null
@@ -3367,11 +3432,14 @@ export type Database = {
           customer_id: string | null
           description: string | null
           id: string
+          message: string | null
           priority: string | null
           resolved_at: string | null
           status: string
           subject: string
-          ticket_number: string
+          ticket_number: string | null
+          updated_at: string
+          user_id: string | null
         }
         Insert: {
           assignee_id?: string | null
@@ -3380,11 +3448,14 @@ export type Database = {
           customer_id?: string | null
           description?: string | null
           id?: string
+          message?: string | null
           priority?: string | null
           resolved_at?: string | null
           status?: string
           subject: string
-          ticket_number: string
+          ticket_number?: string | null
+          updated_at?: string
+          user_id?: string | null
         }
         Update: {
           assignee_id?: string | null
@@ -3393,11 +3464,14 @@ export type Database = {
           customer_id?: string | null
           description?: string | null
           id?: string
+          message?: string | null
           priority?: string | null
           resolved_at?: string | null
           status?: string
           subject?: string
-          ticket_number?: string
+          ticket_number?: string | null
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -3813,6 +3887,18 @@ export type Database = {
       is_customer_portal: { Args: never; Returns: boolean }
       is_main_admin: { Args: never; Returns: boolean }
       is_root_admin: { Args: { _user_id?: string }; Returns: boolean }
+      public_scan_qr: {
+        Args: { p_token: string }
+        Returns: {
+          entity_type: string
+          found: boolean
+          label: string
+          qr_status: string
+          qr_type: string
+          scanned_at: string
+          sub_label: string
+        }[]
+      }
       record_status_transition: {
         Args: {
           _changed_by: string
