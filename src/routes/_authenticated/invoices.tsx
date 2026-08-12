@@ -9,12 +9,13 @@ import {
   AlertTriangle,
   QrCode,
   Eye,
+  Copy,
+  Loader2,
   Plus,
-  Printer,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ResourceView, type FormField } from "@/components/resource-view";
-import { Kpi, StatusBadge, Panel } from "@/components/ui-parts";
+import { Kpi, StatusBadge } from "@/components/ui-parts";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { notifyInvoiceGenerated, notifyPaymentStatusChanged } from "@/lib/notifications";
@@ -71,9 +72,16 @@ const INVOICE_FORM_FIELDS: FormField[] = [
 function InvoicesPage() {
   const queryClient = useQueryClient();
   const { companyId } = useAuth();
-  const [qrDialog, setQrDialog] = useState<{ open: boolean; invoice: any | null }>({
+  const [qrDialog, setQrDialog] = useState<{
+    open: boolean;
+    invoice: any | null;
+    scanUrl: string | null;
+    generating: boolean;
+  }>({
     open: false,
     invoice: null,
+    scanUrl: null,
+    generating: false,
   });
 
   const { data } = useQuery({
@@ -109,19 +117,53 @@ function InvoicesPage() {
     onError: (err: any) => toast.error(err.message),
   });
 
-  // Generate a QR code URL for an invoice
-  const generateQrUrl = (invoice: any) => {
-    const qrData = JSON.stringify({
-      type: "invoice",
-      id: invoice.id,
-      invoice_number: invoice.invoice_number,
-      amount: invoice.total_amount,
-      status: invoice.status,
-      company: invoice.company_id?.slice(0, 8),
-    });
-    // Encode as base64 for a simple QR-like data URL
-    const encoded = btoa(qrData);
-    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
+  // Upsert a qr_codes row and return { token, scanUrl, imageUrl }
+  const createOrGetQrToken = async (invoice: any) => {
+    // Check for existing active token
+    const { data: existing } = await supabase
+      .from("qr_codes")
+      .select("token")
+      .eq("entity_id", invoice.id)
+      .eq("entity_type", "invoice")
+      .eq("status", "active")
+      .maybeSingle();
+
+    let token: string;
+    if (existing?.token) {
+      token = existing.token;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("qr_codes")
+        .insert({
+          company_id: invoice.company_id ?? companyId,
+          entity_type: "invoice",
+          entity_id: invoice.id,
+          type: "invoice",
+          status: "active",
+          qr_data: invoice.id,
+          label: invoice.invoice_number,
+          sub_label: `Status: ${invoice.status}`,
+        })
+        .select("token")
+        .single();
+      if (error) throw error;
+      token = inserted.token;
+    }
+
+    const scanUrl = `${window.location.origin}/scan?t=${token}`;
+    const imageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(scanUrl)}`;
+    return { token, scanUrl, imageUrl };
+  };
+
+  const openQrDialog = async (invoice: any) => {
+    setQrDialog({ open: true, invoice, scanUrl: null, generating: true });
+    try {
+      const { scanUrl } = await createOrGetQrToken(invoice);
+      setQrDialog((d) => ({ ...d, scanUrl, generating: false }));
+    } catch (err: any) {
+      toast.error("Failed to generate QR: " + err.message);
+      setQrDialog((d) => ({ ...d, generating: false }));
+    }
   };
 
   const handleMarkPaid = async (invoice: any) => {
@@ -294,9 +336,10 @@ function InvoicesPage() {
                   variant="ghost"
                   size="sm"
                   className="h-7 w-7 p-0"
+                  title="View scannable QR code"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setQrDialog({ open: true, invoice: r });
+                    openQrDialog(r);
                   }}
                 >
                   <QrCode className="h-3.5 w-3.5" />
@@ -323,55 +366,95 @@ function InvoicesPage() {
 
       {/* QR Code Dialog */}
       <Dialog open={qrDialog.open} onOpenChange={(o) => setQrDialog((d) => ({ ...d, open: o }))}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="sm:max-w-[380px]">
           <DialogHeader>
-            <DialogTitle>Invoice QR Code</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-4 w-4 text-primary" />
+              Invoice QR Code
+            </DialogTitle>
           </DialogHeader>
           {qrDialog.invoice && (
-            <div className="flex flex-col items-center gap-4 py-4">
-              <div className="bg-white rounded-xl p-4">
-                <img
-                  src={generateQrUrl(qrDialog.invoice)}
-                  alt="Invoice QR Code"
-                  className="w-48 h-48"
-                />
+            <div className="flex flex-col items-center gap-4 py-2">
+              {/* QR image */}
+              <div className="bg-white rounded-2xl p-3 shadow-lg">
+                {qrDialog.generating ? (
+                  <div className="w-48 h-48 flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  </div>
+                ) : qrDialog.scanUrl ? (
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(qrDialog.scanUrl)}`}
+                    alt="Invoice QR Code"
+                    className="w-48 h-48 rounded-lg"
+                  />
+                ) : (
+                  <div className="w-48 h-48 flex items-center justify-center text-xs text-muted-foreground">
+                    Failed to generate
+                  </div>
+                )}
               </div>
-              <div className="text-center">
-                <div className="font-medium">{qrDialog.invoice.invoice_number}</div>
-                <div className="text-sm text-muted-foreground">
-                  ${Number(qrDialog.invoice.total_amount ?? 0).toLocaleString()}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
+
+              {/* Info */}
+              <div className="text-center space-y-1">
+                <div className="font-semibold">{qrDialog.invoice.invoice_number}</div>
+                <div className="text-xs text-muted-foreground">
                   Status: <StatusBadge status={qrDialog.invoice.status} />
                 </div>
               </div>
-              <div className="text-[10px] text-muted-foreground text-center max-w-xs">
-                Scan this QR code to view invoice details and make payment. QR contains: invoice
-                number, amount, and payment status.
-              </div>
+
+              {/* Scan URL */}
+              {qrDialog.scanUrl && (
+                <div className="w-full rounded-lg bg-muted/50 border border-border px-3 py-2 flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate font-mono">
+                    {qrDialog.scanUrl}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(qrDialog.scanUrl!);
+                      toast.success("Scan link copied!");
+                    }}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+
+              <p className="text-[10px] text-muted-foreground text-center max-w-xs">
+                Scan with any phone camera — no app needed. Links to the public FactoryOS
+                verification page.
+              </p>
+
+              {/* Actions */}
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(generateQrUrl(qrDialog.invoice), "_blank")}
-                >
-                  <Eye className="h-3.5 w-3.5 mr-1" />
-                  View
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const link = document.createElement("a");
-                    link.href = generateQrUrl(qrDialog.invoice);
-                    link.download = `qr-${qrDialog.invoice.invoice_number}.png`;
-                    link.click();
-                    toast.success("QR code downloaded");
-                  }}
-                >
-                  <Download className="h-3.5 w-3.5 mr-1" />
-                  Download
-                </Button>
+                {qrDialog.scanUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(qrDialog.scanUrl!, "_blank")}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1" />
+                    Preview
+                  </Button>
+                )}
+                {qrDialog.scanUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const link = document.createElement("a");
+                      link.href = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(qrDialog.scanUrl!)}`;
+                      link.download = `qr-${qrDialog.invoice!.invoice_number}.png`;
+                      link.click();
+                      toast.success("QR code downloaded");
+                    }}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1" />
+                    Download
+                  </Button>
+                )}
               </div>
             </div>
           )}
