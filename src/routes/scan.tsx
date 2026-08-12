@@ -144,6 +144,13 @@ function ScanPage() {
       return;
     }
 
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(token)) {
+      setLoading(false);
+      setError("Invalid QR code format. Please scan a valid FactoryOS QR code.");
+      return;
+    }
+
     const lookup = async () => {
       try {
         const { data, error: rpcErr } = await supabase.rpc("public_scan_qr", {
