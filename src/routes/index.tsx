@@ -950,7 +950,7 @@ function Hero() {
       className="relative pt-16 sm:pt-24 pb-16 sm:pb-24 max-w-7xl mx-auto px-4 sm:px-6"
     >
       {/* Furniture factory halftone backdrop (WebGL loupe on desktop) */}
-      <div className="absolute -inset-x-4 sm:-inset-x-6 -top-24 bottom-0 -z-0">
+      <div className="absolute -inset-x-4 sm:-inset-x-6 top-0 bottom-0 -z-0">
         <FactoryHalftoneBackdrop />
       </div>
 

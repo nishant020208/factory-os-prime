@@ -50,7 +50,7 @@ export function FactoryHalftoneBackdrop({ className = "" }: { className?: string
           height={1008}
         />
       )}
-      <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent,var(--background)_92%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_bottom,var(--background)_0%,transparent_15%,transparent_85%,var(--background)_100%)]" />
       <div className="absolute inset-0 bg-background/45" />
     </div>
   );
