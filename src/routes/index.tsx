@@ -66,6 +66,7 @@ import { ROLES } from "@/lib/roles";
 import { useTheme, type ThemeMode } from "@/hooks/use-theme";
 import { supabase } from "@/integrations/supabase/client";
 import { FactoryHalftoneBackdrop } from "@/components/factory-halftone-backdrop";
+import BorderGlow from "@/components/BorderGlow";
 
 
 export const Route = createFileRoute("/")({
@@ -946,7 +947,7 @@ function Hero() {
         y: heroY,
         perspective: 800,
       }}
-      className="relative pb-16 sm:pb-24 max-w-7xl mx-auto px-4 sm:px-6"
+      className="relative pt-16 sm:pt-24 pb-16 sm:pb-24 max-w-7xl mx-auto px-4 sm:px-6"
     >
       {/* Furniture factory halftone backdrop (WebGL loupe on desktop) */}
       <div className="absolute -inset-x-4 sm:-inset-x-6 -top-24 bottom-0 -z-0">
@@ -1035,13 +1036,13 @@ function Hero() {
             onMouseLeave={() => {
               if (btnRef.current) btnRef.current.style.transform = "translate(0, 0)";
             }}
-            className="relative inline-flex items-center gap-1.5 h-10 px-5 rounded-lg text-[13px] font-medium text-white bg-primary hover:bg-primary/90 transition-all duration-150 active:scale-[0.97]"
+            className="cursor-target relative inline-flex items-center gap-1.5 h-10 px-5 rounded-lg text-[13px] font-medium text-white bg-primary hover:bg-primary/90 transition-all duration-150 active:scale-[0.97]"
           >
             Explore Platform <ArrowRight className="h-3.5 w-3.5" />
           </Link>
           <Link
             to="/auth"
-            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-[13px] font-medium border border-border text-muted-foreground hover:text-foreground hover:border-border transition-all duration-150 active:scale-[0.97]"
+            className="cursor-target inline-flex items-center gap-1.5 h-10 px-4 rounded-lg text-[13px] font-medium border border-border text-muted-foreground hover:text-foreground hover:border-border transition-all duration-150 active:scale-[0.97]"
           >
             Sign in
           </Link>
@@ -2062,6 +2063,21 @@ function BentoModuleTile({
   );
   const glowColor = m.colorHex.replace(")", " / 0.13)");
 
+  // Per-module glow palette derived from the module's brand color
+  const moduleGlowColors: Record<string, string[]> = {
+    production:   ['#4ade80', '#22d3ee', '#86efac'],
+    inventory:    ['#818cf8', '#6366f1', '#a5b4fc'],
+    warehouse:    ['#c084fc', '#a855f7', '#d8b4fe'],
+    quality:      ['#38bdf8', '#0ea5e9', '#7dd3fc'],
+    maintenance:  ['#fbbf24', '#f59e0b', '#fde68a'],
+    procurement:  ['#f87171', '#ef4444', '#fca5a5'],
+    finance:      ['#4ade80', '#16a34a', '#86efac'],
+    'crm-ai':     ['#f472b6', '#ec4899', '#fbcfe8'],
+    hr:           ['#fb7185', '#f43f5e', '#fda4af'],
+    analytics:    ['#67e8f9', '#06b6d4', '#a5f3fc'],
+  };
+  const tileColors = moduleGlowColors[m.id] ?? ['#c084fc', '#f472b6', '#38bdf8'];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 24, scale: 0.96 }}
@@ -2070,6 +2086,17 @@ function BentoModuleTile({
       transition={{ type: "spring", stiffness: 260, damping: 20, delay: index * 0.04 }}
       className={`${BENTO_LAYOUT[m.id]} group`}
     >
+      <BorderGlow
+        borderRadius={12}
+        glowRadius={32}
+        glowIntensity={1.2}
+        edgeSensitivity={25}
+        coneSpread={20}
+        colors={tileColors}
+        backgroundColor="transparent"
+        className="h-full cursor-target"
+        animated={index < 3}
+      >
       <motion.button
         ref={buttonRef}
         onMouseEnter={handleMouseEnter}
@@ -2077,7 +2104,7 @@ function BentoModuleTile({
         onMouseLeave={handleMouseLeave}
         whileTap={{ scale: 0.98 }}
         onClick={() => setExpanded((e) => !e)}
-        className={`relative w-full text-left rounded-xl border border-border hover:border-border transition-shadow duration-200 overflow-hidden ${
+        className={`relative w-full text-left rounded-xl transition-shadow duration-200 overflow-hidden ${
           isTwoCol ? "p-5" : "p-4"
         } h-full bg-muted/30 group`}
         style={{
@@ -2251,6 +2278,7 @@ function BentoModuleTile({
           </AnimatePresence>
         </div>
       </motion.button>
+      </BorderGlow>
     </motion.div>
   );
 }
@@ -3498,7 +3526,7 @@ function TopNav() {
           </Link>
           <Link
             to="/auth"
-            className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[12px] font-medium text-primary-foreground bg-primary hover:bg-primary/90 transition-all active:scale-[0.97]"
+            className="cursor-target inline-flex items-center gap-1 h-8 px-3 rounded-md text-[12px] font-medium text-primary-foreground bg-primary hover:bg-primary/90 transition-all active:scale-[0.97]"
           >
             Get started <ArrowRight className="h-3 w-3" />
           </Link>
