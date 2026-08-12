@@ -10,6 +10,10 @@ import {
   RefreshCw,
   ArrowRight,
   ShoppingCart,
+  Copy,
+  Download,
+  Eye,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge } from "@/components/ui-parts";
@@ -53,9 +57,16 @@ function ApprovedOrdersPage() {
   const [advancePercent, setAdvancePercent] = useState("20");
   const [materialId, setMaterialId] = useState("");
   const [quantity, setQuantity] = useState("0");
-  const [qrDialog, setQrDialog] = useState<{ open: boolean; order: any | null }>({
+  const [qrDialog, setQrDialog] = useState<{
+    open: boolean;
+    order: any | null;
+    scanUrl: string | null;
+    generating: boolean;
+  }>({
     open: false,
     order: null,
+    scanUrl: null,
+    generating: false,
   });
 
   const { data: orders } = useQuery({
@@ -100,14 +111,25 @@ function ApprovedOrdersPage() {
       const advanceAmount = orderTotal * (percent / 100);
       const balanceDue = orderTotal - advanceAmount;
 
-      // Generate QR code data
-      const qrData = JSON.stringify({
-        type: "advance_payment",
-        order: order.order_number,
-        amount: advanceAmount,
-        company: companyId.slice(0, 8),
-      });
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(JSON.stringify(qrData))}`;
+      // Generate token-based QR code
+      const { data: qrInserted, error: qrErr } = await supabase
+        .from("qr_codes")
+        .insert({
+          company_id: companyId,
+          entity_type: "customer_order",
+          entity_id: order.id,
+          type: "advance_payment",
+          status: "active",
+          qr_data: order.id,
+          label: order.order_number,
+          sub_label: `Advance: $${advanceAmount.toFixed(2)} (${percent}%)`,
+        })
+        .select("token")
+        .single();
+      if (qrErr) throw qrErr;
+
+      const scanUrl = `${window.location.origin}/scan?t=${qrInserted.token}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(scanUrl)}`;
 
       const { error } = await supabase
         .from("customer_orders")
@@ -117,7 +139,7 @@ function ApprovedOrdersPage() {
           advance_payment_percent: percent,
           advance_amount: advanceAmount,
           balance_due: balanceDue,
-          advance_qr_url: qrUrl,
+          advance_qr_url: scanUrl,
           status: "awaiting_advance_payment",
         })
         .eq("id", order.id);
@@ -216,7 +238,9 @@ function ApprovedOrdersPage() {
                       variant="ghost"
                       size="sm"
                       className="h-6 text-xs mt-1 text-primary"
-                      onClick={() => setQrDialog({ open: true, order: o })}
+                      onClick={() =>
+                        setQrDialog({ open: true, order: o, scanUrl: o.advance_qr_url, generating: false })
+                      }
                     >
                       <QrCode className="h-3 w-3 mr-1" />
                       View QR
@@ -378,18 +402,38 @@ function ApprovedOrdersPage() {
 
       {/* QR Code Dialog */}
       <Dialog open={qrDialog.open} onOpenChange={(o) => setQrDialog((d) => ({ ...d, open: o }))}>
-        <DialogContent className="sm:max-w-[360px]">
+        <DialogContent className="sm:max-w-[380px]">
           <DialogHeader>
-            <DialogTitle>Advance Payment QR</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-4 w-4 text-primary" />
+              Advance Payment QR
+            </DialogTitle>
           </DialogHeader>
-          {qrDialog.order && qrDialog.order.advance_qr_url && (
-            <div className="flex flex-col items-center gap-4 py-4">
-              <div className="bg-white rounded-xl p-4">
-                <img src={qrDialog.order.advance_qr_url} alt="Payment QR" className="w-48 h-48" />
+          {qrDialog.order && (
+            <div className="flex flex-col items-center gap-4 py-2">
+              {/* QR image */}
+              <div className="bg-white rounded-2xl p-3 shadow-lg">
+                {qrDialog.generating ? (
+                  <div className="w-48 h-48 flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  </div>
+                ) : qrDialog.scanUrl ? (
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(qrDialog.scanUrl)}`}
+                    alt="Payment QR"
+                    className="w-48 h-48 rounded-lg"
+                  />
+                ) : (
+                  <div className="w-48 h-48 flex items-center justify-center text-xs text-muted-foreground">
+                    No QR available
+                  </div>
+                )}
               </div>
-              <div className="text-center">
-                <div className="font-medium">{qrDialog.order.order_number}</div>
-                <div className="text-sm text-muted-foreground">
+
+              {/* Info */}
+              <div className="text-center space-y-1">
+                <div className="font-semibold">{qrDialog.order.order_number}</div>
+                <div className="text-xs text-muted-foreground">
                   Advance: $
                   {(
                     (Number(qrDialog.order.order_total ?? 0) *
@@ -397,6 +441,60 @@ function ApprovedOrdersPage() {
                     100
                   ).toFixed(2)}
                 </div>
+              </div>
+
+              {/* Scan URL */}
+              {qrDialog.scanUrl && (
+                <div className="w-full rounded-lg bg-muted/50 border border-border px-3 py-2 flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate font-mono">
+                    {qrDialog.scanUrl}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(qrDialog.scanUrl!);
+                      toast.success("Scan link copied!");
+                    }}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+
+              <p className="text-[10px] text-muted-foreground text-center max-w-xs">
+                Share with your customer. Scan with any phone camera — no app needed.
+              </p>
+
+              {/* Actions */}
+              <div className="flex gap-2">
+                {qrDialog.scanUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(qrDialog.scanUrl!, "_blank")}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1" />
+                    Preview
+                  </Button>
+                )}
+                {qrDialog.scanUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const link = document.createElement("a");
+                      link.href = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(qrDialog.scanUrl!)}`;
+                      link.download = `qr-${qrDialog.order!.order_number}.png`;
+                      link.click();
+                      toast.success("QR downloaded");
+                    }}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1" />
+                    Download
+                  </Button>
+                )}
               </div>
             </div>
           )}
