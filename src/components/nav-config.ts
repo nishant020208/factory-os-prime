@@ -56,6 +56,7 @@ import {
   ClipboardPen,
   UserCheck,
   Bell,
+  QrCode,
 } from "lucide-react";
 import type { AppRole } from "@/lib/roles";
 
@@ -141,6 +142,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
         { to: "/machines", label: "Machines", icon: Cog },
         { to: "/maintenance", label: "Maintenance", icon: Wrench },
         { to: "/quality", label: "Quality", icon: ShieldCheck },
+        { to: "/qr-codes", label: "QR Codes", icon: QrCode },
       ],
     },
     {
@@ -224,6 +226,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
         { to: "/bom", label: "BOM", icon: Layers3 },
         { to: "/scheduling", label: "Scheduling", icon: Calendar },
         { to: "/capacity-planning", label: "Capacity Planning", icon: Gauge },
+        { to: "/qr-codes", label: "QR Codes", icon: QrCode },
       ],
     },
     {
@@ -245,6 +248,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
         { to: "/receiving", label: "Receiving", icon: PackageOpen },
         { to: "/dispatch", label: "Dispatch", icon: Send },
         { to: "/cycle-count", label: "Cycle Count", icon: PackageCheck },
+        { to: "/qr-codes", label: "QR Codes", icon: QrCode },
       ],
     },
     { label: "Reports", items: [{ to: "/reports", label: "Reports", icon: ClipboardList }] },
@@ -318,6 +322,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
         { to: "/taxes", label: "Taxes", icon: FileText },
         { to: "/budgets", label: "Budgets", icon: PiggyBank },
         { to: "/profit-loss", label: "Profit & Loss", icon: LineChart },
+        { to: "/qr-codes", label: "QR Codes", icon: QrCode },
       ],
     },
     {
