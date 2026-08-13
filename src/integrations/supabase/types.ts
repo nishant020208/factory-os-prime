@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       access_logs: {
@@ -2655,6 +2680,7 @@ export type Database = {
           carrier: string | null
           company_id: string
           created_at: string
+          created_by: string | null
           expected_date: string | null
           id: string
           po_number: string
@@ -2669,6 +2695,7 @@ export type Database = {
           carrier?: string | null
           company_id: string
           created_at?: string
+          created_by?: string | null
           expected_date?: string | null
           id?: string
           po_number: string
@@ -2683,6 +2710,7 @@ export type Database = {
           carrier?: string | null
           company_id?: string
           created_at?: string
+          created_by?: string | null
           expected_date?: string | null
           id?: string
           po_number?: string
@@ -3383,6 +3411,260 @@ export type Database = {
           },
         ]
       }
+      supplier_deliveries: {
+        Row: {
+          carrier: string | null
+          company_id: string
+          created_at: string
+          dispatch_date: string | null
+          expected_arrival: string | null
+          id: string
+          po_id: string
+          status: string
+          supplier_id: string | null
+          tracking_number: string | null
+          vehicle_number: string | null
+        }
+        Insert: {
+          carrier?: string | null
+          company_id: string
+          created_at?: string
+          dispatch_date?: string | null
+          expected_arrival?: string | null
+          id?: string
+          po_id: string
+          status?: string
+          supplier_id?: string | null
+          tracking_number?: string | null
+          vehicle_number?: string | null
+        }
+        Update: {
+          carrier?: string | null
+          company_id?: string
+          created_at?: string
+          dispatch_date?: string | null
+          expected_arrival?: string | null
+          id?: string
+          po_id?: string
+          status?: string
+          supplier_id?: string | null
+          tracking_number?: string | null
+          vehicle_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_deliveries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_deliveries_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_deliveries_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_invoices: {
+        Row: {
+          company_id: string
+          created_at: string
+          file_url: string | null
+          gst_amount: number | null
+          id: string
+          invoice_number: string
+          po_id: string | null
+          status: string
+          supplier_id: string
+          total_amount: number | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          file_url?: string | null
+          gst_amount?: number | null
+          id?: string
+          invoice_number: string
+          po_id?: string | null
+          status?: string
+          supplier_id: string
+          total_amount?: number | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          file_url?: string | null
+          gst_amount?: number | null
+          id?: string
+          invoice_number?: string
+          po_id?: string | null
+          status?: string
+          supplier_id?: string
+          total_amount?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_invoices_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_invoices_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_messages: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          message: string
+          po_id: string | null
+          sender_id: string | null
+          sender_role: string
+          supplier_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          message: string
+          po_id?: string | null
+          sender_id?: string | null
+          sender_role: string
+          supplier_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          po_id?: string | null
+          sender_id?: string | null
+          sender_role?: string
+          supplier_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_messages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_messages_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_messages_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_payments: {
+        Row: {
+          amount: number | null
+          company_id: string
+          created_at: string
+          id: string
+          invoice_id: string | null
+          method: string | null
+          paid_at: string | null
+          po_id: string | null
+          receipt_url: string | null
+          status: string
+          supplier_id: string
+          transaction_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          company_id: string
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          method?: string | null
+          paid_at?: string | null
+          po_id?: string | null
+          receipt_url?: string | null
+          status?: string
+          supplier_id: string
+          transaction_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          method?: string | null
+          paid_at?: string | null
+          po_id?: string | null
+          receipt_url?: string | null
+          status?: string
+          supplier_id?: string
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           category: string | null
@@ -3907,6 +4189,8 @@ export type Database = {
         Returns: undefined
       }
       current_company_id: { Args: never; Returns: string }
+      current_supplier_company: { Args: never; Returns: string }
+      current_supplier_id: { Args: never; Returns: string }
       emit_notification: {
         Args: {
           _body: string
@@ -3931,6 +4215,7 @@ export type Database = {
       is_customer_portal: { Args: never; Returns: boolean }
       is_main_admin: { Args: never; Returns: boolean }
       is_root_admin: { Args: { _user_id?: string }; Returns: boolean }
+      is_supplier_portal: { Args: never; Returns: boolean }
       public_scan_qr: {
         Args: { p_token: string }
         Returns: {
@@ -3946,6 +4231,15 @@ export type Database = {
       record_access_log: {
         Args: { p_action: string; p_email: string; p_status?: string }
         Returns: undefined
+      }
+      record_customer_payment: {
+        Args: {
+          p_amount: number
+          p_invoice_id: string
+          p_method?: string
+          p_reference?: string
+        }
+        Returns: Json
       }
       record_status_transition: {
         Args: {
@@ -4103,6 +4397,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: [

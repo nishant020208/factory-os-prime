@@ -172,6 +172,7 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/supplier-invoices": ONLY("supplier_portal", "company_admin", "auditor"),
   "/payments": ONLY("supplier_portal", "company_admin", "finance_manager", "auditor"),
   "/supplier-performance": ONLY("supplier_portal", "company_admin", "procurement_manager", "auditor"),
+  "/messages": ONLY("supplier_portal", "procurement_manager", "company_admin", "auditor"),
 
   "/qr-codes": ONLY(
     "company_admin",

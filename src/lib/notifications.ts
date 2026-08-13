@@ -812,13 +812,28 @@ export async function notifyMaterialReservation(
   );
 }
 
-/** Trigger 21: Supplier accepts PO and ships → Warehouse Manager */
+/** Trigger 21: Supplier dispatches PO → Procurement Manager (creator) + Warehouse Manager */
 export async function notifySupplierShipped(
   companyId: string,
   poNumber: string,
   supplierName: string,
   poId: string,
+  createdBy?: string | null,
+  scanUrl?: string | null,
 ) {
+  // Procurement Manager who created the PO — targeted, never broadcast.
+  const [pmRole, pmUser] = resolveTarget("procurement_manager", createdBy);
+  await fireNotification(
+    companyId,
+    pmRole,
+    pmUser,
+    "🚚 Shipment Dispatched",
+    `${supplierName} has dispatched PO ${poNumber}.${scanUrl ? ` Inbound QR: ${scanUrl}` : ""}`,
+    "info",
+    "purchase_orders",
+    poId,
+  );
+  // Warehouse Manager — expect Goods Receipt.
   await fireNotification(
     companyId,
     "warehouse_manager",
@@ -888,18 +903,20 @@ export async function notifyLowStock(
   );
 }
 
-/** Trigger 24: Supplier responds to PO → Procurement Manager */
+/** Trigger 24: Supplier responds to PO → Procurement Manager who created it */
 export async function notifySupplierPOResponse(
   companyId: string,
   poNumber: string,
   supplierName: string,
   status: string,
   poId: string,
+  createdBy?: string | null,
 ) {
+  const [pmRole, pmUser] = resolveTarget("procurement_manager", createdBy);
   await fireNotification(
     companyId,
-    "procurement_manager",
-    null,
+    pmRole,
+    pmUser,
     "📋 PO Response Received",
     `${supplierName} has ${status} PO ${poNumber}.`,
     status === "accepted" ? "success" : "warning",
@@ -938,6 +955,26 @@ export async function notifyGRNConfirmed(
     null,
     "✅ Goods Receipt Confirmed",
     `GRN confirmed for PO ${poNumber} from ${supplierName}. Release supplier payment.`,
+    "success",
+    "purchase_orders",
+    null,
+  );
+}
+
+/** Trigger 26b: Goods Receipt confirmed → this Supplier ("your shipment received") */
+export async function notifyGRNToSupplier(
+  companyId: string,
+  poNumber: string,
+  supplierName: string,
+  supplierUserId?: string | null,
+) {
+  const [ntRole, ntUser] = resolveTarget("supplier_portal", supplierUserId);
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
+    "✅ Shipment Received",
+    `Your shipment for PO ${poNumber} has been received by the warehouse.`,
     "success",
     "purchase_orders",
     null,

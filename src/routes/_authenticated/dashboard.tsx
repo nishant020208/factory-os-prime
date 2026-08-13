@@ -1804,24 +1804,135 @@ function CustomerDashboard() {
 
 /* ─────────── SUPPLIER ─────────── */
 function SupplierDashboard() {
-  const { companyId } = useAuth();
-  const s = useLiveStats(companyId).data;
+  const { companyId, user } = useAuth();
+  const [openPo, setOpenPo] = useState<string | null>(null);
+
+  const { data: mySupplier } = useQuery({
+    queryKey: ["sup-dash-supplier", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const byUser = await supabase
+        .from("suppliers")
+        .select("id, name")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (byUser.data?.id) {
+        return { id: byUser.data.id as string, name: (byUser.data.name as string) ?? "Your company" };
+      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile?.email) {
+        const { data: sup } = await supabase
+          .from("suppliers")
+          .select("id, name")
+          .eq("contact_email", profile.email)
+          .maybeSingle();
+        return sup?.id ? { id: sup.id as string, name: (sup.name as string) ?? "Your company" } : null;
+      }
+      return null;
+    },
+  });
+
+  const { data: pos } = useQuery({
+    queryKey: ["sup-dash-pos", companyId, mySupplier?.id],
+    queryFn: async () => {
+      if (!mySupplier?.id) return [];
+      const { data } = await supabase
+        .from("purchase_orders")
+        .select("*")
+        .eq("supplier_id", mySupplier.id)
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+    enabled: !!mySupplier?.id,
+  });
+
+  const { data: deliveries } = useQuery({
+    queryKey: ["sup-dash-del", companyId, mySupplier?.id],
+    queryFn: async () => {
+      if (!mySupplier?.id) return [];
+      const { data } = await supabase
+        .from("supplier_deliveries")
+        .select("*")
+        .eq("supplier_id", mySupplier.id);
+      return data ?? [];
+    },
+    enabled: !!mySupplier?.id,
+  });
+
+  const { data: payments } = useQuery({
+    queryKey: ["sup-dash-pay", companyId, mySupplier?.id],
+    queryFn: async () => {
+      if (!mySupplier?.id) return [];
+      const { data } = await supabase
+        .from("supplier_payments")
+        .select("*")
+        .eq("supplier_id", mySupplier.id);
+      return data ?? [];
+    },
+    enabled: !!mySupplier?.id,
+  });
+
+  const awaiting =
+    (pos ?? []).filter((p) => ["sent", "pending"].includes(p.status)).length ?? 0;
+  const accepted =
+    (pos ?? []).filter((p) => ["accepted", "in_progress"].includes(p.status)).length ?? 0;
+  const inbound = (deliveries ?? []).filter((d) => d.status === "dispatched").length ?? 0;
+  const totalPaid = (payments ?? [])
+    .filter((p) => p.status === "paid")
+    .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+
   return (
     <Shell
       eyebrow="Supplier"
       title="Supplier Portal"
-      sub="Purchase orders, deliveries and payments."
+      sub={`Purchase orders, deliveries and payments${mySupplier?.name ? ` for ${mySupplier.name}` : ""}.`}
     >
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Kpi
-          label="Open POs"
-          value={String(s?.purchaseOrdersOpen ?? 0)}
+          label="Awaiting Response"
+          value={String(awaiting)}
           icon={ShoppingCart}
           tone="primary"
         />
-        <Kpi label="Total POs" value={String(s?.purchaseOrders ?? 0)} icon={Truck} tone="success" />
-        <Kpi label="Deliveries" value={String(s?.shipments ?? 0)} icon={Timer} tone="info" />
-        <Kpi label="Payments" value={String(s?.payments ?? 0)} icon={Landmark} tone="warning" />
+        <Kpi label="Accepted" value={String(accepted)} icon={CheckCircle2} tone="success" />
+        <Kpi label="Inbound Shipments" value={String(inbound)} icon={Truck} tone="info" />
+        <Kpi label="Payments Received" value={`$${totalPaid.toLocaleString()}`} icon={Landmark} tone="warning" />
+      </div>
+
+      <div className="mt-4">
+      <Panel title={`${pos?.length ?? 0} Purchase Orders`}>
+        <ul className="space-y-2">
+          {(pos ?? []).slice(0, 6).map((p) => (
+            <li key={p.id}>
+              <button
+                onClick={() => setOpenPo(openPo === p.id ? null : p.id)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5 text-xs transition-colors"
+              >
+                <span className="font-medium">{p.po_number ?? p.id.slice(0, 8)}</span>
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  ${Number(p.total_amount ?? 0).toLocaleString()}
+                  <StatusBadge status={p.status} />
+                </span>
+              </button>
+              {openPo === p.id && (
+                <p className="px-3 pb-2 text-xs text-muted-foreground">
+                  Expected {p.expected_date ? new Date(p.expected_date).toLocaleDateString() : "—"}
+                  {p.supplier_note ? ` · ${p.supplier_note}` : ""}
+                </p>
+              )}
+            </li>
+          ))}
+          {(pos ?? []).length === 0 && (
+            <li className="text-xs text-muted-foreground text-center py-6">
+              No purchase orders yet. When the buyer sends you one, it appears here.
+            </li>
+          )}
+        </ul>
+      </Panel>
       </div>
     </Shell>
   );
