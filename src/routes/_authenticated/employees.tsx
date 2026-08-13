@@ -39,7 +39,8 @@ const EMPLOYEE_FORM_FIELDS: FormField[] = [
 
 function EmployeesPage() {
   const queryClient = useQueryClient();
-  const { companyId } = useAuth();
+  const { companyId, roles } = useAuth();
+  const isAuditor = roles.includes("auditor");
   const [deptFilter, setDeptFilter] = useState<string>("all");
 
   // Fetch employees from profiles
@@ -160,7 +161,7 @@ function EmployeesPage() {
         moduleName="employees"
         rows={filteredEmployees}
         searchKeys={["full_name", "email", "phone", "job_title", "departments"]}
-        formFields={EMPLOYEE_FORM_FIELDS}
+        formFields={isAuditor ? undefined : EMPLOYEE_FORM_FIELDS}
         extraActions={
           <div className="flex items-center gap-2">
             <select
@@ -177,7 +178,7 @@ function EmployeesPage() {
             </select>
           </div>
         }
-        onSubmit={async (formData, editingRow) => {
+        onSubmit={isAuditor ? undefined : async (formData, editingRow) => {
           if (editingRow) {
             const { error } = await supabase
               .from("profiles")
@@ -196,7 +197,7 @@ function EmployeesPage() {
           }
           queryClient.invalidateQueries({ queryKey: ["employees"] });
         }}
-        onDelete={async (row) => {
+        onDelete={isAuditor ? undefined : async (row) => {
           const { error } = await supabase
             .from("profiles")
             .update({ status: "inactive" })

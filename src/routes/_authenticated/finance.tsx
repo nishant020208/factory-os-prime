@@ -78,7 +78,8 @@ type FinanceRow = {
 
 function FinancePage() {
   const queryClient = useQueryClient();
-  const { companyId } = useAuth();
+  const { companyId, roles } = useAuth();
+  const isAuditor = roles.includes("auditor");
 
   // Query purchase orders as financial records
   const { data: purchaseOrders } = useQuery({
@@ -183,12 +184,12 @@ function FinancePage() {
         moduleName="finance"
         rows={allRecords}
         searchKeys={["po_number", "status"]}
-        formFields={PURCHASE_FORM_FIELDS}
-        onSubmit={async (formData, editingRow) => {
+        formFields={isAuditor ? undefined : PURCHASE_FORM_FIELDS}
+        onSubmit={isAuditor ? undefined : async (formData, editingRow) => {
           if (editingRow) await updateMutation.mutateAsync({ id: editingRow.id, data: formData });
           else await createMutation.mutateAsync(formData);
         }}
-        onDelete={(row) => deleteMutation.mutateAsync(row.id)}
+        onDelete={isAuditor ? undefined : (row) => deleteMutation.mutateAsync(row.id)}
         kpis={
           <>
             <Kpi

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useTheme, type ThemeMode } from "@/hooks/use-theme";
 import { toast } from "sonner";
+import { recordAccessLog } from "@/lib/access-log";
 import {
   SidebarProvider,
   Sidebar,
@@ -226,7 +227,9 @@ function TopBar() {
   }, []);
 
   async function signOut() {
+    const email = profile?.email ?? undefined;
     await supabase.auth.signOut();
+    if (email) void recordAccessLog(email, "logout", "success");
     toast.success("Signed out");
     router.navigate({ to: "/auth", replace: true });
   }

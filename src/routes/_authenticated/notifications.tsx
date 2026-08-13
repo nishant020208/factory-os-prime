@@ -505,7 +505,7 @@ function NotificationsPage() {
 
       {isRoot ? (
         <RootNotificationsFeed />
-      ) : (
+      ) : role === "auditor" ? null : ( // Auditor receives zero notifications and cannot send any (writes blocked at DB level)
         <SendNotificationForm companyId={companyId} senderRole={role} isMainAdmin={isMainAdmin} />
       )}
 

@@ -60,7 +60,8 @@ export const Route = createFileRoute("/_authenticated/inventory")({
 
 function InventoryPage() {
   const queryClient = useQueryClient();
-  const { companyId, user } = useAuth();
+  const { companyId, user, roles } = useAuth();
+  const isAuditor = roles.includes("auditor");
   const [showAdjust, setShowAdjust] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [adjustForm, setAdjustForm] = useState({
@@ -186,13 +187,15 @@ function InventoryPage() {
               <History className="h-4 w-4 mr-1.5" />
               History
             </Button>
-            <Button
-              className="bg-[image:var(--gradient-primary)] shadow-glow"
-              onClick={() => setShowAdjust(true)}
-            >
-              <ArrowLeftRight className="h-4 w-4 mr-1.5" />
-              Adjust Stock
-            </Button>
+            {!isAuditor && (
+              <Button
+                className="bg-[image:var(--gradient-primary)] shadow-glow"
+                onClick={() => setShowAdjust(true)}
+              >
+                <ArrowLeftRight className="h-4 w-4 mr-1.5" />
+                Adjust Stock
+              </Button>
+            )}
           </>
         }
       />

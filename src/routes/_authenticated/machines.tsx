@@ -69,7 +69,8 @@ const MACHINE_FORM_FIELDS: FormField[] = [
 
 function MachinesPage() {
   const queryClient = useQueryClient();
-  const { companyId } = useAuth();
+  const { companyId, roles } = useAuth();
+  const isAuditor = roles.includes("auditor");
 
   const { data } = useQuery({
     queryKey: ["machines"],
@@ -143,12 +144,12 @@ function MachinesPage() {
       moduleName="machines"
       rows={data}
       searchKeys={["name", "code", "type", "status"]}
-      formFields={MACHINE_FORM_FIELDS}
-      onSubmit={async (formData, editingRow) => {
+      formFields={isAuditor ? undefined : MACHINE_FORM_FIELDS}
+      onSubmit={isAuditor ? undefined : async (formData, editingRow) => {
         if (editingRow) await updateMutation.mutateAsync({ id: editingRow.id, data: formData });
         else await createMutation.mutateAsync(formData);
       }}
-      onDelete={(row) => deleteMutation.mutateAsync(row.id)}
+      onDelete={isAuditor ? undefined : (row) => deleteMutation.mutateAsync(row.id)}
       kpis={
         <>
           <Kpi label="Total Machines" value={String(data?.length ?? 0)} icon={Cog} tone="primary" />

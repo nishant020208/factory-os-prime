@@ -58,6 +58,7 @@ function SupportPage() {
   const { user, roles, companyId } = useAuth();
   const isCustomer = roles.includes("customer_portal");
   const isAdmin    = roles.includes("company_admin") || roles.includes("plant_admin") || roles.includes("root_super_admin");
+  const isAuditor  = roles.includes("auditor");
 
   // UI state
   const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
@@ -353,8 +354,8 @@ function SupportPage() {
                             </div>
                           ))}
 
-                        {/* Reply box — visible to both customer and admin */}
-                        {ticket.status !== "closed" && (
+                        {/* Reply box — visible to both customer and admin (never auditor) */}
+                        {ticket.status !== "closed" && !isAuditor && (
                           <div className="flex gap-2 pt-1">
                             <Input
                               value={replyText[ticket.id] ?? ""}

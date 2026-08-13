@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ScanRouteImport } from './routes/scan'
+import { Route as AuthenticatedAccessLogsRouteImport } from './routes/_authenticated/access-logs'
 import { Route as AuthenticatedAiCenterRouteImport } from './routes/_authenticated/ai-center'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedApprovedOrdersRouteImport } from './routes/_authenticated/approved-orders'
@@ -40,6 +41,7 @@ import { Route as AuthenticatedDispatchRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedDocumentsRouteImport } from './routes/_authenticated/documents'
 import { Route as AuthenticatedEmployeesRouteImport } from './routes/_authenticated/employees'
 import { Route as AuthenticatedExpensesRouteImport } from './routes/_authenticated/expenses'
+import { Route as AuthenticatedExportRouteImport } from './routes/_authenticated/export'
 import { Route as AuthenticatedFinalInspectionRouteImport } from './routes/_authenticated/final-inspection'
 import { Route as AuthenticatedFinanceRouteImport } from './routes/_authenticated/finance'
 import { Route as AuthenticatedFinanceReportsRouteImport } from './routes/_authenticated/finance-reports'
@@ -128,6 +130,11 @@ const ScanRoute = ScanRouteImport.update({
   id: '/scan',
   path: '/scan',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAccessLogsRoute = AuthenticatedAccessLogsRouteImport.update({
+  id: '/access-logs',
+  path: '/access-logs',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedAiCenterRoute = AuthenticatedAiCenterRouteImport.update({
   id: '/ai-center',
@@ -269,6 +276,11 @@ const AuthenticatedEmployeesRoute = AuthenticatedEmployeesRouteImport.update({
 const AuthenticatedExpensesRoute = AuthenticatedExpensesRouteImport.update({
   id: '/expenses',
   path: '/expenses',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedExportRoute = AuthenticatedExportRouteImport.update({
+  id: '/export',
+  path: '/export',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedFinalInspectionRoute =
@@ -654,6 +666,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/scan': typeof ScanRoute
+  '/access-logs': typeof AuthenticatedAccessLogsRoute
   '/ai-center': typeof AuthenticatedAiCenterRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/approved-orders': typeof AuthenticatedApprovedOrdersRoute
@@ -681,6 +694,7 @@ export interface FileRoutesByFullPath {
   '/documents': typeof AuthenticatedDocumentsRoute
   '/employees': typeof AuthenticatedEmployeesRoute
   '/expenses': typeof AuthenticatedExpensesRoute
+  '/export': typeof AuthenticatedExportRoute
   '/final-inspection': typeof AuthenticatedFinalInspectionRoute
   '/finance': typeof AuthenticatedFinanceRoute
   '/finance-reports': typeof AuthenticatedFinanceReportsRoute
@@ -755,6 +769,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/scan': typeof ScanRoute
+  '/access-logs': typeof AuthenticatedAccessLogsRoute
   '/ai-center': typeof AuthenticatedAiCenterRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/approved-orders': typeof AuthenticatedApprovedOrdersRoute
@@ -782,6 +797,7 @@ export interface FileRoutesByTo {
   '/documents': typeof AuthenticatedDocumentsRoute
   '/employees': typeof AuthenticatedEmployeesRoute
   '/expenses': typeof AuthenticatedExpensesRoute
+  '/export': typeof AuthenticatedExportRoute
   '/final-inspection': typeof AuthenticatedFinalInspectionRoute
   '/finance': typeof AuthenticatedFinanceRoute
   '/finance-reports': typeof AuthenticatedFinanceReportsRoute
@@ -858,6 +874,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/scan': typeof ScanRoute
+  '/_authenticated/access-logs': typeof AuthenticatedAccessLogsRoute
   '/_authenticated/ai-center': typeof AuthenticatedAiCenterRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/approved-orders': typeof AuthenticatedApprovedOrdersRoute
@@ -885,6 +902,7 @@ export interface FileRoutesById {
   '/_authenticated/documents': typeof AuthenticatedDocumentsRoute
   '/_authenticated/employees': typeof AuthenticatedEmployeesRoute
   '/_authenticated/expenses': typeof AuthenticatedExpensesRoute
+  '/_authenticated/export': typeof AuthenticatedExportRoute
   '/_authenticated/final-inspection': typeof AuthenticatedFinalInspectionRoute
   '/_authenticated/finance': typeof AuthenticatedFinanceRoute
   '/_authenticated/finance-reports': typeof AuthenticatedFinanceReportsRoute
@@ -961,6 +979,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/scan'
+    | '/access-logs'
     | '/ai-center'
     | '/analytics'
     | '/approved-orders'
@@ -988,6 +1007,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/employees'
     | '/expenses'
+    | '/export'
     | '/final-inspection'
     | '/finance'
     | '/finance-reports'
@@ -1062,6 +1082,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/scan'
+    | '/access-logs'
     | '/ai-center'
     | '/analytics'
     | '/approved-orders'
@@ -1089,6 +1110,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/employees'
     | '/expenses'
+    | '/export'
     | '/final-inspection'
     | '/finance'
     | '/finance-reports'
@@ -1164,6 +1186,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/scan'
+    | '/_authenticated/access-logs'
     | '/_authenticated/ai-center'
     | '/_authenticated/analytics'
     | '/_authenticated/approved-orders'
@@ -1191,6 +1214,7 @@ export interface FileRouteTypes {
     | '/_authenticated/documents'
     | '/_authenticated/employees'
     | '/_authenticated/expenses'
+    | '/_authenticated/export'
     | '/_authenticated/final-inspection'
     | '/_authenticated/finance'
     | '/_authenticated/finance-reports'
@@ -1298,6 +1322,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/scan'
       preLoaderRoute: typeof ScanRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/access-logs': {
+      id: '/_authenticated/access-logs'
+      path: '/access-logs'
+      fullPath: '/access-logs'
+      preLoaderRoute: typeof AuthenticatedAccessLogsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/ai-center': {
       id: '/_authenticated/ai-center'
@@ -1486,6 +1517,13 @@ declare module '@tanstack/react-router' {
       path: '/expenses'
       fullPath: '/expenses'
       preLoaderRoute: typeof AuthenticatedExpensesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/export': {
+      id: '/_authenticated/export'
+      path: '/export'
+      fullPath: '/export'
+      preLoaderRoute: typeof AuthenticatedExportRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/final-inspection': {
@@ -1975,6 +2013,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAccessLogsRoute: typeof AuthenticatedAccessLogsRoute
   AuthenticatedAiCenterRoute: typeof AuthenticatedAiCenterRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedApprovedOrdersRoute: typeof AuthenticatedApprovedOrdersRoute
@@ -2002,6 +2041,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDocumentsRoute: typeof AuthenticatedDocumentsRoute
   AuthenticatedEmployeesRoute: typeof AuthenticatedEmployeesRoute
   AuthenticatedExpensesRoute: typeof AuthenticatedExpensesRoute
+  AuthenticatedExportRoute: typeof AuthenticatedExportRoute
   AuthenticatedFinalInspectionRoute: typeof AuthenticatedFinalInspectionRoute
   AuthenticatedFinanceRoute: typeof AuthenticatedFinanceRoute
   AuthenticatedFinanceReportsRoute: typeof AuthenticatedFinanceReportsRoute
@@ -2074,6 +2114,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAccessLogsRoute: AuthenticatedAccessLogsRoute,
   AuthenticatedAiCenterRoute: AuthenticatedAiCenterRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedApprovedOrdersRoute: AuthenticatedApprovedOrdersRoute,
@@ -2101,6 +2142,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDocumentsRoute: AuthenticatedDocumentsRoute,
   AuthenticatedEmployeesRoute: AuthenticatedEmployeesRoute,
   AuthenticatedExpensesRoute: AuthenticatedExpensesRoute,
+  AuthenticatedExportRoute: AuthenticatedExportRoute,
   AuthenticatedFinalInspectionRoute: AuthenticatedFinalInspectionRoute,
   AuthenticatedFinanceRoute: AuthenticatedFinanceRoute,
   AuthenticatedFinanceReportsRoute: AuthenticatedFinanceReportsRoute,

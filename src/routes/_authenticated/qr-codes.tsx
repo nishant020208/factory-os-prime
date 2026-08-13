@@ -67,7 +67,8 @@ const STATUS_COLOR: Record<string, string> = {
 
 function QrCodesPage() {
   const queryClient = useQueryClient();
-  const { companyId } = useAuth();
+  const { companyId, roles } = useAuth();
+  const isAuditor = roles.includes("auditor");
   const [previewDialog, setPreviewDialog] = useState<{
     open: boolean;
     row: any | null;
@@ -285,7 +286,7 @@ function QrCodesPage() {
                           </Button>
 
                           {/* Revoke */}
-                          {row.status === "active" && (
+                          {row.status === "active" && !isAuditor && (
                             <Button
                               variant="ghost"
                               size="sm"

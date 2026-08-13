@@ -49,7 +49,8 @@ const PO_FORM_FIELDS: FormField[] = [
 
 function ProcurementPage() {
   const queryClient = useQueryClient();
-  const { companyId } = useAuth();
+  const { companyId, roles } = useAuth();
+  const isAuditor = roles.includes("auditor");
 
   const { data } = useQuery({
     queryKey: ["purchase_orders"],
@@ -120,12 +121,12 @@ function ProcurementPage() {
       moduleName="procurement"
       rows={data}
       searchKeys={["po_number", "status"]}
-      formFields={PO_FORM_FIELDS}
-      onSubmit={async (formData, editingRow) => {
+      formFields={isAuditor ? undefined : PO_FORM_FIELDS}
+      onSubmit={isAuditor ? undefined : async (formData, editingRow) => {
         if (editingRow) await updateMutation.mutateAsync({ id: editingRow.id, data: formData });
         else await createMutation.mutateAsync(formData);
       }}
-      onDelete={(row) => deleteMutation.mutateAsync(row.id)}
+      onDelete={isAuditor ? undefined : (row) => deleteMutation.mutateAsync(row.id)}
       kpis={
         <>
           <Kpi

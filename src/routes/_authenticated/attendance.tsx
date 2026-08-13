@@ -39,7 +39,8 @@ export const Route = createFileRoute("/_authenticated/attendance")({
 });
 
 function AttendancePage() {
-  const { companyId } = useAuth();
+  const { companyId, roles } = useAuth();
+  const isAuditor = roles.includes("auditor");
   const queryClient = useQueryClient();
   const [showNew, setShowNew] = useState(false);
   const [empId, setEmpId] = useState("");
@@ -80,25 +81,40 @@ function AttendancePage() {
     enabled: !!companyId,
   });
 
-  const total = profiles?.length ?? 0;
-  // Simulate attendance from active/inactive status
-  const present = profiles?.filter((p: any) => p.status === "active").length ?? 0;
-  const absent = total - present;
+  // REAL attendance records — same table HR uses, scoped by RLS.
+  const { data: attendanceRecords } = useQuery({
+    queryKey: ["att-records", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const { data } = await supabase
+        .from("attendance")
+        .select("*, profiles!left(full_name, job_title)")
+        .eq("company_id", companyId)
+        .order("date", { ascending: false })
+        .limit(300);
+      return data ?? [];
+    },
+    enabled: !!companyId,
+  });
 
-  const records = (profiles ?? []).map((p: any, i: number) => ({
-    id: p.id,
-    name: p.full_name ?? "Unknown",
-    job_title: p.job_title ?? "—",
-    check_in: i % 5 === 4 ? null : `${8 + (i % 2)}:${String((i * 13) % 60).padStart(2, "0")} AM`,
-    check_out:
-      i % 5 === 4
-        ? null
-        : i % 3 === 0
-          ? null
-          : `${4 + (i % 3)}:${String((i * 7) % 60).padStart(2, "0")} PM`,
-    status: i % 5 === 4 ? "absent" : "present",
-    hours: i % 5 === 4 ? 0 : 7 + (i % 3) * 0.5,
+  const records = (attendanceRecords ?? []).map((r: any) => ({
+    id: r.id,
+    name: r.profiles?.full_name ?? "Unknown",
+    job_title: r.profiles?.job_title ?? "—",
+    date: r.date ?? "",
+    check_in: r.check_in ? new Date(r.check_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—",
+    check_out: r.check_out ? new Date(r.check_out).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—",
+    status: r.status ?? "present",
+    hours: Number(r.hours_worked ?? 0),
   }));
+
+  const total = records.length;
+  const present = records.filter((r: any) => r.status === "present").length;
+  const absent = records.filter((r: any) => r.status === "absent").length;
+  const avgHours =
+    records.length
+      ? (records.reduce((s: number, r: any) => s + r.hours, 0) / records.length).toFixed(1)
+      : "0.0";
 
   return (
     <div className="max-w-[1600px] mx-auto">
@@ -107,13 +123,15 @@ function AttendancePage() {
         title="Attendance"
         sub="Daily attendance tracking, check-in/out and shift management."
         actions={
-          <Button
-            className="bg-[image:var(--gradient-primary)] shadow-glow"
-            onClick={() => setShowNew(true)}
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            Record Attendance
-          </Button>
+          !isAuditor ? (
+            <Button
+              className="bg-[image:var(--gradient-primary)] shadow-glow"
+              onClick={() => setShowNew(true)}
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              Record Attendance
+            </Button>
+          ) : null
         }
       />
       <Dialog open={showNew} onOpenChange={setShowNew}>
@@ -157,7 +175,7 @@ function AttendancePage() {
         <Kpi label="Total Employees" value={String(total)} icon={Timer} tone="primary" />
         <Kpi label="Present Today" value={String(present)} icon={UserCheck} tone="success" />
         <Kpi label="Absent" value={String(absent)} icon={UserX} tone="warning" />
-        <Kpi label="Avg Hours" value="8.2h" icon={Clock} tone="info" />
+        <Kpi label="Avg Hours" value={`${avgHours}h`} icon={Clock} tone="info" />
       </div>
       <div className="mt-4">
         <Panel title="Today's Attendance">
@@ -170,6 +188,9 @@ function AttendancePage() {
                   </th>
                   <th className="text-left text-[11px] uppercase tracking-wider text-muted-foreground py-2 px-2 hidden md:table-cell">
                     Role
+                  </th>
+                  <th className="text-left text-[11px] uppercase tracking-wider text-muted-foreground py-2 px-2 hidden md:table-cell">
+                    Date
                   </th>
                   <th className="text-left text-[11px] uppercase tracking-wider text-muted-foreground py-2 px-2">
                     Check In
@@ -191,6 +212,9 @@ function AttendancePage() {
                     <td className="py-2.5 px-2 font-medium">{r.name}</td>
                     <td className="py-2.5 px-2 text-muted-foreground hidden md:table-cell">
                       {r.job_title}
+                    </td>
+                    <td className="py-2.5 px-2 text-muted-foreground hidden md:table-cell">
+                      {r.date ?? "—"}
                     </td>
                     <td className="py-2.5 px-2 font-mono text-xs">{r.check_in ?? "—"}</td>
                     <td className="py-2.5 px-2 font-mono text-xs hidden md:table-cell">

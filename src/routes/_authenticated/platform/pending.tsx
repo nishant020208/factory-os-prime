@@ -18,6 +18,7 @@ export const Route = createFileRoute("/_authenticated/platform/pending")({
 
 function PendingPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   // Fetch company registrations
   const { data: registrations } = useQuery({
@@ -84,6 +85,22 @@ function PendingPage() {
       // failure can never fail the approval itself.
       await notifyCompanyRegistrationApproved(newCompany.id, newCompany.name);
 
+      // Root's platform-level action is itself audited (company_id NULL =
+      // platform scope — a company Auditor can never see this, per the
+      // in_company() SELECT policy).
+      await supabase.from("audit_logs").insert({
+        company_id: null,
+        user_id: user?.id ?? null,
+        action: "company_registration_approved",
+        entity: "company_registrations",
+        entity_id: registration.id,
+        metadata: {
+          company_name: registration.company_name,
+          email: registration.email,
+          approved_by: user?.email ?? "root_super_admin",
+        },
+      });
+
       return newCompany;
     },
     onSuccess: (newCompany) => {
@@ -103,6 +120,19 @@ function PendingPage() {
         .update({ status: "rejected", reviewed_at: new Date().toISOString() })
         .eq("id", registration.id);
       if (error) throw error;
+      // Root's rejection is audited at the platform level.
+      await supabase.from("audit_logs").insert({
+        company_id: null,
+        user_id: user?.id ?? null,
+        action: "company_registration_rejected",
+        entity: "company_registrations",
+        entity_id: registration.id,
+        metadata: {
+          company_name: registration.company_name,
+          email: registration.email,
+          rejected_by: user?.email ?? "root_super_admin",
+        },
+      });
       // Note: the registrant has no auth account yet (they sign up after being
       // whitelisted on approval), so there is no in-app recipient on rejection.
     },

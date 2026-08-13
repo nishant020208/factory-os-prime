@@ -109,6 +109,7 @@ function DocumentsPage() {
 
   const isCustomer = roles.includes("customer_portal");
   const isAdmin    = roles.includes("company_admin") || roles.includes("plant_admin") || roles.includes("root_super_admin");
+  const isAuditor  = roles.includes("auditor");
 
   // ── Fetch documents ────────────────────────────────────────────────────────
   const { data: allDocs } = useQuery({
@@ -255,13 +256,15 @@ function DocumentsPage() {
         actions={
           <div className="flex items-center gap-2">
             <ModuleCopilot moduleName="documents" />
-            <Button
-              className="bg-[image:var(--gradient-primary)] shadow-glow"
-              onClick={() => setShowUpload(true)}
-            >
-              <Upload className="h-4 w-4 mr-1.5" />
-              Upload
-            </Button>
+            {!isAuditor && (
+              <Button
+                className="bg-[image:var(--gradient-primary)] shadow-glow"
+                onClick={() => setShowUpload(true)}
+              >
+                <Upload className="h-4 w-4 mr-1.5" />
+                Upload
+              </Button>
+            )}
           </div>
         }
       />

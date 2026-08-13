@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ROLES, ROLE_MAP, type AppRole } from "@/lib/roles";
 import { notifyCompanyRegistrationRequest, notifyCustomerAccessRequest } from "@/lib/notifications";
+import { recordAccessLog } from "@/lib/access-log";
 
 const searchSchema = z.object({ role: z.string().optional(), redirect: z.string().optional() });
 
@@ -871,9 +872,12 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
     });
     setBusy(false);
     if (error) {
+      // Record the failed attempt (works while still anonymous).
+      void recordAccessLog(withEmail, "login_failed", "failed");
       toast.error(error.message);
       return;
     }
+    void recordAccessLog(withEmail, "login", "success");
     toast.success(`Welcome back to FactoryOS`);
     navigate({ to: redirect ?? "/dashboard" });
   }
@@ -912,8 +916,10 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
       } else {
         toast.error(msg);
       }
+      void recordAccessLog(email, "login_failed", "failed");
       return;
     }
+    void recordAccessLog(email, "signup", "success");
     toast.success("Account created. You're signed in.");
     navigate({ to: redirect ?? "/dashboard" });
   }

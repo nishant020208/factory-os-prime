@@ -49,7 +49,8 @@ export const Route = createFileRoute("/_authenticated/quality")({
 });
 
 function QualityPage() {
-  const { companyId } = useAuth();
+  const { companyId, roles } = useAuth();
+  const isAuditor = roles.includes("auditor");
   const queryClient = useQueryClient();
   const [showNew, setShowNew] = useState(false);
   const [formData, setFormData] = useState({
@@ -147,13 +148,15 @@ function QualityPage() {
         title="Quality Management"
         sub="Inspections, non-conformance reports and CAPA workflows."
         actions={
-          <Button
-            className="bg-[image:var(--gradient-primary)] shadow-glow"
-            onClick={() => setShowNew(true)}
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Inspection
-          </Button>
+          !isAuditor ? (
+            <Button
+              className="bg-[image:var(--gradient-primary)] shadow-glow"
+              onClick={() => setShowNew(true)}
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Inspection
+            </Button>
+          ) : null
         }
       />
       <Dialog open={showNew} onOpenChange={setShowNew}>

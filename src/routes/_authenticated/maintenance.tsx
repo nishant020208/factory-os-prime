@@ -40,7 +40,8 @@ export const Route = createFileRoute("/_authenticated/maintenance")({
 });
 
 function MaintenancePage() {
-  const { companyId } = useAuth();
+  const { companyId, roles } = useAuth();
+  const isAuditor = roles.includes("auditor");
   const queryClient = useQueryClient();
   const [showNew, setShowNew] = useState(false);
   const [machineName, setMachineName] = useState("");
@@ -132,13 +133,15 @@ function MaintenancePage() {
         title="Maintenance"
         sub="Preventive, corrective and AI-driven predictive maintenance across every asset."
         actions={
-          <Button
-            className="bg-[image:var(--gradient-primary)] shadow-glow"
-            onClick={() => setShowNew(true)}
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Work Order
-          </Button>
+          !isAuditor ? (
+            <Button
+              className="bg-[image:var(--gradient-primary)] shadow-glow"
+              onClick={() => setShowNew(true)}
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Work Order
+            </Button>
+          ) : null
         }
       />
       <Dialog open={showNew} onOpenChange={setShowNew}>

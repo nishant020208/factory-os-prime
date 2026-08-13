@@ -83,6 +83,7 @@ function InvoicesPage() {
   const queryClient = useQueryClient();
   const { companyId, roles, user } = useAuth();
   const isCustomer = roles.includes("customer_portal");
+  const isAuditor = roles.includes("auditor");
 
   const [qrDialog, setQrDialog] = useState<{
     open: boolean;
@@ -349,8 +350,8 @@ function InvoicesPage() {
         moduleName="invoices"
         rows={rows}
         searchKeys={["invoice_number", "customer_name", "status"]}
-        formFields={INVOICE_FORM_FIELDS}
-        onSubmit={async (formData) => {
+        formFields={isAuditor ? undefined : INVOICE_FORM_FIELDS}
+        onSubmit={isAuditor ? undefined : async (formData) => {
           if (!companyId) return;
           const { data: inserted, error } = await supabase
             .from("invoices")
@@ -458,7 +459,7 @@ function InvoicesPage() {
                 >
                   <QrCode className="h-3.5 w-3.5" />
                 </Button>
-                {r.status === "sent" && (
+                {r.status === "sent" && !isAuditor && (
                   <Button
                     variant="ghost"
                     size="sm"

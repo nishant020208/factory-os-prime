@@ -401,10 +401,12 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
       label: "Audit",
       items: [
         { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { to: "/notifications", label: "Notifications", icon: Bell, badge: "!" },
+        // Auditor receives zero notifications by design — no badge.
+        { to: "/notifications", label: "Notifications", icon: Bell },
         { to: "/audit", label: "Audit Logs", icon: ScrollText },
-        { to: "/reports", label: "Reports", icon: ClipboardList },
-        { to: "/compliance", label: "Compliance", icon: Shield },
+        { to: "/compliance", label: "Compliance Reports", icon: Shield },
+        { to: "/access-logs", label: "Access Logs", icon: Timer },
+        { to: "/export", label: "Data Export", icon: Database },
         { to: "/documents", label: "Documents", icon: Files },
         { to: "/settings", label: "Settings", icon: Settings },
       ],

@@ -49,7 +49,8 @@ export const Route = createFileRoute("/_authenticated/supplier-pos")({
 // Supplier portal: ONLY receive, accept/reject/modify POs — NEVER create them
 function SupplierPosPage() {
   const queryClient = useQueryClient();
-  const { companyId } = useAuth();
+  const { companyId, roles } = useAuth();
+  const isAuditor = roles.includes("auditor");
   const [respondDialog, setRespondDialog] = useState<{
     open: boolean;
     poId: string;
@@ -213,7 +214,7 @@ function SupplierPosPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      {(po.status === "sent" || po.status === "pending") && (
+                      {!isAuditor && (po.status === "sent" || po.status === "pending") && (
                         <>
                           <Button
                             size="sm"
@@ -250,7 +251,7 @@ function SupplierPosPage() {
                           </Button>
                         </>
                       )}
-                      {po.status === "in_progress" && (
+                      {!isAuditor && po.status === "in_progress" && (
                         <Button
                           size="sm"
                           variant="ghost"

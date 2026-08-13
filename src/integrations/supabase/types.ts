@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_logs: {
+        Row: {
+          action: string
+          company_id: string | null
+          created_at: string
+          email: string | null
+          id: string
+          ip_address: string | null
+          role: string | null
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          company_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          ip_address?: string | null
+          role?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          company_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          ip_address?: string | null
+          role?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approvals: {
         Row: {
           approver_id: string | null
@@ -3898,6 +3942,10 @@ export type Database = {
           scanned_at: string
           sub_label: string
         }[]
+      }
+      record_access_log: {
+        Args: { p_action: string; p_email: string; p_status?: string }
+        Returns: undefined
       }
       record_status_transition: {
         Args: {

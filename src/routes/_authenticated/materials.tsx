@@ -58,7 +58,8 @@ export const Route = createFileRoute("/_authenticated/materials")({
 
 function MaterialsPage() {
   const queryClient = useQueryClient();
-  const { companyId } = useAuth();
+  const { companyId, roles } = useAuth();
+  const isAuditor = roles.includes("auditor");
   const [showNew, setShowNew] = useState(false);
   const [showEdit, setShowEdit] = useState<{ open: boolean; material: any | null }>({
     open: false,
@@ -154,16 +155,18 @@ function MaterialsPage() {
         title="Materials"
         sub="Material master list — single source for customer orders and production planning."
         actions={
-          <Button
-            onClick={() => {
-              setForm({ name: "", unit: "pcs", unit_cost: "0", is_active: "true" });
-              setShowNew(true);
-            }}
-            className="bg-[image:var(--gradient-primary)] shadow-glow"
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Material
-          </Button>
+          !isAuditor ? (
+            <Button
+              onClick={() => {
+                setForm({ name: "", unit: "pcs", unit_cost: "0", is_active: "true" });
+                setShowNew(true);
+              }}
+              className="bg-[image:var(--gradient-primary)] shadow-glow"
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Material
+            </Button>
+          ) : null
         }
       />
 
@@ -225,32 +228,36 @@ function MaterialsPage() {
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => {
-                        setForm({
-                          name: m.name,
-                          unit: m.unit,
-                          unit_cost: String(m.unit_cost ?? 0),
-                          is_active: String(m.is_active),
-                        });
-                        setShowEdit({ open: true, material: m });
-                      }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive"
-                      onClick={() => {
-                        if (confirm("Delete this material?")) deleteMutation.mutate(m.id);
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {!isAuditor && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setForm({
+                              name: m.name,
+                              unit: m.unit,
+                              unit_cost: String(m.unit_cost ?? 0),
+                              is_active: String(m.is_active),
+                            });
+                            setShowEdit({ open: true, material: m });
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => {
+                            if (confirm("Delete this material?")) deleteMutation.mutate(m.id);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

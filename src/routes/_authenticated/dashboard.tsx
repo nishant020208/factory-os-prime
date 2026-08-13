@@ -1839,7 +1839,7 @@ function AuditorDashboard() {
           (
             await supabase
               .from("audit_logs")
-              .select("*, profiles(full_name)")
+              .select("*")
               .order("created_at", { ascending: false })
               .limit(20)
           ).data ?? []
