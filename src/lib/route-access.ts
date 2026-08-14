@@ -48,13 +48,10 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/knowledge": ALL_COMPANY,
   "/notifications": ALL_COMPANY,
   "/analytics": ONLY("company_admin", "plant_admin", "plant_manager", "finance_manager"),
-  "/settings": ONLY(
-    "company_admin",
-    "plant_admin",
-    "customer_portal",
-    "supplier_portal",
-    "auditor",
-  ),
+  // Profile is available to EVERY role. Root lands on /platform/profile for
+  // their own profile but uses /settings to review Company Admin requests.
+  // Each role sees only its own self-editable vs approval-gated fields.
+  "/settings": [...ALL_COMPANY, "customer_portal", "supplier_portal", "root_super_admin"],
 
   // NEW: Materials (Company Admin + Production Manager read; Auditor read-only)
   "/materials": ONLY("company_admin", "production_manager", "auditor"),

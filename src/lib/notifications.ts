@@ -483,22 +483,63 @@ export async function notifyOrderChangesRequested(
   );
 }
 
-/** Trigger 7: Profile/role change request → Company Admin */
+/** Trigger 7: Profile/role change request → the SPECIFIC Company Admin */
 export async function notifyChangeRequest(
   companyId: string,
   requesterName: string,
   requestId: string,
+  approverUserId?: string | null,
 ) {
+  // Targeted to the single approver (to_user), never a role broadcast. Falls
+  // back to role-wide only if the approver cannot be resolved.
+  const [role, user] = resolveTarget("company_admin", approverUserId);
   await fireNotification(
     companyId,
-    "company_admin",
-    null,
+    role,
+    user,
     "✏️ Change Request Pending",
-    `${requesterName} has submitted a profile/role change request.`,
+    `${requesterName} has submitted a profile change request. Review in Profile → Change Requests.`,
     "info",
     "profile_change_requests",
     requestId,
   );
+}
+
+/** A Company Admin's own change request → the single Root Super Admin */
+export async function notifyChangeRequestToRoot(
+  companyId: string,
+  requesterName: string,
+  requestId: string,
+) {
+  // Resolve the root user for precise to_user targeting. user_roles RLS hides
+  // the root's row from non-root users, so this goes through the SECURITY
+  // DEFINER get_root_user_id() RPC.
+  const { data } = await supabase.rpc("get_root_user_id");
+  const rootUserId = data ?? null;
+  if (rootUserId) {
+    await fireNotification(
+      companyId,
+      null,
+      rootUserId,
+      "👑 Company Admin Change Request",
+      `${requesterName} (Company Admin) has submitted a profile change request. Review in Profile → Change Requests.`,
+      "info",
+      "profile_change_requests",
+      requestId,
+    );
+  } else {
+    // No root user resolved — fall back to the established root role-wide pattern.
+    await fireNotification(
+      null,
+      "root_super_admin",
+      null,
+      "👑 Company Admin Change Request",
+      `${requesterName} (Company Admin) has submitted a profile change request.`,
+      "info",
+      "profile_change_requests",
+      requestId,
+    );
+  }
 }
 
 /** Trigger 8: High-value PO escalation → Company Admin */
@@ -1329,11 +1370,16 @@ export async function markAllNotificationsRead(
 ) {
   try {
     if (isRootRole(role)) {
-      await supabase
+      const q = supabase
         .from("notifications")
         .update({ is_read: true })
-        .eq("to_role", "root_super_admin")
         .eq("is_read", false);
+      if (userId) {
+        q.or(`to_user.eq.${userId},to_role.eq.root_super_admin`);
+      } else {
+        q.eq("to_role", "root_super_admin");
+      }
+      await q;
       return;
     }
     // Non-root roles always have a company — guard for type safety.
@@ -1362,11 +1408,16 @@ export async function getUnreadNotificationCount(
 ): Promise<number> {
   try {
     if (isRootRole(role)) {
-      const { count } = await supabase
+      const q = supabase
         .from("notifications")
         .select("id", { count: "exact", head: true })
-        .eq("to_role", "root_super_admin")
         .eq("is_read", false);
+      if (userId) {
+        q.or(`to_user.eq.${userId},to_role.eq.root_super_admin`);
+      } else {
+        q.eq("to_role", "root_super_admin");
+      }
+      const { count } = await q;
       return count ?? 0;
     }
     // Non-root roles always have a company — guard for type safety.
@@ -1397,12 +1448,17 @@ export async function fetchNotifications(
 ): Promise<AppNotification[]> {
   try {
     if (isRootRole(role)) {
-      const { data } = await supabase
+      const q = supabase
         .from("notifications")
         .select("*")
-        .eq("to_role", "root_super_admin")
         .order("created_at", { ascending: false })
         .limit(limit);
+      if (userId) {
+        q.or(`to_user.eq.${userId},to_role.eq.root_super_admin`);
+      } else {
+        q.eq("to_role", "root_super_admin");
+      }
+      const { data } = await q;
       return (data ?? []) as AppNotification[];
     }
     // Non-root roles always have a company — guard for type safety.

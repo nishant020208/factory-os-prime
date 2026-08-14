@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       access_logs: {
@@ -2514,41 +2489,47 @@ export type Database = {
       }
       profile_change_requests: {
         Row: {
-          approver_id: string | null
           company_id: string
           created_at: string
-          current_value: string | null
           field_name: string
           id: string
+          new_value: string
           notes: string | null
-          requested_value: string
-          resolved_at: string | null
+          old_value: string | null
+          rejection_reason: string | null
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           status: string
           user_id: string
         }
         Insert: {
-          approver_id?: string | null
           company_id: string
           created_at?: string
-          current_value?: string | null
           field_name: string
           id?: string
+          new_value: string
           notes?: string | null
-          requested_value: string
-          resolved_at?: string | null
+          old_value?: string | null
+          rejection_reason?: string | null
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
           user_id: string
         }
         Update: {
-          approver_id?: string | null
           company_id?: string
           created_at?: string
-          current_value?: string | null
           field_name?: string
           id?: string
+          new_value?: string
           notes?: string | null
-          requested_value?: string
-          resolved_at?: string | null
+          old_value?: string | null
+          rejection_reason?: string | null
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
           user_id?: string
         }
@@ -2557,8 +2538,10 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          certifications: string | null
           company_id: string | null
           created_at: string
+          department: string | null
           email: string
           full_name: string | null
           id: string
@@ -2572,8 +2555,10 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          certifications?: string | null
           company_id?: string | null
           created_at?: string
+          department?: string | null
           email: string
           full_name?: string | null
           id: string
@@ -2587,8 +2572,10 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          certifications?: string | null
           company_id?: string | null
           created_at?: string
+          department?: string | null
           email?: string
           full_name?: string | null
           id?: string
@@ -3667,12 +3654,17 @@ export type Database = {
       }
       suppliers: {
         Row: {
+          address: string | null
+          bank_details: string | null
           category: string | null
           company_id: string
           contact_email: string | null
+          contact_person: string | null
           contact_phone: string | null
           created_at: string
+          gst_number: string | null
           id: string
+          materials_supplied: string | null
           name: string
           payment_terms: string | null
           rating: number | null
@@ -3680,12 +3672,17 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          address?: string | null
+          bank_details?: string | null
           category?: string | null
           company_id: string
           contact_email?: string | null
+          contact_person?: string | null
           contact_phone?: string | null
           created_at?: string
+          gst_number?: string | null
           id?: string
+          materials_supplied?: string | null
           name: string
           payment_terms?: string | null
           rating?: number | null
@@ -3693,12 +3690,17 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          address?: string | null
+          bank_details?: string | null
           category?: string | null
           company_id?: string
           contact_email?: string | null
+          contact_person?: string | null
           contact_phone?: string | null
           created_at?: string
+          gst_number?: string | null
           id?: string
+          materials_supplied?: string | null
           name?: string
           payment_terms?: string | null
           rating?: number | null
@@ -4202,6 +4204,7 @@ export type Database = {
       }
       get_active_companies: { Args: never; Returns: Json }
       get_platform_stats: { Args: never; Returns: Json }
+      get_root_user_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -4397,9 +4400,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: [
