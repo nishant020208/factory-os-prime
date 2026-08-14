@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { StubModule } from "@/components/stub-module";
+import { OperatorIssueReporting } from "@/components/operator-workspace";
 
 export const Route = createFileRoute("/_authenticated/issue-reporting")({
   head: () => ({
@@ -8,7 +8,5 @@ export const Route = createFileRoute("/_authenticated/issue-reporting")({
       { name: "description", content: "Report machine or quality issues" },
     ],
   }),
-  component: () => (
-    <StubModule eyebrow="Module" title="Report an Issue" sub="Report machine or quality issues" />
-  ),
+  component: OperatorIssueReporting,
 });

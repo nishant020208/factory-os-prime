@@ -368,7 +368,6 @@ function useLiveStats(companyId: string | null) {
   });
 }
 
-
 /** Honest fallback when a metric has no real data source yet */
 function na(): string {
   return "N/A";
@@ -1656,15 +1655,14 @@ function HRDashboard() {
 
 /* ─────────── OPERATOR ─────────── */
 function OperatorDashboard() {
-  const { companyId, user } = useAuth();
-  const s = useLiveStats(companyId).data;
-  const { data: myWorkOrders } = useQuery({
+  const { user } = useAuth();
+  const { data: myWorkOrders = [] } = useQuery({
     queryKey: ["my-wos", user?.id],
     queryFn: async () => {
       try {
         const { data } = await supabase
           .from("work_orders")
-          .select("id,status")
+          .select("id,status,progress_percent,created_at")
           .eq("operator_id", user?.id ?? "")
           .limit(50);
         return data ?? [];
@@ -1678,39 +1676,54 @@ function OperatorDashboard() {
     <Shell
       eyebrow="My Shift"
       title="Today's Work"
-      sub="Your assigned work orders, machines and tasks."
+      sub="Your assigned work orders, attendance and reported issues."
     >
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Kpi
           label="My Work Orders"
-          value={String(myWorkOrders?.length ?? 0)}
+          value={String(
+            myWorkOrders.filter((o: any) => !["completed", "cancelled"].includes(o.status)).length,
+          )}
           icon={ClipboardList}
           tone="primary"
         />
-        <Kpi label="Company WOs" value={String(s?.workOrders ?? 0)} icon={Cog} tone="info" />
         <Kpi
-          label="Machines Up"
-          value={`${s?.machinesUp ?? 0}/${s?.machines ?? 0}`}
-          icon={ShieldCheck}
+          label="Completed"
+          value={String(myWorkOrders.filter((o: any) => o.status === "completed").length)}
+          icon={CheckCircle2}
           tone="success"
         />
         <Kpi
-          label="Open Tickets"
-          value={String(s?.supportTicketsOpen ?? 0)}
-          icon={ShieldCheck}
+          label="In Progress"
+          value={String(myWorkOrders.filter((o: any) => o.status === "in_progress").length)}
+          icon={Clock}
+          tone="info"
+        />
+        <Kpi
+          label="My Blocked Work"
+          value={String(myWorkOrders.filter((o: any) => o.status === "blocked").length)}
+          icon={AlertTriangle}
           tone="warning"
         />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <Panel title="Your work orders">
-          <div className="text-sm text-muted-foreground">
-            Assigned work orders ({myWorkOrders?.length ?? 0}) will appear here in real time as your
-            manager releases them.
+          <div className="space-y-2 text-sm">
+            {myWorkOrders.slice(0, 5).map((o: any) => (
+              <div key={o.id} className="flex justify-between gap-2">
+                <span>{o.progress_percent}% complete</span>
+                <StatusBadge status={o.status} />
+              </div>
+            ))}
+            {!myWorkOrders.length && (
+              <span className="text-muted-foreground">No assigned work orders.</span>
+            )}
           </div>
         </Panel>
-        <Panel title="Machine status">
+        <Panel title="Your scope">
           <div className="text-sm text-muted-foreground">
-            {s?.machinesUp ?? 0} of {s?.machines ?? 0} machines operational right now.
+            This dashboard only shows your assigned work. Use My Attendance to check in or out and
+            Report Issue to pause an assigned work order.
           </div>
         </Panel>
       </div>
@@ -1817,7 +1830,10 @@ function SupplierDashboard() {
         .eq("user_id", user.id)
         .maybeSingle();
       if (byUser.data?.id) {
-        return { id: byUser.data.id as string, name: (byUser.data.name as string) ?? "Your company" };
+        return {
+          id: byUser.data.id as string,
+          name: (byUser.data.name as string) ?? "Your company",
+        };
       }
       const { data: profile } = await supabase
         .from("profiles")
@@ -1830,7 +1846,9 @@ function SupplierDashboard() {
           .select("id, name")
           .eq("contact_email", profile.email)
           .maybeSingle();
-        return sup?.id ? { id: sup.id as string, name: (sup.name as string) ?? "Your company" } : null;
+        return sup?.id
+          ? { id: sup.id as string, name: (sup.name as string) ?? "Your company" }
+          : null;
       }
       return null;
     },
@@ -1876,8 +1894,7 @@ function SupplierDashboard() {
     enabled: !!mySupplier?.id,
   });
 
-  const awaiting =
-    (pos ?? []).filter((p) => ["sent", "pending"].includes(p.status)).length ?? 0;
+  const awaiting = (pos ?? []).filter((p) => ["sent", "pending"].includes(p.status)).length ?? 0;
   const accepted =
     (pos ?? []).filter((p) => ["accepted", "in_progress"].includes(p.status)).length ?? 0;
   const inbound = (deliveries ?? []).filter((d) => d.status === "dispatched").length ?? 0;
@@ -1900,39 +1917,45 @@ function SupplierDashboard() {
         />
         <Kpi label="Accepted" value={String(accepted)} icon={CheckCircle2} tone="success" />
         <Kpi label="Inbound Shipments" value={String(inbound)} icon={Truck} tone="info" />
-        <Kpi label="Payments Received" value={`$${totalPaid.toLocaleString()}`} icon={Landmark} tone="warning" />
+        <Kpi
+          label="Payments Received"
+          value={`$${totalPaid.toLocaleString()}`}
+          icon={Landmark}
+          tone="warning"
+        />
       </div>
 
       <div className="mt-4">
-      <Panel title={`${pos?.length ?? 0} Purchase Orders`}>
-        <ul className="space-y-2">
-          {(pos ?? []).slice(0, 6).map((p) => (
-            <li key={p.id}>
-              <button
-                onClick={() => setOpenPo(openPo === p.id ? null : p.id)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5 text-xs transition-colors"
-              >
-                <span className="font-medium">{p.po_number ?? p.id.slice(0, 8)}</span>
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  ${Number(p.total_amount ?? 0).toLocaleString()}
-                  <StatusBadge status={p.status} />
-                </span>
-              </button>
-              {openPo === p.id && (
-                <p className="px-3 pb-2 text-xs text-muted-foreground">
-                  Expected {p.expected_date ? new Date(p.expected_date).toLocaleDateString() : "—"}
-                  {p.supplier_note ? ` · ${p.supplier_note}` : ""}
-                </p>
-              )}
-            </li>
-          ))}
-          {(pos ?? []).length === 0 && (
-            <li className="text-xs text-muted-foreground text-center py-6">
-              No purchase orders yet. When the buyer sends you one, it appears here.
-            </li>
-          )}
-        </ul>
-      </Panel>
+        <Panel title={`${pos?.length ?? 0} Purchase Orders`}>
+          <ul className="space-y-2">
+            {(pos ?? []).slice(0, 6).map((p) => (
+              <li key={p.id}>
+                <button
+                  onClick={() => setOpenPo(openPo === p.id ? null : p.id)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5 text-xs transition-colors"
+                >
+                  <span className="font-medium">{p.po_number ?? p.id.slice(0, 8)}</span>
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    ${Number(p.total_amount ?? 0).toLocaleString()}
+                    <StatusBadge status={p.status} />
+                  </span>
+                </button>
+                {openPo === p.id && (
+                  <p className="px-3 pb-2 text-xs text-muted-foreground">
+                    Expected{" "}
+                    {p.expected_date ? new Date(p.expected_date).toLocaleDateString() : "—"}
+                    {p.supplier_note ? ` · ${p.supplier_note}` : ""}
+                  </p>
+                )}
+              </li>
+            ))}
+            {(pos ?? []).length === 0 && (
+              <li className="text-xs text-muted-foreground text-center py-6">
+                No purchase orders yet. When the buyer sends you one, it appears here.
+              </li>
+            )}
+          </ul>
+        </Panel>
       </div>
     </Shell>
   );

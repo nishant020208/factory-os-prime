@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -1774,6 +1774,7 @@ export type Database = {
           created_at: string
           id: string
           issue_description: string
+          issue_type: string
           machine_id: string | null
           priority: string
           reported_by: string | null
@@ -1781,6 +1782,7 @@ export type Database = {
           resolved_at: string | null
           resolved_by: string | null
           status: string
+          target_user_id: string | null
           ticket_number: string | null
           updated_at: string
           work_order_id: string | null
@@ -1791,6 +1793,7 @@ export type Database = {
           created_at?: string
           id?: string
           issue_description: string
+          issue_type?: string
           machine_id?: string | null
           priority?: string
           reported_by?: string | null
@@ -1798,6 +1801,7 @@ export type Database = {
           resolved_at?: string | null
           resolved_by?: string | null
           status?: string
+          target_user_id?: string | null
           ticket_number?: string | null
           updated_at?: string
           work_order_id?: string | null
@@ -1808,6 +1812,7 @@ export type Database = {
           created_at?: string
           id?: string
           issue_description?: string
+          issue_type?: string
           machine_id?: string | null
           priority?: string
           reported_by?: string | null
@@ -1815,6 +1820,7 @@ export type Database = {
           resolved_at?: string | null
           resolved_by?: string | null
           status?: string
+          target_user_id?: string | null
           ticket_number?: string | null
           updated_at?: string
           work_order_id?: string | null
@@ -1832,6 +1838,13 @@ export type Database = {
             columns: ["machine_id"]
             isOneToOne: false
             referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_tickets_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -2420,6 +2433,58 @@ export type Database = {
             columns: ["material_id"]
             isOneToOne: false
             referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_progress: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          operator_id: string
+          progress_percent: number
+          work_order_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          operator_id: string
+          progress_percent: number
+          work_order_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          operator_id?: string
+          progress_percent?: number
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_progress_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_progress_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_progress_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -4079,12 +4144,18 @@ export type Database = {
       }
       work_orders: {
         Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          checklist: Json
           company_id: string
           created_at: string
           department_id: string | null
+          design_image_url: string | null
+          due_date: string | null
           end_time: string | null
           id: string
           machine_id: string | null
+          materials: Json
           notes: string | null
           operation: string | null
           operator_id: string | null
@@ -4096,12 +4167,18 @@ export type Database = {
           wo_number: string
         }
         Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          checklist?: Json
           company_id: string
           created_at?: string
           department_id?: string | null
+          design_image_url?: string | null
+          due_date?: string | null
           end_time?: string | null
           id?: string
           machine_id?: string | null
+          materials?: Json
           notes?: string | null
           operation?: string | null
           operator_id?: string | null
@@ -4113,12 +4190,18 @@ export type Database = {
           wo_number: string
         }
         Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          checklist?: Json
           company_id?: string
           created_at?: string
           department_id?: string | null
+          design_image_url?: string | null
+          due_date?: string | null
           end_time?: string | null
           id?: string
           machine_id?: string | null
+          materials?: Json
           notes?: string | null
           operation?: string | null
           operator_id?: string | null
@@ -4130,6 +4213,13 @@ export type Database = {
           wo_number?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "work_orders_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "work_orders_department_id_fkey"
             columns: ["department_id"]

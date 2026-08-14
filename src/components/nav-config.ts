@@ -358,10 +358,9 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
         { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { to: "/notifications", label: "Notifications", icon: Bell, badge: "!" },
         { to: "/assigned-work-orders", label: "Work Orders", icon: ListTodo },
-        { to: "/assigned-machines", label: "My Machines", icon: Cog },
-        { to: "/tasks", label: "Tasks", icon: ClipboardCheck },
-        { to: "/production-logs", label: "Production Logs", icon: ScrollText },
         { to: "/issue-reporting", label: "Report Issue", icon: AlertOctagon },
+        { to: "/attendance", label: "My Attendance", icon: Timer },
+        { to: "/settings", label: "Profile", icon: User },
       ],
     },
     {

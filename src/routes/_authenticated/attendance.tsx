@@ -24,6 +24,7 @@ import {
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { OperatorAttendance } from "@/components/operator-workspace";
 
 export const Route = createFileRoute("/_authenticated/attendance")({
   head: () => ({
@@ -40,6 +41,7 @@ export const Route = createFileRoute("/_authenticated/attendance")({
 
 function AttendancePage() {
   const { companyId, roles } = useAuth();
+  if (roles.includes("production_operator")) return <OperatorAttendance />;
   const isAuditor = roles.includes("auditor");
   const queryClient = useQueryClient();
   const [showNew, setShowNew] = useState(false);
@@ -102,8 +104,12 @@ function AttendancePage() {
     name: r.profiles?.full_name ?? "Unknown",
     job_title: r.profiles?.job_title ?? "—",
     date: r.date ?? "",
-    check_in: r.check_in ? new Date(r.check_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—",
-    check_out: r.check_out ? new Date(r.check_out).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—",
+    check_in: r.check_in
+      ? new Date(r.check_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : "—",
+    check_out: r.check_out
+      ? new Date(r.check_out).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : "—",
     status: r.status ?? "present",
     hours: Number(r.hours_worked ?? 0),
   }));
@@ -111,10 +117,9 @@ function AttendancePage() {
   const total = records.length;
   const present = records.filter((r: any) => r.status === "present").length;
   const absent = records.filter((r: any) => r.status === "absent").length;
-  const avgHours =
-    records.length
-      ? (records.reduce((s: number, r: any) => s + r.hours, 0) / records.length).toFixed(1)
-      : "0.0";
+  const avgHours = records.length
+    ? (records.reduce((s: number, r: any) => s + r.hours, 0) / records.length).toFixed(1)
+    : "0.0";
 
   return (
     <div className="max-w-[1600px] mx-auto">

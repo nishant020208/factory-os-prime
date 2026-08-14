@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { StubModule } from "@/components/stub-module";
+import { OperatorWorkOrders } from "@/components/operator-workspace";
 
 export const Route = createFileRoute("/_authenticated/assigned-work-orders")({
   head: () => ({
@@ -8,7 +8,5 @@ export const Route = createFileRoute("/_authenticated/assigned-work-orders")({
       { name: "description", content: "Work orders assigned to you" },
     ],
   }),
-  component: () => (
-    <StubModule eyebrow="Module" title="My Work Orders" sub="Work orders assigned to you" />
-  ),
+  component: OperatorWorkOrders,
 });

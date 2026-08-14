@@ -7,13 +7,7 @@ import { ROLE_MAP, type AppRole } from "@/lib/roles";
 import { PageHeader, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
-import {
-  Download,
-  FileText,
-  Table2,
-  ScrollText,
-  AlertCircle,
-} from "lucide-react";
+import { Download, FileText, Table2, ScrollText, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
   downloadCsv,
@@ -94,7 +88,11 @@ export interface ReportSection {
   columns: Column[];
   rows: Row[];
   fileName: string;
-  summary?: { label: string; value: string; tone?: "primary" | "success" | "warning" | "info" | "destructive" }[];
+  summary?: {
+    label: string;
+    value: string;
+    tone?: "primary" | "success" | "warning" | "info" | "destructive";
+  }[];
   pdf?: { meta?: [string, string][]; footer?: string; title: string; sub?: string };
   note?: string;
 }
@@ -187,9 +185,21 @@ const rootBuilders: Builder[] = [
       fileName: "platform-companies",
       summary: [
         { label: "Total Companies", value: num(rows.length), tone: "primary" },
-        { label: "Active", value: num(rows.filter((r) => r.status === "active").length), tone: "success" },
-        { label: "Pending Approval", value: num(rows.filter((r) => r.status === "pending").length), tone: "warning" },
-        { label: "Suspended", value: num(rows.filter((r) => r.status === "suspended").length), tone: "destructive" },
+        {
+          label: "Active",
+          value: num(rows.filter((r) => r.status === "active").length),
+          tone: "success",
+        },
+        {
+          label: "Pending Approval",
+          value: num(rows.filter((r) => r.status === "pending").length),
+          tone: "warning",
+        },
+        {
+          label: "Suspended",
+          value: num(rows.filter((r) => r.status === "suspended").length),
+          tone: "destructive",
+        },
       ],
     };
   },
@@ -220,8 +230,16 @@ const rootBuilders: Builder[] = [
       fileName: "platform-company-approvals",
       summary: [
         { label: "Total Requests", value: num(rows.length), tone: "primary" },
-        { label: "Approved", value: num(rows.filter((r) => r.status === "approved").length), tone: "success" },
-        { label: "Rejected", value: num(rows.filter((r) => r.status === "rejected").length), tone: "destructive" },
+        {
+          label: "Approved",
+          value: num(rows.filter((r) => r.status === "approved").length),
+          tone: "success",
+        },
+        {
+          label: "Rejected",
+          value: num(rows.filter((r) => r.status === "rejected").length),
+          tone: "destructive",
+        },
       ],
     };
   },
@@ -255,7 +273,9 @@ const rootBuilders: Builder[] = [
       entity: c.value,
       actions: c.count,
     }));
-    const okLogins = access.filter((a) => a.status === "success" || a.status === "succeeded").length;
+    const okLogins = access.filter(
+      (a) => a.status === "success" || a.status === "succeeded",
+    ).length;
     return {
       id: "root-system-health",
       module: "platform",
@@ -287,7 +307,10 @@ const companyAdminBuilders: Builder[] = [
     const rows = counts.map((c) => ({
       status: c.value,
       orders: c.count,
-      value: sumBy(orders.filter((o) => o.status === c.value), "total_amount"),
+      value: sumBy(
+        orders.filter((o) => o.status === c.value),
+        "total_amount",
+      ),
     }));
     return {
       id: "ca-orders-by-status",
@@ -303,8 +326,16 @@ const companyAdminBuilders: Builder[] = [
       fileName: "company-orders-by-status",
       summary: [
         { label: "Total Orders", value: num(orders.length), tone: "primary" },
-        { label: "Pending Approval", value: num(orders.filter((o) => o.status === "pending_approval").length), tone: "warning" },
-        { label: "Delivered", value: num(orders.filter((o) => o.status === "delivered").length), tone: "success" },
+        {
+          label: "Pending Approval",
+          value: num(orders.filter((o) => o.status === "pending_approval").length),
+          tone: "warning",
+        },
+        {
+          label: "Delivered",
+          value: num(orders.filter((o) => o.status === "delivered").length),
+          tone: "success",
+        },
       ],
     };
   },
@@ -322,7 +353,10 @@ const companyAdminBuilders: Builder[] = [
       paid_date: i.paid_date,
     }));
     const issued = sumBy(invoices, "total_amount");
-    const paid = sumBy(invoices.filter((i) => i.status === "paid"), "total_amount");
+    const paid = sumBy(
+      invoices.filter((i) => i.status === "paid"),
+      "total_amount",
+    );
     return {
       id: "ca-revenue",
       module: "finance",
@@ -378,8 +412,16 @@ const companyAdminBuilders: Builder[] = [
       fileName: "company-production-throughput",
       summary: [
         { label: "In Flight", value: num(inFlight.length), tone: "info" },
-        { label: "Delivered", value: num(orders.filter((o) => o.status === "delivered").length), tone: "success" },
-        { label: "Avg Progress", value: `${avgBy(inFlight, "progress").toFixed(1)}%`, tone: "primary" },
+        {
+          label: "Delivered",
+          value: num(orders.filter((o) => o.status === "delivered").length),
+          tone: "success",
+        },
+        {
+          label: "Avg Progress",
+          value: `${avgBy(inFlight, "progress").toFixed(1)}%`,
+          tone: "primary",
+        },
       ],
     };
   },
@@ -411,7 +453,9 @@ const companyAdminBuilders: Builder[] = [
       ],
       rows,
       fileName: "company-inventory-value",
-      summary: [{ label: "Total Stock Value", value: money(sumBy(rows, "value")), tone: "primary" }],
+      summary: [
+        { label: "Total Stock Value", value: money(sumBy(rows, "value")), tone: "primary" },
+      ],
     };
   },
   async () => {
@@ -439,7 +483,11 @@ const companyAdminBuilders: Builder[] = [
       rows,
       fileName: "company-pending-approvals",
       summary: [
-        { label: "Total Pending", value: num(pendingOrders + pendingPcr + pendingReqs), tone: "warning" },
+        {
+          label: "Total Pending",
+          value: num(pendingOrders + pendingPcr + pendingReqs),
+          tone: "warning",
+        },
       ],
     };
   },
@@ -526,8 +574,12 @@ const plantBuilders: Builder[] = [
       employee: e.full_name,
       department: e.department ?? ctx.lookups.departments.get(e.department_id)?.name ?? "—",
       records: attendance.filter((a) => a.employee_id === e.id).length,
-      hours_worked: sumBy(attendance.filter((a) => a.employee_id === e.id), "hours_worked"),
-      present_days: attendance.filter((a) => a.employee_id === e.id && a.status === "present").length,
+      hours_worked: sumBy(
+        attendance.filter((a) => a.employee_id === e.id),
+        "hours_worked",
+      ),
+      present_days: attendance.filter((a) => a.employee_id === e.id && a.status === "present")
+        .length,
     }));
     return {
       id: "plant-attendance",
@@ -576,7 +628,11 @@ const plantBuilders: Builder[] = [
       summary: [
         { label: "Machines", value: num(machines.length), tone: "primary" },
         { label: "Operational", value: num(operational), tone: "success" },
-        { label: "Avg Utilization", value: `${avgBy(machines, "utilization").toFixed(1)}%`, tone: "info" },
+        {
+          label: "Avg Utilization",
+          value: `${avgBy(machines, "utilization").toFixed(1)}%`,
+          tone: "info",
+        },
       ],
     };
   },
@@ -606,7 +662,9 @@ const plantBuilders: Builder[] = [
       ],
       rows,
       fileName: "plant-local-stock",
-      summary: [{ label: "Total Stock Value", value: money(sumBy(rows, "value")), tone: "primary" }],
+      summary: [
+        { label: "Total Stock Value", value: money(sumBy(rows, "value")), tone: "primary" },
+      ],
     };
   },
 ];
@@ -628,7 +686,10 @@ const productionManagerBuilders: Builder[] = [
       product: products.get(o.id),
       status: o.status,
       progress: o.progress ?? 0,
-      quantity: sumBy(items.filter((it) => it.sales_order_id === o.id), "quantity"),
+      quantity: sumBy(
+        items.filter((it) => it.sales_order_id === o.id),
+        "quantity",
+      ),
       due_date: o.due_date,
     }));
     return {
@@ -648,8 +709,16 @@ const productionManagerBuilders: Builder[] = [
       fileName: "production-pipeline",
       summary: [
         { label: "In Flight", value: num(inScope.length), tone: "primary" },
-        { label: "In Production", value: num(inScope.filter((o) => o.status === "in_production").length), tone: "info" },
-        { label: "Avg Progress", value: `${avgBy(inScope, "progress").toFixed(1)}%`, tone: "success" },
+        {
+          label: "In Production",
+          value: num(inScope.filter((o) => o.status === "in_production").length),
+          tone: "info",
+        },
+        {
+          label: "Avg Progress",
+          value: `${avgBy(inScope, "progress").toFixed(1)}%`,
+          tone: "success",
+        },
       ],
     };
   },
@@ -689,7 +758,9 @@ const productionManagerBuilders: Builder[] = [
         });
       } else {
         for (const ci of comps) {
-          const comp = ctx.lookups.products.get(ci.component_product_id) ?? ctx.lookups.materials.get(ci.component_product_id);
+          const comp =
+            ctx.lookups.products.get(ci.component_product_id) ??
+            ctx.lookups.materials.get(ci.component_product_id);
           rows.push({
             product: product?.name ?? "—",
             component: comp?.name ?? "—",
@@ -821,7 +892,11 @@ const warehouseBuilders: Builder[] = [
       fileName: "warehouse-stock-levels",
       summary: [
         { label: "Stock Items", value: num(inv.length), tone: "primary" },
-        { label: "Below Reorder", value: num(rows.filter((r) => r.status === "low_stock").length), tone: "destructive" },
+        {
+          label: "Below Reorder",
+          value: num(rows.filter((r) => r.status === "low_stock").length),
+          tone: "destructive",
+        },
       ],
     };
   },
@@ -879,7 +954,8 @@ const warehouseBuilders: Builder[] = [
     const rows = inv
       .map((r) => {
         const it = itemName(r, ctx.lookups);
-        const reorder = (r.product_id ? ctx.lookups.products.get(r.product_id)?.reorder_level : null) ?? 0;
+        const reorder =
+          (r.product_id ? ctx.lookups.products.get(r.product_id)?.reorder_level : null) ?? 0;
         return {
           item: it.name,
           warehouse: ctx.lookups.warehouses.get(r.warehouse_id)?.name ?? "—",
@@ -901,7 +977,13 @@ const warehouseBuilders: Builder[] = [
       ],
       rows,
       fileName: "warehouse-low-stock-alerts",
-      summary: [{ label: "Low-Stock Items", value: num(rows.length), tone: rows.length ? "destructive" : "success" }],
+      summary: [
+        {
+          label: "Low-Stock Items",
+          value: num(rows.length),
+          tone: rows.length ? "destructive" : "success",
+        },
+      ],
       note: "No items are currently below reorder level — replenishment not required.",
     };
   },
@@ -1002,9 +1084,19 @@ const procurementBuilders: Builder[] = [
       rows,
       fileName: "procurement-requisitions-vs-pos",
       summary: [
-        { label: "Open Requisitions", value: num(reqs.filter((r) => r.status !== "approved" && r.status !== "completed").length), tone: "warning" },
+        {
+          label: "Open Requisitions",
+          value: num(
+            reqs.filter((r) => r.status !== "approved" && r.status !== "completed").length,
+          ),
+          tone: "warning",
+        },
         { label: "Purchase Orders", value: num(pos.length), tone: "primary" },
-        { label: "Received", value: num(pos.filter((p) => p.status === "received").length), tone: "success" },
+        {
+          label: "Received",
+          value: num(pos.filter((p) => p.status === "received").length),
+          tone: "success",
+        },
       ],
     };
   },
@@ -1037,7 +1129,11 @@ const procurementBuilders: Builder[] = [
       fileName: "procurement-supplier-performance",
       summary: [
         { label: "Suppliers", value: num(suppliers.length), tone: "primary" },
-        { label: "Avg Rating", value: avgBy(suppliers, "rating") ? avgBy(suppliers, "rating").toFixed(1) : "—", tone: "info" },
+        {
+          label: "Avg Rating",
+          value: avgBy(suppliers, "rating") ? avgBy(suppliers, "rating").toFixed(1) : "—",
+          tone: "info",
+        },
       ],
     };
   },
@@ -1049,7 +1145,8 @@ const procurementBuilders: Builder[] = [
       total_amount: p.total_amount,
     }));
     const bySupplier = new Map<string, number>();
-    for (const r of rows) bySupplier.set(r.supplier, (bySupplier.get(r.supplier) ?? 0) + Number(r.total_amount || 0));
+    for (const r of rows)
+      bySupplier.set(r.supplier, (bySupplier.get(r.supplier) ?? 0) + Number(r.total_amount || 0));
     const summaryRows = [...bySupplier.entries()].map(([supplier, spend]) => ({
       supplier,
       spend,
@@ -1065,7 +1162,9 @@ const procurementBuilders: Builder[] = [
       ],
       rows: summaryRows,
       fileName: "procurement-spend-by-supplier",
-      summary: [{ label: "Total PO Spend", value: money(sumBy(pos, "total_amount")), tone: "primary" }],
+      summary: [
+        { label: "Total PO Spend", value: money(sumBy(pos, "total_amount")), tone: "primary" },
+      ],
     };
   },
   async (ctx) => {
@@ -1093,7 +1192,9 @@ const procurementBuilders: Builder[] = [
       ],
       rows,
       fileName: "procurement-open-pos",
-      summary: [{ label: "Open POs", value: num(rows.length), tone: rows.length ? "warning" : "success" }],
+      summary: [
+        { label: "Open POs", value: num(rows.length), tone: rows.length ? "warning" : "success" },
+      ],
       note: "All purchase orders have been received — no open POs.",
     };
   },
@@ -1146,7 +1247,10 @@ const qualityBuilders: Builder[] = [
     const map = new Map<string, number>();
     for (const i of inspections) {
       const raw = String(i.defects_found ?? "");
-      const parts = raw.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+      const parts = raw
+        .split(/[,;]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
       if (!parts.length) continue;
       for (const p of parts) map.set(p, (map.get(p) ?? 0) + 1);
     }
@@ -1191,7 +1295,13 @@ const qualityBuilders: Builder[] = [
       ],
       rows,
       fileName: "quality-rework-turnaround",
-      summary: [{ label: "Failed Batches", value: num(rows.length), tone: rows.length ? "destructive" : "success" }],
+      summary: [
+        {
+          label: "Failed Batches",
+          value: num(rows.length),
+          tone: rows.length ? "destructive" : "success",
+        },
+      ],
       note: "No failed batches — nothing in rework.",
     };
   },
@@ -1262,7 +1372,11 @@ const maintenanceBuilders: Builder[] = [
       fileName: "maintenance-machine-health",
       summary: [
         { label: "Machines", value: num(machines.length), tone: "primary" },
-        { label: "Operational", value: num(machines.filter((m) => m.status === "operational").length), tone: "success" },
+        {
+          label: "Operational",
+          value: num(machines.filter((m) => m.status === "operational").length),
+          tone: "success",
+        },
       ],
     };
   },
@@ -1273,7 +1387,10 @@ const maintenanceBuilders: Builder[] = [
       ...tickets.map((t) => ({
         date: t.created_at,
         type: "Ticket",
-        machine: ctx.lookups.products.get(t.machine_id)?.name ?? ctx.lookups.materials.get(t.machine_id)?.name ?? "—",
+        machine:
+          ctx.lookups.products.get(t.machine_id)?.name ??
+          ctx.lookups.materials.get(t.machine_id)?.name ??
+          "—",
         subject: t.ticket_number ?? t.issue_description ?? "—",
         status: t.status,
       })),
@@ -1301,7 +1418,11 @@ const maintenanceBuilders: Builder[] = [
       fileName: "maintenance-breakdown-history",
       summary: [
         { label: "Tickets", value: num(tickets.length), tone: "primary" },
-        { label: "Breakdowns", value: num(breakdowns.length), tone: breakdowns.length ? "destructive" : "success" },
+        {
+          label: "Breakdowns",
+          value: num(breakdowns.length),
+          tone: breakdowns.length ? "destructive" : "success",
+        },
       ],
       note: "No breakdowns or tickets recorded yet.",
     };
@@ -1343,7 +1464,10 @@ const maintenanceBuilders: Builder[] = [
     const schedules = await fetchAll("maintenance_schedules");
     const now = Date.now();
     const rows = schedules.map((s) => ({
-      machine: ctx.lookups.products.get(s.machine_id)?.name ?? ctx.lookups.materials.get(s.machine_id)?.name ?? "—",
+      machine:
+        ctx.lookups.products.get(s.machine_id)?.name ??
+        ctx.lookups.materials.get(s.machine_id)?.name ??
+        "—",
       recurrence: s.recurrence ?? "—",
       status: s.status,
       next_due: s.next_due,
@@ -1389,7 +1513,10 @@ const financeBuilders: Builder[] = [
       paid_date: i.paid_date,
     }));
     const issued = sumBy(invoices, "total_amount");
-    const paid = sumBy(invoices.filter((i) => i.status === "paid"), "total_amount");
+    const paid = sumBy(
+      invoices.filter((i) => i.status === "paid"),
+      "total_amount",
+    );
     return {
       id: "fn-invoices",
       module: "finance",
@@ -1423,7 +1550,9 @@ const financeBuilders: Builder[] = [
         customer: ctx.lookups.customers.get(i.customer_id)?.name ?? "—",
         total_amount: i.total_amount,
         due_date: i.due_date,
-        days_overdue: i.due_date ? Math.max(0, Math.floor((Date.now() - new Date(i.due_date).getTime()) / 86_400_000)) : 0,
+        days_overdue: i.due_date
+          ? Math.max(0, Math.floor((Date.now() - new Date(i.due_date).getTime()) / 86_400_000))
+          : 0,
       }));
     return {
       id: "fn-receivables",
@@ -1439,7 +1568,9 @@ const financeBuilders: Builder[] = [
       ],
       rows,
       fileName: "finance-outstanding-receivables",
-      summary: [{ label: "Outstanding", value: money(sumBy(rows, "total_amount")), tone: "warning" }],
+      summary: [
+        { label: "Outstanding", value: money(sumBy(rows, "total_amount")), tone: "warning" },
+      ],
       note: "All customer invoices are collected — no outstanding receivables.",
     };
   },
@@ -1469,7 +1600,9 @@ const financeBuilders: Builder[] = [
       ],
       rows,
       fileName: "finance-outstanding-payables",
-      summary: [{ label: "Outstanding", value: money(sumBy(outstanding, "total_amount")), tone: "warning" }],
+      summary: [
+        { label: "Outstanding", value: money(sumBy(outstanding, "total_amount")), tone: "warning" },
+      ],
       note: "All supplier invoices are paid — no outstanding payables.",
     };
   },
@@ -1499,10 +1632,18 @@ const financeBuilders: Builder[] = [
         gst: v.gst,
         total: v.base + v.gst,
       }));
-    const allRows = [...invoiceRows, ...filingRows.map((f) => ({ period: String(f.period), base: "", gst: f.amount, total: "" }))];
+    const allRows = [
+      ...invoiceRows,
+      ...filingRows.map((f) => ({ period: String(f.period), base: "", gst: f.amount, total: "" })),
+    ];
     const rows = invoiceRows.length
       ? invoiceRows
-      : filingRows.map((f) => ({ period: String(f.period), base: 0, gst: f.amount, total: f.amount }));
+      : filingRows.map((f) => ({
+          period: String(f.period),
+          base: 0,
+          gst: f.amount,
+          total: f.amount,
+        }));
     return {
       id: "fn-gst-summary",
       module: "finance",
@@ -1554,7 +1695,9 @@ const financeBuilders: Builder[] = [
       ],
       rows,
       fileName: "finance-revenue-by-product",
-      summary: [{ label: "Total Revenue", value: money(sumBy(rows, "line_total")), tone: "primary" }],
+      summary: [
+        { label: "Total Revenue", value: money(sumBy(rows, "line_total")), tone: "primary" },
+      ],
     };
   },
   async (ctx) => {
@@ -1563,7 +1706,8 @@ const financeBuilders: Builder[] = [
       const inv = p.invoice_id ? ctx.lookups.invoices.get(p.invoice_id) : null;
       const due = inv?.due_date ? new Date(inv.due_date).getTime() : null;
       const paid = p.paid_at ? new Date(p.paid_at).getTime() : null;
-      const late = due != null && paid != null ? Math.max(0, Math.floor((paid - due) / 86_400_000)) : null;
+      const late =
+        due != null && paid != null ? Math.max(0, Math.floor((paid - due) / 86_400_000)) : null;
       return {
         payment_number: p.payment_number,
         invoice: inv?.invoice_number ?? "—",
@@ -1655,18 +1799,16 @@ const hrBuilders: Builder[] = [
   },
   async () => {
     const payroll = await fetchAll("payroll");
-    const rows = [...new Set(payroll.map((p) => p.period))]
-      .sort()
-      .map((period) => {
-        const recs = payroll.filter((p) => p.period === period);
-        return {
-          period,
-          employees: recs.length,
-          gross: sumBy(recs, "gross_amount"),
-          deductions: sumBy(recs, "deductions"),
-          net: sumBy(recs, "net_amount"),
-        };
-      });
+    const rows = [...new Set(payroll.map((p) => p.period))].sort().map((period) => {
+      const recs = payroll.filter((p) => p.period === period);
+      return {
+        period,
+        employees: recs.length,
+        gross: sumBy(recs, "gross_amount"),
+        deductions: sumBy(recs, "deductions"),
+        net: sumBy(recs, "net_amount"),
+      };
+    });
     return {
       id: "hr-payroll",
       module: "hr",
@@ -1725,7 +1867,7 @@ const hrBuilders: Builder[] = [
 const operatorBuilders: Builder[] = [
   async (ctx) => {
     const wos = await fetchAll("work_orders");
-    const mine = wos.filter((w) => w.operator_id === ctx.userId);
+    const mine = wos.filter((w) => w.operator_id === ctx.userId && w.status === "completed");
     const rows = mine.map((w) => ({
       wo_number: w.wo_number,
       operation: w.operation ?? "—",
@@ -1751,20 +1893,13 @@ const operatorBuilders: Builder[] = [
       ],
       rows,
       fileName: "operator-my-work-orders",
-      summary: [
-        { label: "Assigned to Me", value: num(mine.length), tone: "primary" },
-        { label: "Completed", value: num(mine.filter((w) => w.status === "completed").length), tone: "success" },
-      ],
+      summary: [{ label: "Completed", value: num(mine.length), tone: "success" }],
       note: "No work orders assigned to you yet.",
     };
   },
   async (ctx) => {
-    const employees = await fetchAll("employees");
     const attendance = await fetchAll("attendance");
-    const me = employees.find(
-      (e) => e.email?.toLowerCase() === ctx.lookups.profiles.get(ctx.userId)?.email?.toLowerCase(),
-    );
-    const mine = me ? attendance.filter((a) => a.employee_id === me.id) : [];
+    const mine = attendance.filter((a) => a.employee_id === ctx.userId);
     const rows = mine.map((a) => ({
       date: a.date,
       status: a.status,
@@ -1794,8 +1929,8 @@ const operatorBuilders: Builder[] = [
     };
   },
   async (ctx) => {
-    const tasks = await fetchAll("tasks");
-    const mine = tasks.filter((t) => t.assignee_id === ctx.userId);
+    const tasks = await fetchAll("work_orders");
+    const mine = tasks.filter((t) => t.operator_id === ctx.userId && t.status === "completed");
     const rows = mine.map((t) => ({
       title: t.title,
       status: t.status,
@@ -1804,10 +1939,10 @@ const operatorBuilders: Builder[] = [
       created_at: t.created_at,
     }));
     return {
-      id: "op-my-tasks",
+      id: "op-task-turnaround",
       module: "production",
-      title: "My Tasks",
-      sub: "Tasks assigned to you and their status.",
+      title: "My Task Turnaround Time",
+      sub: "Completed work orders assigned to you; timing is derived from their recorded start and end times.",
       columns: [
         { key: "title", label: "Task" },
         { key: "status", label: "Status" },
@@ -1816,10 +1951,14 @@ const operatorBuilders: Builder[] = [
         { key: "created_at", label: "Created" },
       ],
       rows,
-      fileName: "operator-my-tasks",
+      fileName: "operator-task-turnaround",
       summary: [
         { label: "My Tasks", value: num(mine.length), tone: "primary" },
-        { label: "Completed", value: num(mine.filter((t) => ["completed", "done"].includes(t.status)).length), tone: "success" },
+        {
+          label: "Completed",
+          value: num(mine.filter((t) => ["completed", "done"].includes(t.status)).length),
+          tone: "success",
+        },
       ],
       note: "No tasks assigned to you yet.",
     };
@@ -1862,8 +2001,18 @@ const customerBuilders: Builder[] = [
       fileName: "customer-my-orders",
       summary: [
         { label: "Total Orders", value: num(orders.length), tone: "primary" },
-        { label: "Active", value: num(orders.filter((o) => !["delivered", "completed", "rejected"].includes(o.status)).length), tone: "info" },
-        { label: "Delivered", value: num(orders.filter((o) => o.status === "delivered").length), tone: "success" },
+        {
+          label: "Active",
+          value: num(
+            orders.filter((o) => !["delivered", "completed", "rejected"].includes(o.status)).length,
+          ),
+          tone: "info",
+        },
+        {
+          label: "Delivered",
+          value: num(orders.filter((o) => o.status === "delivered").length),
+          tone: "success",
+        },
       ],
     };
   },
@@ -1900,7 +2049,7 @@ const customerBuilders: Builder[] = [
     const payments = await fetchAll("payments");
     const rows = payments.map((p) => ({
       payment_number: p.payment_number,
-      invoice: p.invoice_id ? ctx.lookups.invoices.get(p.invoice_id)?.invoice_number ?? "—" : "—",
+      invoice: p.invoice_id ? (ctx.lookups.invoices.get(p.invoice_id)?.invoice_number ?? "—") : "—",
       amount: p.amount,
       method: p.method ?? "—",
       status: p.status,
@@ -1955,7 +2104,11 @@ const customerBuilders: Builder[] = [
       fileName: "customer-delivery-timeliness",
       summary: [
         { label: "Shipments", value: num(shipments.length), tone: "primary" },
-        { label: "Delivered", value: num(shipments.filter((s) => s.status === "delivered").length), tone: "success" },
+        {
+          label: "Delivered",
+          value: num(shipments.filter((s) => s.status === "delivered").length),
+          tone: "success",
+        },
       ],
     };
   },
@@ -1972,7 +2125,10 @@ const supplierBuilders: Builder[] = [
     const rows = counts.map((c) => ({
       status: c.value,
       count: c.count,
-      value: sumBy(pos.filter((p) => p.status === c.value), "total_amount"),
+      value: sumBy(
+        pos.filter((p) => p.status === c.value),
+        "total_amount",
+      ),
     }));
     return {
       id: "supplier-my-pos",
@@ -1988,15 +2144,23 @@ const supplierBuilders: Builder[] = [
       fileName: "supplier-pos",
       summary: [
         { label: "Total POs", value: num(pos.length), tone: "primary" },
-        { label: "Accepted", value: num(pos.filter((p) => p.status === "accepted").length), tone: "success" },
-        { label: "Awaiting Dispatch", value: num(pos.filter((p) => p.status === "dispatched").length), tone: "info" },
+        {
+          label: "Accepted",
+          value: num(pos.filter((p) => p.status === "accepted").length),
+          tone: "success",
+        },
+        {
+          label: "Awaiting Dispatch",
+          value: num(pos.filter((p) => p.status === "dispatched").length),
+          tone: "info",
+        },
       ],
     };
   },
   async (ctx) => {
     const deliveries = await fetchAll("supplier_deliveries");
     const rows = deliveries.map((d) => ({
-      po_number: d.po_id ? ctx.lookups.purchaseOrders.get(d.po_id)?.po_number ?? "—" : "—",
+      po_number: d.po_id ? (ctx.lookups.purchaseOrders.get(d.po_id)?.po_number ?? "—") : "—",
       dispatch_date: d.dispatch_date,
       carrier: d.carrier ?? "—",
       vehicle_number: d.vehicle_number ?? "—",
@@ -2022,7 +2186,11 @@ const supplierBuilders: Builder[] = [
       fileName: "supplier-delivery-timeliness",
       summary: [
         { label: "Deliveries", value: num(deliveries.length), tone: "primary" },
-        { label: "Received", value: num(deliveries.filter((d) => d.status === "received").length), tone: "success" },
+        {
+          label: "Received",
+          value: num(deliveries.filter((d) => d.status === "received").length),
+          tone: "success",
+        },
       ],
     };
   },
@@ -2112,7 +2280,10 @@ const MODULE_SCOPE: Record<string, string> = {
 /* Presentation                                                        */
 /* ------------------------------------------------------------------ */
 
-function cellValue(r: Row, c: Column): { text: string; kind: "status" | "date" | "money" | "num" | "pct" | "text" } {
+function cellValue(
+  r: Row,
+  c: Column,
+): { text: string; kind: "status" | "date" | "money" | "num" | "pct" | "text" } {
   const v = r[c.key];
   const key = c.key;
   if (key === "overdue") {
@@ -2125,10 +2296,33 @@ function cellValue(r: Row, c: Column): { text: string; kind: "status" | "date" |
     return { text: fmtDate(v), kind: "date" };
   }
   if (typeof v === "number") {
-    if (key === "progress" || key === "progress_percent" || key === "utilization" || key === "rating" || key === "avg_hours" || key === "mttr_hours") {
-      return { text: `${Number(v).toLocaleString("en-IN")}${key.includes("percent") || key === "utilization" || key === "progress" ? "%" : ""}`, kind: "num" };
+    if (
+      key === "progress" ||
+      key === "progress_percent" ||
+      key === "utilization" ||
+      key === "rating" ||
+      key === "avg_hours" ||
+      key === "mttr_hours"
+    ) {
+      return {
+        text: `${Number(v).toLocaleString("en-IN")}${key.includes("percent") || key === "utilization" || key === "progress" ? "%" : ""}`,
+        kind: "num",
+      };
     }
-    if (key.includes("amount") || key.includes("total") || key.includes("value") || key.includes("price") || key.includes("cost") || key === "spend" || key === "base" || key === "gst" || key === "net" || key === "gross" || key === "deductions" || key === "line_total") {
+    if (
+      key.includes("amount") ||
+      key.includes("total") ||
+      key.includes("value") ||
+      key.includes("price") ||
+      key.includes("cost") ||
+      key === "spend" ||
+      key === "base" ||
+      key === "gst" ||
+      key === "net" ||
+      key === "gross" ||
+      key === "deductions" ||
+      key === "line_total"
+    ) {
       return { text: money(v), kind: "money" };
     }
     return { text: Number(v).toLocaleString("en-IN"), kind: "num" };
@@ -2145,7 +2339,9 @@ function SectionTable({ section }: { section: ReportSection }) {
         <div className="mx-auto h-8 w-8 rounded-lg bg-muted grid place-items-center mb-2">
           <AlertCircle className="h-4 w-4 text-muted-foreground" />
         </div>
-        <div className="text-sm text-muted-foreground">{section.note ?? "No data recorded yet — this report will populate from live activity."}</div>
+        <div className="text-sm text-muted-foreground">
+          {section.note ?? "No data recorded yet — this report will populate from live activity."}
+        </div>
       </div>
     );
   }
@@ -2156,7 +2352,10 @@ function SectionTable({ section }: { section: ReportSection }) {
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border/60">
               {columns.map((c) => (
-                <th key={c.key} className={`px-2 py-2 font-medium ${c.align === "right" ? "text-right" : ""}`}>
+                <th
+                  key={c.key}
+                  className={`px-2 py-2 font-medium ${c.align === "right" ? "text-right" : ""}`}
+                >
                   {c.label}
                 </th>
               ))}
@@ -2175,7 +2374,13 @@ function SectionTable({ section }: { section: ReportSection }) {
                       {cell.kind === "status" ? (
                         <StatusBadge status={cell.text} />
                       ) : (
-                        <span className={cell.kind === "money" || cell.kind === "num" ? "tabular-nums" : undefined}>
+                        <span
+                          className={
+                            cell.kind === "money" || cell.kind === "num"
+                              ? "tabular-nums"
+                              : undefined
+                          }
+                        >
                           {cell.text}
                         </span>
                       )}
@@ -2204,15 +2409,19 @@ function downloadSection(section: ReportSection) {
       meta: section.pdf.meta,
       footer: section.pdf.footer,
       columns: section.columns.map((c) => c.label),
-      rows: section.rows.map((r) => section.columns.map((c) => {
-        const cell = cellValue(r, c);
-        return cell.text;
-      })),
+      rows: section.rows.map((r) =>
+        section.columns.map((c) => {
+          const cell = cellValue(r, c);
+          return cell.text;
+        }),
+      ),
     });
     toast.success(`Downloaded ${section.fileName}-${new Date().toISOString().slice(0, 10)}.pdf`);
   } else {
     downloadCsv(section.fileName, section.columns, section.rows);
-    toast.success(`Downloaded ${section.fileName}-${new Date().toISOString().slice(0, 10)}.csv (${section.rows.length} rows)`);
+    toast.success(
+      `Downloaded ${section.fileName}-${new Date().toISOString().slice(0, 10)}.csv (${section.rows.length} rows)`,
+    );
   }
 }
 
@@ -2226,19 +2435,38 @@ export function RoleReports({ module }: { module?: string }) {
   const roleLabel = ROLE_MAP[role]?.label ?? "Company";
   const builders = REPORT_BUILDERS[role] ?? [];
 
-  const { data: sections, isLoading, error, refetch } = useQuery({
+  const {
+    data: sections,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["role-reports", role, module ?? "all", user?.id],
     queryFn: async () => {
-      const lookups = await fetchLookups();
+      const lookups =
+        role === "production_operator"
+          ? {
+              products: new Map(),
+              materials: new Map(),
+              warehouses: new Map(),
+              customers: new Map(),
+              suppliers: new Map(),
+              employees: new Map(),
+              departments: new Map(),
+              profiles: new Map(),
+              invoices: new Map(),
+              purchaseOrders: new Map(),
+            }
+          : await fetchLookups();
       const ctx: ReportCtx = { userId: user?.id ?? "", lookups };
       const all = await Promise.all(builders.map((b) => b(ctx)));
       return module ? all.filter((s) => s.module === module) : all;
     },
   });
 
-  const title = module ? MODULE_TITLES[module] ?? "Reports" : `${roleLabel} Reports`;
+  const title = module ? (MODULE_TITLES[module] ?? "Reports") : `${roleLabel} Reports`;
   const sub = module
-    ? MODULE_SCOPE[module] ?? "Live reports for this module."
+    ? (MODULE_SCOPE[module] ?? "Live reports for this module.")
     : `Live reports scoped to your ${roleLabel.toLowerCase()} access — every number is computed from the real database through row-level security.`;
 
   return (
@@ -2283,7 +2511,11 @@ export function RoleReports({ module }: { module?: string }) {
                   className="h-7 text-xs"
                   onClick={() => downloadSection(s)}
                 >
-                  {s.pdf ? <FileText className="h-3.5 w-3.5 mr-1.5" /> : <Table2 className="h-3.5 w-3.5 mr-1.5" />}
+                  {s.pdf ? (
+                    <FileText className="h-3.5 w-3.5 mr-1.5" />
+                  ) : (
+                    <Table2 className="h-3.5 w-3.5 mr-1.5" />
+                  )}
                   Download {s.pdf ? "PDF" : "CSV"}
                 </Button>
               }
@@ -2291,8 +2523,13 @@ export function RoleReports({ module }: { module?: string }) {
               {s.summary && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
                   {s.summary.map((k) => (
-                    <div key={k.label} className="rounded-xl border border-border/50 bg-card/50 p-3">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{k.label}</div>
+                    <div
+                      key={k.label}
+                      className="rounded-xl border border-border/50 bg-card/50 p-3"
+                    >
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        {k.label}
+                      </div>
                       <div className="mt-1 text-lg font-semibold tabular-nums">{k.value}</div>
                     </div>
                   ))}
@@ -2316,7 +2553,8 @@ export function RoleReports({ module }: { module?: string }) {
         <div className="mt-6 flex items-center justify-between text-[11px] text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <ScrollText className="h-3.5 w-3.5" />
-            Every figure is computed live from the database through RLS — exports match exactly what is shown on screen.
+            Every figure is computed live from the database through RLS — exports match exactly what
+            is shown on screen.
           </span>
           <Button variant="ghost" size="sm" onClick={() => refetch()} className="h-7 text-xs">
             Refresh
