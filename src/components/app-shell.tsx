@@ -255,6 +255,7 @@ function TopBar() {
           </div>
 
           <button
+            type="button"
             onClick={() => setCmdOpen(true)}
             className="ml-auto flex items-center gap-2 text-xs text-muted-foreground bg-card/60 border border-white/5 rounded-lg px-2 sm:px-3 h-9 hover:border-primary/30 transition min-w-[40px] sm:min-w-[220px]"
           >
@@ -273,6 +274,7 @@ function TopBar() {
               { id: "aesthetic" as ThemeMode, icon: Palette, label: "Aesthetic" },
             ].map(({ id, icon: Icon, label }) => (
               <button
+                type="button"
                 key={id}
                 onClick={() => setTheme(id)}
                 className={`relative flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium rounded-md transition-all duration-200 ${
@@ -304,6 +306,7 @@ function TopBar() {
               onClick={() => setThemeMenuOpen((o) => !o)}
               className="h-9 w-9"
               aria-label="Theme"
+              aria-expanded={themeMenuOpen}
             >
               {theme === "dark" ? (
                 <Moon className="h-4 w-4" />
@@ -327,6 +330,7 @@ function TopBar() {
                     { id: "aesthetic" as ThemeMode, icon: Palette, label: "Aesthetic" },
                   ].map(({ id, icon: Icon, label }) => (
                     <button
+                      type="button"
                       key={id}
                       onClick={() => {
                         setTheme(id);
@@ -365,7 +369,10 @@ function TopBar() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1 sm:gap-2 hover:bg-card rounded-lg px-1 sm:px-2 h-9">
+              <button
+                type="button"
+                className="flex items-center gap-1 sm:gap-2 hover:bg-card rounded-lg px-1 sm:px-2 h-9"
+              >
                 <Avatar className="h-7 w-7">
                   <AvatarFallback className="text-xs bg-primary/20 text-primary">
                     {(profile?.full_name ?? profile?.email ?? "U").slice(0, 1).toUpperCase()}
