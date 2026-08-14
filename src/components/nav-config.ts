@@ -91,6 +91,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
       label: "System",
       items: [
         { to: "/platform/audit", label: "Audit Logs", icon: ScrollText },
+        { to: "/platform/reports", label: "Reports", icon: ClipboardList },
         { to: "/platform/settings", label: "Platform Settings", icon: Settings },
         { to: "/platform/profile", label: "Profile", icon: User },
       ],
@@ -363,6 +364,10 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
         { to: "/issue-reporting", label: "Report Issue", icon: AlertOctagon },
       ],
     },
+    {
+      label: "Reports",
+      items: [{ to: "/reports", label: "My Reports", icon: ClipboardList }],
+    },
   ],
 
   customer_portal: [
@@ -376,6 +381,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
         { to: "/shipments", label: "Shipments", icon: TruckIcon },
         { to: "/support", label: "Support", icon: MessageSquare },
         { to: "/documents", label: "Documents", icon: Files },
+        { to: "/reports", label: "Reports", icon: ClipboardList },
         { to: "/settings", label: "Settings", icon: Settings },
       ],
     },
@@ -393,6 +399,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
         { to: "/payments", label: "Payments", icon: CreditCard },
         { to: "/supplier-performance", label: "Performance", icon: Star },
         { to: "/messages", label: "Messages", icon: MessageSquare },
+        { to: "/reports", label: "Reports", icon: ClipboardList },
         { to: "/settings", label: "Settings", icon: Settings },
       ],
     },

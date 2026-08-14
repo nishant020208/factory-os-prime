@@ -109,6 +109,7 @@ import { Route as AuthenticatedPlatformAuditRouteImport } from './routes/_authen
 import { Route as AuthenticatedPlatformCompaniesRouteImport } from './routes/_authenticated/platform/companies'
 import { Route as AuthenticatedPlatformPendingRouteImport } from './routes/_authenticated/platform/pending'
 import { Route as AuthenticatedPlatformProfileRouteImport } from './routes/_authenticated/platform/profile'
+import { Route as AuthenticatedPlatformReportsRouteImport } from './routes/_authenticated/platform/reports'
 import { Route as AuthenticatedPlatformSettingsRouteImport } from './routes/_authenticated/platform/settings'
 import { Route as AuthenticatedPlatformSuspendedRouteImport } from './routes/_authenticated/platform/suspended'
 import { Route as AuthenticatedPlatformWhitelistRouteImport } from './routes/_authenticated/platform/whitelist'
@@ -649,6 +650,12 @@ const AuthenticatedPlatformProfileRoute =
     path: '/platform/profile',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPlatformReportsRoute =
+  AuthenticatedPlatformReportsRouteImport.update({
+    id: '/platform/reports',
+    path: '/platform/reports',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPlatformSettingsRoute =
   AuthenticatedPlatformSettingsRouteImport.update({
     id: '/platform/settings',
@@ -767,6 +774,7 @@ export interface FileRoutesByFullPath {
   '/platform/companies': typeof AuthenticatedPlatformCompaniesRoute
   '/platform/pending': typeof AuthenticatedPlatformPendingRoute
   '/platform/profile': typeof AuthenticatedPlatformProfileRoute
+  '/platform/reports': typeof AuthenticatedPlatformReportsRoute
   '/platform/settings': typeof AuthenticatedPlatformSettingsRoute
   '/platform/suspended': typeof AuthenticatedPlatformSuspendedRoute
   '/platform/whitelist': typeof AuthenticatedPlatformWhitelistRoute
@@ -871,6 +879,7 @@ export interface FileRoutesByTo {
   '/platform/companies': typeof AuthenticatedPlatformCompaniesRoute
   '/platform/pending': typeof AuthenticatedPlatformPendingRoute
   '/platform/profile': typeof AuthenticatedPlatformProfileRoute
+  '/platform/reports': typeof AuthenticatedPlatformReportsRoute
   '/platform/settings': typeof AuthenticatedPlatformSettingsRoute
   '/platform/suspended': typeof AuthenticatedPlatformSuspendedRoute
   '/platform/whitelist': typeof AuthenticatedPlatformWhitelistRoute
@@ -977,6 +986,7 @@ export interface FileRoutesById {
   '/_authenticated/platform/companies': typeof AuthenticatedPlatformCompaniesRoute
   '/_authenticated/platform/pending': typeof AuthenticatedPlatformPendingRoute
   '/_authenticated/platform/profile': typeof AuthenticatedPlatformProfileRoute
+  '/_authenticated/platform/reports': typeof AuthenticatedPlatformReportsRoute
   '/_authenticated/platform/settings': typeof AuthenticatedPlatformSettingsRoute
   '/_authenticated/platform/suspended': typeof AuthenticatedPlatformSuspendedRoute
   '/_authenticated/platform/whitelist': typeof AuthenticatedPlatformWhitelistRoute
@@ -1083,6 +1093,7 @@ export interface FileRouteTypes {
     | '/platform/companies'
     | '/platform/pending'
     | '/platform/profile'
+    | '/platform/reports'
     | '/platform/settings'
     | '/platform/suspended'
     | '/platform/whitelist'
@@ -1187,6 +1198,7 @@ export interface FileRouteTypes {
     | '/platform/companies'
     | '/platform/pending'
     | '/platform/profile'
+    | '/platform/reports'
     | '/platform/settings'
     | '/platform/suspended'
     | '/platform/whitelist'
@@ -1292,6 +1304,7 @@ export interface FileRouteTypes {
     | '/_authenticated/platform/companies'
     | '/_authenticated/platform/pending'
     | '/_authenticated/platform/profile'
+    | '/_authenticated/platform/reports'
     | '/_authenticated/platform/settings'
     | '/_authenticated/platform/suspended'
     | '/_authenticated/platform/whitelist'
@@ -2007,6 +2020,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPlatformProfileRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/platform/reports': {
+      id: '/_authenticated/platform/reports'
+      path: '/platform/reports'
+      fullPath: '/platform/reports'
+      preLoaderRoute: typeof AuthenticatedPlatformReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/platform/settings': {
       id: '/_authenticated/platform/settings'
       path: '/platform/settings'
@@ -2127,6 +2147,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPlatformCompaniesRoute: typeof AuthenticatedPlatformCompaniesRoute
   AuthenticatedPlatformPendingRoute: typeof AuthenticatedPlatformPendingRoute
   AuthenticatedPlatformProfileRoute: typeof AuthenticatedPlatformProfileRoute
+  AuthenticatedPlatformReportsRoute: typeof AuthenticatedPlatformReportsRoute
   AuthenticatedPlatformSettingsRoute: typeof AuthenticatedPlatformSettingsRoute
   AuthenticatedPlatformSuspendedRoute: typeof AuthenticatedPlatformSuspendedRoute
   AuthenticatedPlatformWhitelistRoute: typeof AuthenticatedPlatformWhitelistRoute
@@ -2229,6 +2250,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPlatformCompaniesRoute: AuthenticatedPlatformCompaniesRoute,
   AuthenticatedPlatformPendingRoute: AuthenticatedPlatformPendingRoute,
   AuthenticatedPlatformProfileRoute: AuthenticatedPlatformProfileRoute,
+  AuthenticatedPlatformReportsRoute: AuthenticatedPlatformReportsRoute,
   AuthenticatedPlatformSettingsRoute: AuthenticatedPlatformSettingsRoute,
   AuthenticatedPlatformSuspendedRoute: AuthenticatedPlatformSuspendedRoute,
   AuthenticatedPlatformWhitelistRoute: AuthenticatedPlatformWhitelistRoute,

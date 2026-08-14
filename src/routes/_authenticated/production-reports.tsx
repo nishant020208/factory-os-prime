@@ -1,18 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { StubModule } from "@/components/stub-module";
+import { RoleReports } from "@/components/role-reports";
 
 export const Route = createFileRoute("/_authenticated/production-reports")({
   head: () => ({
     meta: [
       { title: "Production Reports — FactoryOS AI" },
-      { name: "description", content: "Downloadable production analytics" },
+      { name: "description", content: "Live production analytics, downloadable" },
     ],
   }),
-  component: () => (
-    <StubModule
-      eyebrow="Module"
-      title="Production Reports"
-      sub="Downloadable production analytics"
-    />
-  ),
+  component: () => <RoleReports module="production" />,
 });

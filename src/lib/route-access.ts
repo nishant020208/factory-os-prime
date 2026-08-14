@@ -185,7 +185,24 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/access-logs": ONLY("auditor", "company_admin"),
   "/export": ONLY("auditor", "company_admin"),
 
-  "/reports": NON_EXTERNAL,
+  // Reports: every company role plus the two external portals (customer +
+  // supplier get personal-scope reports). Auditor's reports live in their own
+  // Compliance/Audit/Export tabs.
+  "/reports": ONLY(
+    "company_admin",
+    "plant_admin",
+    "plant_manager",
+    "production_manager",
+    "warehouse_manager",
+    "procurement_manager",
+    "quality_inspector",
+    "maintenance_engineer",
+    "finance_manager",
+    "hr_manager",
+    "production_operator",
+    "customer_portal",
+    "supplier_portal",
+  ),
   "/ai-center": NON_EXTERNAL,
 
   "/plant-overview": ONLY("plant_admin", "company_admin"),

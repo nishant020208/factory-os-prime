@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { gsap } from 'gsap';
 import './TargetCursor.css';
 
@@ -46,6 +46,16 @@ const TargetCursor = ({
   const spinTl = useRef(null);
   const dotRef = useRef(null);
   const containingBlockRef = useRef(null);
+
+  // The cursor must not be part of the server-rendered HTML — it is a
+  // client-only visual layer. Rendering it during SSR caused a hydration
+  // mismatch (server: null, client: wrapper div) that threw on every page
+  // load and could leave the tree in a broken state where clicks no longer
+  // fired. Gate the render behind a mounted flag instead.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isActiveRef = useRef(false);
   const targetCornerPositionsRef = useRef(null);
@@ -390,6 +400,7 @@ const TargetCursor = ({
     parallaxOn,
     cursorColor,
     cursorColorOnTarget,
+    mounted,
   ]);
 
   useEffect(() => {
@@ -400,10 +411,11 @@ const TargetCursor = ({
         .timeline({ repeat: -1 })
         .to(cursorRef.current, { rotation: '+=360', duration: spinDuration, ease: 'none' });
     }
-  }, [spinDuration, isMobile]);
+  }, [spinDuration, isMobile, mounted]);
 
-  // Never render on mobile/touch — preserves normal scrolling & touch UX
-  if (isMobile) {
+  // Never render on mobile/touch — preserves normal scrolling & touch UX.
+  // Also render nothing until the client has mounted (see mounted flag above).
+  if (!mounted || isMobile) {
     return null;
   }
 
