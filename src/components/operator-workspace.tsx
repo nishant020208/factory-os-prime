@@ -167,6 +167,19 @@ function WorkOrderDetail({
   const [custom, setCustom] = useState(String(order.progress_percent));
   const checklist = Array.isArray(order.checklist) ? order.checklist : [];
   const materials = Array.isArray(order.materials) ? order.materials : [];
+  // Open issues reported on this work order (visible via reported_by = me).
+  const { data: openTickets = [] } = useQuery({
+    queryKey: ["operator-open-tickets", order.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("maintenance_tickets")
+        .select("id,ticket_number,issue_type,status")
+        .eq("work_order_id", order.id)
+        .in("status", ["open", "in_progress", "pending"]);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
   const setStep = (index: number, checked: boolean) => {
     const next = checklist.map((s: any, i: number) =>
       i === index ? { ...s, completed: checked } : s,
@@ -178,6 +191,19 @@ function WorkOrderDetail({
   };
   return (
     <div className="space-y-5">
+      {order.status === "blocked" && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm text-amber-400">
+          <div className="flex items-center gap-1.5 font-medium">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            Blocked by an open issue
+          </div>
+          <p className="mt-1 text-xs text-amber-400/80">
+            {openTickets.length
+              ? `${openTickets.map((t: any) => t.issue_type).join(", ")} issue${openTickets.length > 1 ? "s" : ""} reported. You'll be notified when it's resolved — update progress below to resume.`
+              : "An issue was reported on this work order. You'll be notified when it's resolved — update progress below to resume."}
+          </p>
+        </div>
+      )}
       <div>
         <div className="flex items-center justify-between">
           <span className="font-medium">{order.operation ?? "Production task"}</span>
@@ -202,7 +228,7 @@ function WorkOrderDetail({
               <Checkbox
                 checked={!!step.completed}
                 onCheckedChange={(v) => setStep(i, v === true)}
-                disabled={pending || order.status === "blocked"}
+                disabled={pending}
               />
               {step.label}
             </label>
@@ -237,7 +263,7 @@ function WorkOrderDetail({
               key={n}
               variant="outline"
               size="sm"
-              disabled={pending || order.status === "blocked" || n < order.progress_percent}
+              disabled={pending || n < order.progress_percent}
               onClick={() => save({ order, progress: n })}
             >
               {n}%
@@ -254,7 +280,7 @@ function WorkOrderDetail({
             onChange={(e) => setCustom(e.target.value)}
           />
           <Button
-            disabled={pending || order.status === "blocked"}
+            disabled={pending}
             onClick={() =>
               save({
                 order,
@@ -412,7 +438,7 @@ export function OperatorAttendance() {
           });
         if (error) throw error;
       } else {
-        const start = new Date(todayRecord.check_in).getTime();
+        const start = todayRecord.check_in ? new Date(todayRecord.check_in).getTime() : Date.now();
         const { error } = await supabase
           .from("attendance")
           .update({

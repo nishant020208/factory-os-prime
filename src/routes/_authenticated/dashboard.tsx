@@ -1655,14 +1655,15 @@ function HRDashboard() {
 
 /* ─────────── OPERATOR ─────────── */
 function OperatorDashboard() {
-  const { user } = useAuth();
+  const { user, companyId, roles } = useAuth();
+  const today = new Date().toISOString().slice(0, 10);
   const { data: myWorkOrders = [] } = useQuery({
     queryKey: ["my-wos", user?.id],
     queryFn: async () => {
       try {
         const { data } = await supabase
           .from("work_orders")
-          .select("id,status,progress_percent,created_at")
+          .select("id,status,progress_percent,created_at,wo_number,operation")
           .eq("operator_id", user?.id ?? "")
           .limit(50);
         return data ?? [];
@@ -1672,6 +1673,80 @@ function OperatorDashboard() {
     },
     enabled: !!user,
   });
+  const { data: todayAtt = null } = useQuery({
+    queryKey: ["my-att-today", user?.id, today],
+    queryFn: async () => {
+      try {
+        const { data } = await supabase
+          .from("attendance")
+          .select("check_in,check_out,hours_worked,status")
+          .eq("employee_id", user?.id ?? "")
+          .eq("date", today)
+          .maybeSingle();
+        return data ?? null;
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!user,
+  });
+  const { data: myOpenIssues = [] } = useQuery({
+    queryKey: ["my-open-issues", user?.id],
+    queryFn: async () => {
+      try {
+        const { data } = await supabase
+          .from("maintenance_tickets")
+          .select("id,ticket_number,issue_type,status,created_at")
+          .eq("reported_by", user?.id ?? "")
+          .in("status", ["open", "in_progress", "pending"])
+          .order("created_at", { ascending: false })
+          .limit(5);
+        return data ?? [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!user,
+  });
+  const { data: myNotifications = [] } = useQuery({
+    queryKey: ["my-notifs", user?.id, companyId],
+    queryFn: async () => {
+      try {
+        const q = supabase
+          .from("notifications")
+          .select("id,title,body,severity,created_at")
+          .eq("company_id", companyId ?? "")
+          .order("created_at", { ascending: false })
+          .limit(5);
+        q.or(`to_user.eq.${user?.id ?? ""},to_role.eq.${roles?.[0] ?? "production_operator"}`);
+        const { data } = await q;
+        return data ?? [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!user && !!companyId,
+  });
+  const active = myWorkOrders.filter(
+    (o: any) => !["completed", "cancelled", "closed"].includes(o.status),
+  ).length;
+  const completedWeek = myWorkOrders.filter((o: any) => {
+    if (o.status !== "completed") return false;
+    const d = new Date(o.created_at);
+    const weekAgo = Date.now() - 7 * 86400000;
+    return d.getTime() >= weekAgo;
+  }).length;
+  const completedMonth = myWorkOrders.filter((o: any) => {
+    if (o.status !== "completed") return false;
+    const d = new Date(o.created_at);
+    const monthAgo = Date.now() - 30 * 86400000;
+    return d.getTime() >= monthAgo;
+  }).length;
+  const attLabel = todayAtt
+    ? todayAtt.check_out
+      ? "Checked out"
+      : "Checked in"
+    : "Not checked in";
   return (
     <Shell
       eyebrow="My Shift"
@@ -1679,39 +1754,24 @@ function OperatorDashboard() {
       sub="Your assigned work orders, attendance and reported issues."
     >
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="My Active Work" value={String(active)} icon={ClipboardList} tone="primary" />
         <Kpi
-          label="My Work Orders"
-          value={String(
-            myWorkOrders.filter((o: any) => !["completed", "cancelled"].includes(o.status)).length,
-          )}
-          icon={ClipboardList}
-          tone="primary"
-        />
-        <Kpi
-          label="Completed"
-          value={String(myWorkOrders.filter((o: any) => o.status === "completed").length)}
+          label="Completed (wk/mo)"
+          value={`${completedWeek}/${completedMonth}`}
           icon={CheckCircle2}
           tone="success"
         />
-        <Kpi
-          label="In Progress"
-          value={String(myWorkOrders.filter((o: any) => o.status === "in_progress").length)}
-          icon={Clock}
-          tone="info"
-        />
-        <Kpi
-          label="My Blocked Work"
-          value={String(myWorkOrders.filter((o: any) => o.status === "blocked").length)}
-          icon={AlertTriangle}
-          tone="warning"
-        />
+        <Kpi label="My Attendance Today" value={attLabel} icon={Timer} tone="info" />
+        <Kpi label="My Open Issues" value={String(myOpenIssues.length)} icon={AlertTriangle} tone="warning" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <Panel title="Your work orders">
           <div className="space-y-2 text-sm">
             {myWorkOrders.slice(0, 5).map((o: any) => (
               <div key={o.id} className="flex justify-between gap-2">
-                <span>{o.progress_percent}% complete</span>
+                <span>
+                  {o.wo_number ?? o.operation ?? "WO"} · {o.progress_percent}% complete
+                </span>
                 <StatusBadge status={o.status} />
               </div>
             ))}
@@ -1720,10 +1780,34 @@ function OperatorDashboard() {
             )}
           </div>
         </Panel>
-        <Panel title="Your scope">
-          <div className="text-sm text-muted-foreground">
-            This dashboard only shows your assigned work. Use My Attendance to check in or out and
-            Report Issue to pause an assigned work order.
+        <Panel title="Open issues I've reported">
+          <div className="space-y-2 text-sm">
+            {myOpenIssues.map((t: any) => (
+              <div key={t.id} className="flex justify-between gap-2">
+                <span className="capitalize">{t.issue_type} issue</span>
+                <StatusBadge status={t.status} />
+              </div>
+            ))}
+            {!myOpenIssues.length && (
+              <span className="text-muted-foreground">No open issues — you're all clear.</span>
+            )}
+          </div>
+        </Panel>
+      </div>
+      <div className="mt-4">
+        <Panel title="Recent notifications">
+          <div className="space-y-2 text-sm">
+            {myNotifications.map((n: any) => (
+              <div key={n.id} className="flex justify-between gap-2">
+                <span className="truncate">{n.title}</span>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {safeDate(n.created_at)}
+                </span>
+              </div>
+            ))}
+            {!myNotifications.length && (
+              <span className="text-muted-foreground">No notifications yet.</span>
+            )}
           </div>
         </Panel>
       </div>

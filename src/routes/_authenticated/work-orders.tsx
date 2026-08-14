@@ -41,12 +41,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  notifyWorkOrderAssigned,
-  notifyWorkOrderCompleted,
-  notifyQualityPassed,
-  notifyBatchFailed,
-} from "@/lib/notifications";
+// Assignment and 100% completion notifications are fired by the database
+// triggers (trg_operator_work_order_notify) with precise to_user targeting —
+// never duplicated or broadcast from the client.
+import { notifyQualityPassed, notifyBatchFailed } from "@/lib/notifications";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -194,11 +192,8 @@ function WorkOrdersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work-orders"] });
-      // Fire notification to the assigned operator
-      const assignedWO = workOrders?.find((w: any) => w.id === showAssign.woId);
-      if (assignedWO && companyId) {
-        notifyWorkOrderAssigned(companyId, assignedWO.wo_number, assignOp, showAssign.woId);
-      }
+      // The database trigger fires the targeted "work order assigned"
+      // notification to the specific operator (to_user).
       toast.success("Operator assigned — notification sent");
       setShowAssign({ open: false, woId: "" });
       setAssignOp("");
@@ -212,27 +207,17 @@ function WorkOrdersPage() {
       const newStatus = progress >= 100 ? "completed" : "in_progress";
       const { error } = await (supabase.from("work_orders") as any)
         .update({
-          progress,
+          progress_percent: progress,
           status: newStatus,
           end_time: progress >= 100 ? new Date().toISOString() : null,
         })
         .eq("id", woId);
       if (error) throw error;
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work-orders"] });
-      // Fire notification when work order reaches 100%
-      if (variables.progress >= 100 && companyId) {
-        const completedWO = workOrders?.find((w: any) => w.id === variables.woId);
-        if (completedWO) {
-          notifyWorkOrderCompleted(
-            companyId,
-            completedWO.wo_number,
-            completedWO.operator_name || "Operator",
-            variables.woId,
-          );
-        }
-      }
+      // The database trigger fires the targeted "work order complete"
+      // notification to the production manager who assigned it (to_user).
       toast.success("Progress updated");
     },
     onError: (err: any) => toast.error(err.message),
@@ -340,11 +325,11 @@ function WorkOrdersPage() {
                       <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
                         <div
                           className="h-full bg-[image:var(--gradient-primary)]"
-                          style={{ width: `${wo.progress ?? 0}%` }}
+                          style={{ width: `${wo.progress_percent ?? 0}%` }}
                         />
                       </div>
                       <span className="tabular-nums text-xs w-8 text-right">
-                        {Math.round(Number(wo.progress ?? 0))}%
+                        {Math.round(Number(wo.progress_percent ?? 0))}%
                       </span>
                     </div>
                   </TableCell>

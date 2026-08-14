@@ -40,8 +40,11 @@ export const Route = createFileRoute("/_authenticated/maintenance")({
 });
 
 function MaintenancePage() {
-  const { companyId, roles } = useAuth();
+  const { companyId, roles, user } = useAuth();
   const isAuditor = roles.includes("auditor");
+  const canResolve = roles.some((r) =>
+    ["maintenance_engineer", "company_admin", "production_manager"].includes(r),
+  );
   const queryClient = useQueryClient();
   const [showNew, setShowNew] = useState(false);
   const [machineName, setMachineName] = useState("");
@@ -80,6 +83,9 @@ function MaintenancePage() {
         issue_description: `${machineName || "Machine"} — ${woType.toLowerCase()} maintenance`,
         priority: "medium",
         status: "open",
+        // RLS requires reported_by = auth.uid(); the operator-issue trigger
+        // routes the ticket and notifies the responsible engineer.
+        reported_by: user?.id ?? null,
       });
       if (error) throw error;
     },
@@ -87,6 +93,27 @@ function MaintenancePage() {
       toast.success("Maintenance ticket created");
       setShowNew(false);
       setMachineName("");
+      queryClient.invalidateQueries({ queryKey: ["maint-tickets"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const resolveMutation = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { error } = await supabase
+        .from("maintenance_tickets")
+        .update({
+          status: "resolved",
+          resolved_at: new Date().toISOString(),
+          resolved_by: user?.id ?? null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      // The operator-issue workflow trigger notifies the reporting operator
+      // (to_user) so they know to resume their work order.
+      toast.success("Ticket resolved — operator notified to resume");
       queryClient.invalidateQueries({ queryKey: ["maint-tickets"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -220,7 +247,23 @@ function MaintenancePage() {
                     <Clock className="h-3 w-3" />
                     {safeDate(w.created_at)}
                   </div>
-                  <StatusBadge status={w.status} />
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={w.status} />
+                    {canResolve &&
+                      !["resolved", "closed"].includes(w.status) &&
+                      w.status !== "cancelled" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs text-success"
+                          onClick={() => resolveMutation.mutate({ id: w.id })}
+                          disabled={resolveMutation.isPending}
+                        >
+                          <Wrench className="h-3 w-3 mr-1" />
+                          Resolve
+                        </Button>
+                      )}
+                  </div>
                 </div>
               ))}
             </div>
