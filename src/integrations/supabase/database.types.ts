@@ -378,6 +378,59 @@ export type Database = {
           },
         ]
       }
+      capa: {
+        Row: {
+          assigned_to: string | null
+          capa_number: string
+          company_id: string
+          corrective_action: string | null
+          created_at: string
+          created_by: string
+          due_date: string | null
+          id: string
+          ncr_id: string | null
+          preventive_action: string | null
+          resolved_inspection_id: string | null
+          status: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          capa_number: string
+          company_id: string
+          corrective_action?: string | null
+          created_at?: string
+          created_by: string
+          due_date?: string | null
+          id?: string
+          ncr_id?: string | null
+          preventive_action?: string | null
+          resolved_inspection_id?: string | null
+          status?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          capa_number?: string
+          company_id?: string
+          corrective_action?: string | null
+          created_at?: string
+          created_by?: string
+          due_date?: string | null
+          id?: string
+          ncr_id?: string | null
+          preventive_action?: string | null
+          resolved_inspection_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capa_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           address: string | null
@@ -1678,7 +1731,7 @@ export type Database = {
             foreignKeyName: "leaves_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
-            referencedRelation: "employees"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2029,6 +2082,62 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ncr: {
+        Row: {
+          assigned_to: string | null
+          batch_number: string | null
+          company_id: string
+          created_at: string
+          created_by: string
+          defect_category: string
+          description: string | null
+          id: string
+          inspection_id: string | null
+          ncr_number: string
+          severity: string
+          status: string
+          work_order_id: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          batch_number?: string | null
+          company_id: string
+          created_at?: string
+          created_by: string
+          defect_category: string
+          description?: string | null
+          id?: string
+          inspection_id?: string | null
+          ncr_number: string
+          severity?: string
+          status?: string
+          work_order_id?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          batch_number?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          defect_category?: string
+          description?: string | null
+          id?: string
+          inspection_id?: string | null
+          ncr_number?: string
+          severity?: string
+          status?: string
+          work_order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ncr_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -3166,6 +3275,54 @@ export type Database = {
             columns: ["production_order_id"]
             isOneToOne: false
             referencedRelation: "production_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfq_responses: {
+        Row: {
+          created_at: string
+          delivery_days: number | null
+          id: string
+          notes: string | null
+          rfq_id: string
+          status: string
+          supplier_id: string
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          delivery_days?: number | null
+          id?: string
+          notes?: string | null
+          rfq_id: string
+          status?: string
+          supplier_id: string
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          delivery_days?: number | null
+          id?: string
+          notes?: string | null
+          rfq_id?: string
+          status?: string
+          supplier_id?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfq_responses_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfqs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_responses_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -4433,7 +4590,9 @@ export type Database = {
       is_auditor: { Args: never; Returns: boolean }
       is_customer_portal: { Args: never; Returns: boolean }
       is_finance_manager: { Args: never; Returns: boolean }
+      is_hr_manager: { Args: never; Returns: boolean }
       is_main_admin: { Args: never; Returns: boolean }
+      is_maintenance_engineer: { Args: never; Returns: boolean }
       is_production_operator: { Args: never; Returns: boolean }
       is_root_admin: { Args: { _user_id?: string }; Returns: boolean }
       is_supplier_portal: { Args: never; Returns: boolean }
