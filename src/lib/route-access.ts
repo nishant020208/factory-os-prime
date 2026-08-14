@@ -42,7 +42,7 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
 
   "/company": ONLY("company_admin"),
   "/plants": ONLY("company_admin", "plant_admin"),
-  "/departments": ONLY("company_admin", "plant_admin"),
+  "/departments": ONLY("company_admin", "plant_admin", "hr_manager"),
   "/roles": ONLY("company_admin"),
   "/whitelist": ONLY("company_admin"),
   "/knowledge": ALL_COMPANY,
@@ -73,7 +73,7 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/training": ONLY("company_admin", "hr_manager", "auditor"),
   "/performance": ONLY("company_admin", "hr_manager", "auditor"),
   "/hr-reports": ONLY("company_admin", "hr_manager", "auditor"),
-  "/payroll": ONLY("company_admin", "hr_manager", "finance_manager", "auditor"),
+  "/payroll": ONLY("company_admin", "hr_manager", "auditor"),
   "/team": ONLY("company_admin", "plant_admin", "hr_manager", "auditor"),
 
   "/production": ONLY(
@@ -173,6 +173,8 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
 
   "/finance": ONLY("company_admin", "finance_manager", "auditor"),
   "/invoices": ONLY("company_admin", "finance_manager", "auditor"),
+  "/supplier-payments": ONLY("company_admin", "finance_manager", "auditor"),
+  "/customer-ledger": ONLY("company_admin", "finance_manager", "auditor"),
   "/expenses": ONLY("company_admin", "finance_manager", "auditor"),
   "/taxes": ONLY("company_admin", "finance_manager", "auditor"),
   "/budgets": ONLY("company_admin", "finance_manager", "auditor"),

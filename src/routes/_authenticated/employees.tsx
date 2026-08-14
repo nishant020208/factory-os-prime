@@ -1,10 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, UserCheck, UserMinus, GraduationCap, Building2 } from "lucide-react";
+import { Users, UserCheck, Building2, Link2, Plus, Loader2, Pencil, UserMinus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { ResourceView, type FormField } from "@/components/resource-view";
-import { Kpi, StatusBadge } from "@/components/ui-parts";
-import { Badge } from "@/components/ui/badge";
+import { PageHeader, Kpi, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -19,302 +27,312 @@ export const Route = createFileRoute("/_authenticated/employees")({
   component: EmployeesPage,
 });
 
-const EMPLOYEE_FORM_FIELDS: FormField[] = [
-  { key: "full_name", label: "Full Name", type: "text", placeholder: "John Smith", required: true },
-  { key: "email", label: "Email", type: "email", placeholder: "john@company.com", required: true },
-  { key: "phone", label: "Phone", type: "text", placeholder: "+1 555-0123" },
-  { key: "job_title", label: "Job Title", type: "text", placeholder: "CNC Operator" },
-  {
-    key: "status",
-    label: "Status",
-    type: "select",
-    defaultValue: "active",
-    options: [
-      { value: "active", label: "Active" },
-      { value: "inactive", label: "Inactive" },
-      { value: "on_leave", label: "On Leave" },
-    ],
-  },
-];
+const EMPTY_FORM = {
+  full_name: "",
+  email: "",
+  phone: "",
+  job_title: "",
+  department_id: "",
+  hire_date: "",
+  salary: "",
+  status: "active",
+};
 
 function EmployeesPage() {
   const queryClient = useQueryClient();
   const { companyId, roles } = useAuth();
   const isAuditor = roles.includes("auditor");
-  const [deptFilter, setDeptFilter] = useState<string>("all");
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [form, setForm] = useState({ ...EMPTY_FORM });
 
-  // Fetch employees from profiles
-  const { data } = useQuery({
+  // REAL employee records — the same table that links to profiles via email.
+  const { data: employees } = useQuery({
     queryKey: ["employees", companyId],
-    queryFn: async () => {
-      if (!companyId) return [];
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("company_id", companyId)
-        .order("full_name");
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      (
+        await supabase
+          .from("employees")
+          .select("*")
+          .eq("company_id", companyId!)
+          .order("full_name")
+      ).data ?? [],
     enabled: !!companyId,
   });
 
-  // Fetch roles
-  const { data: rolesData } = useQuery({
-    queryKey: ["employee-roles", companyId],
-    queryFn: async () => {
-      if (!companyId) return [];
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("*, profiles!inner(full_name, email, phone, job_title, status, avatar_url)")
-        .eq("company_id", companyId);
-      if (error) return [];
-      return data ?? [];
-    },
-    enabled: !!companyId,
-  });
-
-  // Fetch departments
   const { data: departments } = useQuery({
     queryKey: ["emp-departments", companyId],
-    queryFn: async () => (await supabase.from("departments").select("*").order("name")).data ?? [],
-  });
-
-  // Fetch employee-department assignments
-  const { data: empDepts } = useQuery({
-    queryKey: ["emp-dept-assignments", companyId],
     queryFn: async () =>
-      (await supabase.from("employee_departments").select("*, departments(name)")).data ?? [],
+      (await supabase.from("departments").select("*").order("name")).data ?? [],
   });
 
-  // Build department map: employee_id -> department names
-  const deptMap = new Map<string, { id: string; name: string }[]>();
-  (empDepts ?? []).forEach((ed: any) => {
-    const existing = deptMap.get(ed.employee_id) ?? [];
-    existing.push({ id: ed.department_id, name: ed.departments?.name ?? "—" });
-    deptMap.set(ed.employee_id, existing);
+  const { data: profiles } = useQuery({
+    queryKey: ["emp-profiles", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("profiles")
+          .select("id, email, full_name")
+          .eq("company_id", companyId!)
+      ).data ?? [],
+    enabled: !!companyId,
   });
 
-  // Merge: prefer profiles, supplement with role info and departments
-  const employees = (data ?? []).map((p) => {
-    const role = rolesData?.find((r: any) => r.user_id === p.id);
-    const departments_ = deptMap.get(p.id) ?? [];
-    return {
-      ...p,
-      role: role?.role ?? null,
-      departments: departments_.map((d: any) => d.name).join(", "),
-      department_ids: departments_.map((d: any) => d.id),
-    };
-  });
+  const linkedEmails = new Set((profiles ?? []).map((p: any) => p.email?.toLowerCase()));
+  const rows = (employees ?? []).map((e: any) => ({
+    ...e,
+    linked: linkedEmails.has((e.email ?? "").toLowerCase()),
+  }));
 
-  // Filter by department
-  const filteredEmployees =
-    deptFilter === "all"
-      ? employees
-      : employees.filter((e) => e.department_ids?.includes(deptFilter));
+  const deptName = (id: string | null) =>
+    (departments ?? []).find((d: any) => d.id === id)?.name ?? (id ? id : "—");
 
-  const activeCount = employees.filter((e) => e.status === "active").length;
-  const totalRoles = new Set(rolesData?.map((r: any) => r.role).filter(Boolean)).size;
+  const activeCount = rows.filter((e: any) => e.status === "active").length;
 
-  // Assign/update department for an employee
-  const assignDeptMutation = useMutation({
-    mutationFn: async ({
-      employeeId,
-      deptId,
-      add,
-    }: {
-      employeeId: string;
-      deptId: string;
-      add: boolean;
-    }) => {
-      if (!companyId) return;
-      if (add) {
-        const { error } = await supabase.from("employee_departments").insert({
-          company_id: companyId,
-          employee_id: employeeId,
-          department_id: deptId,
-          is_primary: false,
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!companyId) throw new Error("No company");
+      if (!form.full_name.trim()) throw new Error("Full name is required");
+      const payload: any = {
+        company_id: companyId,
+        full_name: form.full_name.trim(),
+        email: form.email.trim() || null,
+        phone: form.phone.trim() || null,
+        job_title: form.job_title.trim() || null,
+        department_id: form.department_id || null,
+        department: deptName(form.department_id),
+        hire_date: form.hire_date || null,
+        salary: parseFloat(form.salary) || 0,
+        status: form.status || "active",
+      };
+      if (editing) {
+        const { error } = await supabase.from("employees").update(payload).eq("id", editing.id);
+        if (error) throw error;
+        toast.success("Employee updated");
+      } else {
+        const { error } = await supabase.from("employees").insert({
+          ...payload,
+          employee_code: `EMP-${Date.now().toString().slice(-6)}`,
         });
         if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("employee_departments")
-          .delete()
-          .eq("employee_id", employeeId)
-          .eq("department_id", deptId);
-        if (error) throw error;
+        toast.success("Employee record created");
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["emp-dept-assignments"] });
-      toast.success("Department updated");
+      setShowForm(false);
+      setEditing(null);
+      setForm({ ...EMPTY_FORM });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
     },
-    onError: (err: any) => toast.error(err.message),
+    onError: (e: Error) => toast.error(e.message),
   });
+
+  const deactivateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("employees")
+        .update({ status: "inactive" })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Employee deactivated");
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const openNew = () => {
+    setEditing(null);
+    setForm({ ...EMPTY_FORM });
+    setShowForm(true);
+  };
+  const openEdit = (row: any) => {
+    setEditing(row);
+    setForm({
+      full_name: row.full_name ?? "",
+      email: row.email ?? "",
+      phone: row.phone ?? "",
+      job_title: row.job_title ?? "",
+      department_id: row.department_id ?? "",
+      hire_date: row.hire_date ? row.hire_date.slice(0, 10) : "",
+      salary: row.salary ? String(row.salary) : "",
+      status: row.status ?? "active",
+    });
+    setShowForm(true);
+  };
 
   return (
     <div className="max-w-[1600px] mx-auto">
-      <ResourceView
+      <PageHeader
         eyebrow="People"
         title="Employees"
-        sub="Company employee directory with roles, departments and contact information."
-        moduleName="employees"
-        rows={filteredEmployees}
-        searchKeys={["full_name", "email", "phone", "job_title", "departments"]}
-        formFields={isAuditor ? undefined : EMPLOYEE_FORM_FIELDS}
-        extraActions={
-          <div className="flex items-center gap-2">
-            <select
-              value={deptFilter}
-              onChange={(e) => setDeptFilter(e.target.value)}
-              className="h-8 text-xs rounded-md border border-input bg-background px-2"
-            >
-              <option value="all">All Departments</option>
-              {(departments ?? []).map((d: any) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        sub="Employment records across every department — the same records linked to system users via email."
+        actions={
+          !isAuditor ? (
+            <Button className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={openNew}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add Employee
+            </Button>
+          ) : null
         }
-        onSubmit={isAuditor ? undefined : async (formData, editingRow) => {
-          if (editingRow) {
-            const { error } = await supabase
-              .from("profiles")
-              .update({
-                full_name: formData.full_name,
-                email: formData.email,
-                phone: formData.phone || null,
-                job_title: formData.job_title || null,
-                status: formData.status || "active",
-              })
-              .eq("id", editingRow.id);
-            if (error) throw error;
-            toast.success("Employee updated");
-          } else {
-            toast.info("New employees must be created via whitelist and sign up");
-          }
-          queryClient.invalidateQueries({ queryKey: ["employees"] });
-        }}
-        onDelete={isAuditor ? undefined : async (row) => {
-          const { error } = await supabase
-            .from("profiles")
-            .update({ status: "inactive" })
-            .eq("id", row.id);
-          if (error) throw error;
-          queryClient.invalidateQueries({ queryKey: ["employees"] });
-          toast.success("Employee deactivated");
-        }}
-        kpis={
-          <>
-            <Kpi
-              label="Total Employees"
-              value={String(employees.length)}
-              icon={Users}
-              tone="primary"
-            />
-            <Kpi label="Active" value={String(activeCount)} icon={UserCheck} tone="success" />
-            <Kpi
-              label="Departments"
-              value={String(departments?.length ?? 0)}
-              icon={Building2}
-              tone="info"
-            />
-            <Kpi
-              label="Unique Roles"
-              value={String(totalRoles)}
-              icon={GraduationCap}
-              tone="warning"
-            />
-          </>
-        }
-        columns={[
-          {
-            key: "full_name",
-            header: "Employee",
-            render: (r) => (
-              <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-full bg-primary/15 flex items-center justify-center text-[10px] font-medium text-primary">
-                  {(r.full_name ?? "?")
-                    .split(" ")
-                    .map((w: string) => w[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase()}
-                </div>
-                <div>
-                  <div className="font-medium">{r.full_name ?? "—"}</div>
-                  <div className="text-[11px] text-muted-foreground">{r.job_title ?? "—"}</div>
-                </div>
-              </div>
-            ),
-          },
-          { key: "email", header: "Email", hideOnMobile: true },
-          { key: "phone", header: "Phone", hideOnMobile: true },
-          {
-            key: "role",
-            header: "Role",
-            render: (r) =>
-              r.role ? (
-                <Badge variant="outline" className="text-[10px] font-medium capitalize">
-                  {r.role.replace(/_/g, " ")}
-                </Badge>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              ),
-          },
-          {
-            key: "departments",
-            header: "Departments",
-            render: (r) =>
-              r.departments ? (
-                <div className="flex flex-wrap gap-1">
-                  {r.departments.split(", ").map((d: string, i: number) => (
-                    <span
-                      key={i}
-                      className="text-[10px] bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5"
-                    >
-                      {d}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              ),
-          },
-          { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
-        ]}
       />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi label="Total Employees" value={String(rows.length)} icon={Users} tone="primary" />
+        <Kpi label="Active" value={String(activeCount)} icon={UserCheck} tone="success" />
+        <Kpi label="Departments" value={String(departments?.length ?? 0)} icon={Building2} tone="info" />
+        <Kpi label="Linked to Login" value={String(rows.filter((r: any) => r.linked).length)} icon={Link2} tone="warning" />
+      </div>
 
-      {/* Department assignment panel */}
-      {departments && departments.length > 0 && (
-        <div className="mt-4 glass rounded-2xl p-5 border-white/5">
-          <div className="text-sm font-medium mb-3 flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-primary" />
-            Department Assignments
-          </div>
-          <div className="text-xs text-muted-foreground mb-3">
-            Employees can belong to multiple departments. Use the select menu to assign departments.
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            {(departments ?? []).map((dept: any) => {
-              const count = employees.filter((e) => e.department_ids?.includes(dept.id)).length;
-              return (
-                <div
-                  key={dept.id}
-                  className="rounded-lg bg-card/60 border border-white/5 p-2 text-center"
+      <div className="mt-4">
+        <Panel title={`${rows.length} Employee Records`}>
+          {rows.length === 0 ? (
+            <EmptyState title="No employees yet" sub="Add an employee record to get started." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/5">
+                    {["Employee", "Designation", "Department", "Hire Date", "Salary", "Status", "Login", ""].map((h) => (
+                      <th key={h} className="text-left text-[11px] uppercase tracking-wider text-muted-foreground py-2 px-2">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r: any) => (
+                    <tr key={r.id} className="border-b border-white/5 hover:bg-white/[0.02]">
+                      <td className="py-2.5 px-2">
+                        <div className="font-medium">{r.full_name}</div>
+                        <div className="text-[11px] text-muted-foreground">{r.email ?? "—"}</div>
+                      </td>
+                      <td className="py-2.5 px-2 text-muted-foreground">{r.job_title ?? "—"}</td>
+                      <td className="py-2.5 px-2 text-muted-foreground">{deptName(r.department_id)}</td>
+                      <td className="py-2.5 px-2 text-xs font-mono">{r.hire_date?.slice(0, 10) ?? "—"}</td>
+                      <td className="py-2.5 px-2 text-xs font-mono">
+                        {Number(r.salary ?? 0) > 0 ? `$${Number(r.salary).toLocaleString()}` : "—"}
+                      </td>
+                      <td className="py-2.5 px-2">
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="py-2.5 px-2">
+                        {r.linked ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-success">
+                            <Link2 className="h-3 w-3" /> Linked
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">No login</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-2">
+                        {!isAuditor && (
+                          <div className="flex items-center gap-1.5">
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Edit" onClick={() => openEdit(r)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            {r.status !== "inactive" && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-destructive"
+                                title="Deactivate"
+                                onClick={() => deactivateMutation.mutate(r.id)}
+                              >
+                                <UserMinus className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit Employee Record" : "Add Employee Record"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Full Name *</Label>
+              <Input value={form.full_name} onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Email</Label>
+                <Input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="matches login if any" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Phone</Label>
+                <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Designation</Label>
+                <Input value={form.job_title} onChange={(e) => setForm((f) => ({ ...f, job_title: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Department</Label>
+                <select
+                  value={form.department_id}
+                  onChange={(e) => setForm((f) => ({ ...f, department_id: e.target.value }))}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs"
                 >
-                  <div className="text-sm font-medium">{dept.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {count} employee{count !== 1 ? "s" : ""}
-                  </div>
-                </div>
-              );
-            })}
+                  <option value="">Select department…</option>
+                  {(departments ?? []).map((d: any) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Hire Date</Label>
+                <Input type="date" value={form.hire_date} onChange={(e) => setForm((f) => ({ ...f, hire_date: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Salary ($/yr)</Label>
+                <Input type="number" value={form.salary} onChange={(e) => setForm((f) => ({ ...f, salary: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Status</Label>
+              <select
+                value={form.status}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="on_leave">On Leave</option>
+              </select>
+            </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowForm(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-[image:var(--gradient-primary)]"
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending}
+            >
+              {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              {editing ? "Save Changes" : "Create Record"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

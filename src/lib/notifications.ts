@@ -1112,6 +1112,69 @@ export async function notifyChangeRequestRejected(
   );
 }
 
+/** HR: Leave request submitted → HR Manager (role-targeted, HR-only) */
+export async function notifyLeaveRequestSubmitted(
+  companyId: string,
+  employeeName: string,
+  leaveType: string,
+  leaveId: string,
+) {
+  await fireNotification(
+    companyId,
+    "hr_manager",
+    null,
+    "🗓️ New Leave Request",
+    `${employeeName} has requested ${leaveType} leave. Review in Leaves.`,
+    "info",
+    "leaves",
+    leaveId,
+  );
+}
+
+/** HR: Leave approved/rejected → the specific employee only (to_user) */
+export async function notifyLeaveDecision(
+  companyId: string,
+  employeeUserId: string,
+  leaveType: string,
+  decision: string,
+  reason: string,
+  leaveId: string,
+) {
+  const [ntRole, ntUser] = resolveTarget("hr_manager", employeeUserId);
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
+    decision === "approved" ? "✅ Leave Approved" : "❌ Leave Rejected",
+    decision === "approved"
+      ? `Your ${leaveType} leave request has been approved.`
+      : `Your ${leaveType} leave request was rejected.${reason ? ` Reason: ${reason}` : ""}`,
+    decision === "approved" ? "success" : "warning",
+    "leaves",
+    leaveId,
+  );
+}
+
+/** HR: Payroll marked paid → the specific employee only (to_user, fail-closed) */
+export async function notifyPayrollPaid(
+  companyId: string,
+  employeeUserId: string,
+  period: string,
+  amount: number,
+) {
+  const [ntRole, ntUser] = resolveTarget("hr_manager", employeeUserId);
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
+    "💸 Payroll Released",
+    `Your salary for ${period} ($${amount.toLocaleString()}) has been paid.`,
+    "success",
+    "payroll",
+    null,
+  );
+}
+
 /** Trigger 28: Customer creates Support Ticket → Company Admin */
 export async function notifySupportTicket(
   companyId: string,

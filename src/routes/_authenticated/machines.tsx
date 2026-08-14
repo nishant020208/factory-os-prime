@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Cog, Wrench, TrendingUp, AlertTriangle } from "lucide-react";
+import { Cog, Wrench, TrendingUp, AlertTriangle, CalendarClock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ResourceView, type FormField } from "@/components/resource-view";
 import { Kpi, StatusBadge } from "@/components/ui-parts";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
@@ -69,12 +70,55 @@ const MACHINE_FORM_FIELDS: FormField[] = [
 
 function MachinesPage() {
   const queryClient = useQueryClient();
-  const { companyId, roles } = useAuth();
+  const { companyId, roles, user } = useAuth();
   const isAuditor = roles.includes("auditor");
 
   const { data } = useQuery({
     queryKey: ["machines"],
     queryFn: async () => (await supabase.from("machines").select("*").order("name")).data ?? [],
+  });
+
+  // Next scheduled maintenance per machine (from the real schedules table).
+  const { data: schedules } = useQuery({
+    queryKey: ["machines-schedules", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("maintenance_schedules")
+          .select("machine_id, next_due, status")
+          .eq("company_id", companyId!)
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+  const nextDueByMachine = new Map<string, string>();
+  for (const s of schedules ?? []) {
+    if (!s.machine_id || s.status === "completed") continue;
+    const cur = nextDueByMachine.get(s.machine_id);
+    if (!cur || (s.next_due ?? "") < cur) nextDueByMachine.set(s.machine_id, s.next_due ?? "");
+  }
+
+  const logServiceMutation = useMutation({
+    mutationFn: async (row: any) => {
+      if (!companyId || !user) throw new Error("Not authenticated");
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from("machines")
+        .update({ status: "operational", last_maintenance: nowIso })
+        .eq("id", row.id);
+      await supabase.from("machine_status_log").insert({
+        company_id: companyId,
+        machine_id: row.id,
+        from_status: row.status ?? "operational",
+        to_status: "operational",
+        reason: "Service logged",
+        changed_by: user.id,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Service logged — Last Serviced updated");
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
+    },
+    onError: (err: any) => toast.error(err.message),
   });
 
   const operational = data?.filter((m) => m.status === "operational").length ?? 0;
@@ -188,6 +232,51 @@ function MachinesPage() {
           ),
         },
         { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
+        {
+          key: "last_maintenance",
+          header: "Last Serviced",
+          hideOnMobile: true,
+          render: (r) =>
+            r.last_maintenance ? (
+              <span className="text-xs text-muted-foreground">
+                {new Date(r.last_maintenance).toLocaleDateString()}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">Never</span>
+            ),
+        },
+        {
+          key: "next_due",
+          header: "Next Scheduled",
+          hideOnMobile: true,
+          render: (r) =>
+            nextDueByMachine.get(r.id) ? (
+              <span className="inline-flex items-center gap-1 text-xs text-warning">
+                <CalendarClock className="h-3 w-3" />
+                {nextDueByMachine.get(r.id)!.slice(0, 10)}
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">—</span>
+            ),
+        },
+        {
+          key: "service",
+          header: "Actions",
+          hideOnMobile: true,
+          render: (r) =>
+            !isAuditor ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-success"
+                onClick={() => logServiceMutation.mutate(r)}
+                disabled={logServiceMutation.isPending}
+              >
+                <Wrench className="h-3 w-3 mr-1" />
+                Log Service
+              </Button>
+            ) : null,
+        },
       ]}
     />
   );

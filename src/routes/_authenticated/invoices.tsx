@@ -23,8 +23,9 @@ import { notifyInvoiceGenerated, notifyPaymentStatusChanged } from "@/lib/notifi
 import { getCustomerUserId } from "@/lib/customer-lookup";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_authenticated/invoices")({
   head: () => ({
@@ -95,6 +96,12 @@ function InvoicesPage() {
     invoice: null,
     scanUrl: null,
     generating: false,
+  });
+
+  const [genDialog, setGenDialog] = useState<{ open: boolean; order: any | null; gstPercent: string }>({
+    open: false,
+    order: null,
+    gstPercent: "18",
   });
 
   // ── Data fetch: admin gets all invoices; customer gets only their own ─────
@@ -227,6 +234,58 @@ function InvoicesPage() {
     }
   };
 
+  // Orders ready for a final invoice (real balance_due from customer_orders).
+  const { data: invoicableOrders } = useQuery({
+    queryKey: ["invoicable-orders", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("customer_orders")
+          .select("*, customers!left(business_name, name)")
+          .eq("company_id", companyId!)
+          .in("status", ["advance_paid", "in_production", "dispatch_ready", "delivered", "completed"])
+          .gt("balance_due", 0)
+          .order("created_at", { ascending: false })
+      ).data ?? [],
+    enabled: !!companyId && !isCustomer,
+  });
+
+  const generateFinalMutation = useMutation({
+    mutationFn: async () => {
+      if (!companyId || !genDialog.order) throw new Error("No order selected");
+      const order = genDialog.order;
+      const balance = Number(order.balance_due ?? 0);
+      const gst = (parseFloat(genDialog.gstPercent) || 0) / 100;
+      const tax = Math.round(balance * gst * 100) / 100;
+      const invoiceNumber = `INV-${new Date().getFullYear()}-${String((data?.length ?? 0) + 1).padStart(4, "0")}`;
+      const { data: inserted, error } = await supabase
+        .from("invoices")
+        .insert({
+          company_id: companyId,
+          customer_id: order.customer_id,
+          invoice_number: invoiceNumber,
+          total_amount: balance,
+          tax_amount: tax,
+          status: "sent",
+          issue_date: new Date().toISOString(),
+          due_date: new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10),
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      const customerUserId = await getCustomerUserId(order.customer_id);
+      await notifyInvoiceGenerated(companyId, invoiceNumber, customerUserId ?? "", inserted.id);
+      return invoiceNumber;
+    },
+    onSuccess: (invNum) => {
+      toast.success(`Final invoice ${invNum} generated — customer notified`);
+      setGenDialog({ open: false, order: null, gstPercent: "18" });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoicable-orders"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   const total = (data ?? []).reduce((s: number, inv: any) => s + Number(inv.total_amount ?? 0), 0);
   const paid = (data ?? []).filter((inv: any) => inv.status === "paid").length;
   const outstanding = (data ?? []).filter(
@@ -343,6 +402,34 @@ function InvoicesPage() {
   // ── Admin / Finance view: full ResourceView with QR + Mark Paid ───────────
   return (
     <>
+      {!isAuditor && (invoicableOrders ?? []).length > 0 && (
+        <div className="mb-4 glass rounded-2xl p-4 border-white/5">
+          <div className="text-sm font-medium mb-2 flex items-center gap-2">
+            <Receipt className="h-4 w-4 text-primary" />
+            Orders Ready for Final Invoice
+          </div>
+          <div className="divide-y divide-white/5">
+            {(invoicableOrders ?? []).map((o: any) => (
+              <div key={o.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <div>
+                  <div className="font-medium">{o.order_number}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {o.customers?.business_name ?? o.customers?.name ?? "—"} · Balance ${Number(o.balance_due ?? 0).toLocaleString()}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="h-7 text-xs bg-[image:var(--gradient-primary)]"
+                  onClick={() => setGenDialog({ open: true, order: o, gstPercent: "18" })}
+                >
+                  <FileDown className="h-3.5 w-3.5 mr-1" />
+                  Generate Final Invoice
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <ResourceView
         eyebrow="Finance"
         title="Invoices"
@@ -483,6 +570,67 @@ function InvoicesPage() {
         dialog={qrDialog}
         onOpenChange={(o) => setQrDialog((d) => ({ ...d, open: o }))}
       />
+
+      {/* Generate final invoice dialog — real balance_due from the order */}
+      <Dialog open={genDialog.open} onOpenChange={(o) => setGenDialog((d) => ({ ...d, open: o }))}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Generate Final Invoice</DialogTitle>
+          </DialogHeader>
+          {genDialog.order && (
+            <div className="space-y-4 py-2">
+              <div className="text-sm">
+                <span className="text-muted-foreground">Order:</span>{" "}
+                {genDialog.order.order_number} —{" "}
+                {genDialog.order.customers?.business_name ?? genDialog.order.customers?.name ?? ""}
+              </div>
+              <div className="rounded-xl bg-card/60 border border-white/5 p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Balance Due (real)</span>
+                  <span className="font-medium">
+                    ${Number(genDialog.order.balance_due ?? 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">GST %</Label>
+                  <input
+                    type="number"
+                    value={genDialog.gstPercent}
+                    onChange={(e) => setGenDialog((d) => ({ ...d, gstPercent: e.target.value }))}
+                    className="flex h-8 w-24 rounded-md border border-input bg-transparent px-2 text-xs"
+                  />
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">GST Amount</span>
+                  <span className="font-medium text-primary">
+                    $
+                    {((Number(genDialog.order.balance_due ?? 0) * (parseFloat(genDialog.gstPercent) || 0)) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="border-t border-white/5 pt-2 flex justify-between">
+                  <span className="font-medium">Total (excl. GST)</span>
+                  <span className="font-medium">${Number(genDialog.order.balance_due ?? 0).toLocaleString()}</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Creates a real invoice row, embeds its QR, and notifies the customer (to_user).
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGenDialog({ open: false, order: null, gstPercent: "18" })}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-[image:var(--gradient-primary)]"
+              onClick={() => generateFinalMutation.mutate()}
+              disabled={generateFinalMutation.isPending}
+            >
+              Generate Invoice
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

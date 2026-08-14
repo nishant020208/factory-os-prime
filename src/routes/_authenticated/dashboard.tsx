@@ -27,6 +27,8 @@ import {
   Plus,
   X,
   MessageSquare,
+  Calendar,
+  UserCheck,
 } from "lucide-react";
 import {
   Area,
@@ -1559,10 +1561,70 @@ function MaintenanceDashboard() {
 /* ─────────── FINANCE MANAGER ─────────── */
 function FinanceDashboard() {
   const { companyId } = useAuth();
-  const s = useLiveStats(companyId).data;
-  const cash = trend(14, 120000, 4000);
-  const revenue = (s?.salesOrdersRevenue ?? 0) / 1_000_000;
-  const outInv = (s?.invoicesOutstanding ?? 0) / 1000;
+  const { data: invoices = [] } = useQuery({
+    queryKey: ["fin-dash-invoices", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("invoices")
+          .select("status, total_amount, issue_date")
+          .eq("company_id", companyId!)
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+  const { data: payments = [] } = useQuery({
+    queryKey: ["fin-dash-payments", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("payments")
+          .select("amount, paid_at")
+          .eq("company_id", companyId!)
+          .eq("status", "completed")
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+  const { data: supplierPayments = [] } = useQuery({
+    queryKey: ["fin-dash-sup", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("supplier_payments")
+          .select("amount, paid_at")
+          .eq("company_id", companyId!)
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+
+  const totalRevenue = payments.reduce((s: number, p: any) => s + Number(p.amount ?? 0), 0);
+  const outstanding = invoices
+    .filter((i: any) => i.status !== "paid")
+    .reduce((s: number, i: any) => s + Number(i.total_amount ?? 0), 0);
+  const paidCount = invoices.filter((i: any) => i.status === "paid").length;
+  const moneyOut = supplierPayments.reduce((s: number, p: any) => s + Number(p.amount ?? 0), 0);
+
+  const byMonth = new Map<string, { in: number; out: number }>();
+  for (const p of payments) {
+    const k = (p.paid_at ?? "").slice(0, 7);
+    if (!k) continue;
+    const m = byMonth.get(k) ?? { in: 0, out: 0 };
+    m.in += Number(p.amount ?? 0);
+    byMonth.set(k, m);
+  }
+  for (const p of supplierPayments) {
+    const k = (p.paid_at ?? "").slice(0, 7);
+    if (!k) continue;
+    const m = byMonth.get(k) ?? { in: 0, out: 0 };
+    m.out += Number(p.amount ?? 0);
+    byMonth.set(k, m);
+  }
+  const cash = [...byMonth.keys()]
+    .sort()
+    .map((m) => ({
+      m: new Date(m + "-01").toLocaleDateString(undefined, { month: "short" }),
+      v: (byMonth.get(m)!.in - byMonth.get(m)!.out) / 1000,
+    }));
+
   return (
     <Shell
       eyebrow="Finance"
@@ -1571,34 +1633,44 @@ function FinanceDashboard() {
     >
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Kpi
-          label="Order Revenue"
-          value={s ? `$${revenue.toFixed(2)}M` : "…"}
+          label="Revenue (collected)"
+          value={`$${(totalRevenue / 1000).toFixed(1)}k`}
           icon={TrendingUp}
           tone="success"
         />
-        <Kpi label="Invoices" value={String(s?.invoices ?? 0)} icon={Landmark} tone="primary" />
+        <Kpi label="Invoices" value={String(invoices.length)} icon={Landmark} tone="primary" />
         <Kpi
-          label="Outstanding Invoices"
-          value={s ? `$${outInv.toFixed(0)}k` : "…"}
+          label="Outstanding"
+          value={`$${(outstanding / 1000).toFixed(1)}k`}
           icon={ClipboardList}
           tone="warning"
         />
-        <Kpi label="Payments" value={String(s?.payments ?? 0)} icon={ClipboardList} tone="info" />
+        <Kpi
+          label="Paid to Suppliers"
+          value={`$${(moneyOut / 1000).toFixed(1)}k`}
+          icon={ClipboardList}
+          tone="info"
+        />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2">
-          <Panel title="Cash flow">
-            <OutputChart data={cash} />
+          <Panel title="Net cash flow · real payments">
+            {cash.length === 0 ? (
+              <div className="h-72 flex items-center justify-center text-sm text-muted-foreground">
+                No payments recorded yet.
+              </div>
+            ) : (
+              <OutputChart
+                data={cash.map((c: any) => ({ d: c.d ?? c.m ?? "", a: c.a ?? c.v ?? 0, b: 0 }))}
+              />
+            )}
           </Panel>
         </div>
         <AIInsights
           dashboardType="finance_manager"
           items={[
-            { t: `${s?.invoicesOutstanding ?? 0} invoice(s) awaiting payment`, c: 84 },
-            {
-              t: `${s?.salesOrders ?? 0} customer orders worth $${(s?.salesOrdersRevenue ?? 0).toLocaleString()}`,
-              c: 71,
-            },
+            { t: `${invoices.filter((i: any) => i.status !== "paid").length} invoice(s) awaiting payment`, c: 84 },
+            { t: `${paidCount} invoice(s) paid, $${totalRevenue.toLocaleString()} collected`, c: 71 },
           ]}
         />
       </div>
@@ -1609,43 +1681,95 @@ function FinanceDashboard() {
 /* ─────────── HR MANAGER ─────────── */
 function HRDashboard() {
   const { companyId } = useAuth();
-  const s = useLiveStats(companyId).data;
+  const { data: employees = [] } = useQuery({
+    queryKey: ["hr-dash-employees", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("employees")
+          .select("hire_date, department_id")
+          .eq("company_id", companyId!)
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+  const { data: departments = [] } = useQuery({
+    queryKey: ["hr-dash-depts", companyId],
+    queryFn: async () =>
+      (await supabase.from("departments").select("id, name").order("name")).data ?? [],
+  });
+  const { data: attendance = [] } = useQuery({
+    queryKey: ["hr-dash-att", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("attendance")
+          .select("status, date")
+          .eq("company_id", companyId!)
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+  const { data: leaves = [] } = useQuery({
+    queryKey: ["hr-dash-leaves", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("leaves")
+          .select("status")
+          .eq("company_id", companyId!)
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const todaysAtt = attendance.filter((a: any) => a.date === today);
+  const presentToday = todaysAtt.filter((a: any) => a.status === "present").length;
+  const onLeaveToday = todaysAtt.filter((a: any) => a.status === "on_leave").length;
+  const pendingLeaves = leaves.filter((l: any) => l.status === "pending").length;
+
+  const byMonth = new Map<string, number>();
+  for (const e of employees) {
+    const k = (e.hire_date ?? "").slice(0, 7);
+    if (!k) continue;
+    byMonth.set(k, (byMonth.get(k) ?? 0) + 1);
+  }
+  const trendData = [...byMonth.keys()]
+    .sort()
+    .slice(-14)
+    .map((m) => ({
+      d: new Date(m + "-01").toLocaleDateString(undefined, { month: "short" }),
+      a: byMonth.get(m)!,
+      b: 0,
+    }));
+
   return (
     <Shell
       eyebrow="People"
       title="HR Command"
-      sub="Headcount, departments and workforce analytics."
+      sub="Headcount, attendance and leave — live from people tables."
     >
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Headcount" value={String(s?.employees ?? 0)} icon={Users} tone="primary" />
-        <Kpi
-          label="Departments"
-          value={String(s?.departments ?? 0)}
-          icon={Factory}
-          tone="success"
-        />
-        <Kpi
-          label="Open Support Tickets"
-          value={String(s?.supportTicketsOpen ?? 0)}
-          icon={ClipboardList}
-          tone="info"
-        />
-        <Kpi label="Customers" value={String(s?.customers ?? 0)} icon={UserRound} tone="warning" />
+        <Kpi label="Headcount" value={String(employees.length)} icon={Users} tone="primary" />
+        <Kpi label="Departments" value={String(departments.length)} icon={Factory} tone="success" />
+        <Kpi label="Present Today" value={String(presentToday)} icon={UserCheck} tone="info" />
+        <Kpi label="Pending Leaves" value={String(pendingLeaves)} icon={Calendar} tone="warning" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <div className="lg:col-span-2">
-          <Panel title="Headcount trend">
-            <OutputChart data={trend(14, 240, 3)} />
+          <Panel title="Hires by month · real records">
+            {trendData.length === 0 ? (
+              <div className="h-72 flex items-center justify-center text-sm text-muted-foreground">
+                No employee hire records yet.
+              </div>
+            ) : (
+              <OutputChart data={trendData} />
+            )}
           </Panel>
         </div>
         <AIInsights
           dashboardType="hr_manager"
           items={[
-            {
-              t: `${s?.employees ?? 0} employees across ${s?.departments ?? 0} departments`,
-              c: 74,
-            },
-            { t: `${s?.supportTicketsOpen ?? 0} open support tickets need attention`, c: 82 },
+            { t: `${employees.length} employees across ${departments.length} departments`, c: 74 },
+            { t: `${onLeaveToday} on approved leave today, ${presentToday} present`, c: 82 },
           ]}
         />
       </div>

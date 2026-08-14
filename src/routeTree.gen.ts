@@ -30,6 +30,7 @@ import { Route as AuthenticatedCompanyRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedComplianceRouteImport } from './routes/_authenticated/compliance'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedCustomerInvoicesRouteImport } from './routes/_authenticated/customer-invoices'
+import { Route as AuthenticatedCustomerLedgerRouteImport } from './routes/_authenticated/customer-ledger'
 import { Route as AuthenticatedCustomerRequestsRouteImport } from './routes/_authenticated/customer-requests'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
 import { Route as AuthenticatedCycleCountRouteImport } from './routes/_authenticated/cycle-count'
@@ -91,6 +92,7 @@ import { Route as AuthenticatedShipmentsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedSparePartsRouteImport } from './routes/_authenticated/spare-parts'
 import { Route as AuthenticatedStockMovementRouteImport } from './routes/_authenticated/stock-movement'
 import { Route as AuthenticatedSupplierInvoicesRouteImport } from './routes/_authenticated/supplier-invoices'
+import { Route as AuthenticatedSupplierPaymentsRouteImport } from './routes/_authenticated/supplier-payments'
 import { Route as AuthenticatedSupplierPerformanceRouteImport } from './routes/_authenticated/supplier-performance'
 import { Route as AuthenticatedSupplierPosRouteImport } from './routes/_authenticated/supplier-pos'
 import { Route as AuthenticatedSuppliersRouteImport } from './routes/_authenticated/suppliers'
@@ -221,6 +223,12 @@ const AuthenticatedCustomerInvoicesRoute =
   AuthenticatedCustomerInvoicesRouteImport.update({
     id: '/customer-invoices',
     path: '/customer-invoices',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedCustomerLedgerRoute =
+  AuthenticatedCustomerLedgerRouteImport.update({
+    id: '/customer-ledger',
+    path: '/customer-ledger',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedCustomerRequestsRoute =
@@ -552,6 +560,12 @@ const AuthenticatedSupplierInvoicesRoute =
     path: '/supplier-invoices',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSupplierPaymentsRoute =
+  AuthenticatedSupplierPaymentsRouteImport.update({
+    id: '/supplier-payments',
+    path: '/supplier-payments',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSupplierPerformanceRoute =
   AuthenticatedSupplierPerformanceRouteImport.update({
     id: '/supplier-performance',
@@ -696,6 +710,7 @@ export interface FileRoutesByFullPath {
   '/compliance': typeof AuthenticatedComplianceRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/customer-invoices': typeof AuthenticatedCustomerInvoicesRoute
+  '/customer-ledger': typeof AuthenticatedCustomerLedgerRoute
   '/customer-requests': typeof AuthenticatedCustomerRequestsRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/cycle-count': typeof AuthenticatedCycleCountRoute
@@ -757,6 +772,7 @@ export interface FileRoutesByFullPath {
   '/spare-parts': typeof AuthenticatedSparePartsRoute
   '/stock-movement': typeof AuthenticatedStockMovementRoute
   '/supplier-invoices': typeof AuthenticatedSupplierInvoicesRoute
+  '/supplier-payments': typeof AuthenticatedSupplierPaymentsRoute
   '/supplier-performance': typeof AuthenticatedSupplierPerformanceRoute
   '/supplier-pos': typeof AuthenticatedSupplierPosRoute
   '/suppliers': typeof AuthenticatedSuppliersRoute
@@ -801,6 +817,7 @@ export interface FileRoutesByTo {
   '/compliance': typeof AuthenticatedComplianceRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/customer-invoices': typeof AuthenticatedCustomerInvoicesRoute
+  '/customer-ledger': typeof AuthenticatedCustomerLedgerRoute
   '/customer-requests': typeof AuthenticatedCustomerRequestsRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/cycle-count': typeof AuthenticatedCycleCountRoute
@@ -862,6 +879,7 @@ export interface FileRoutesByTo {
   '/spare-parts': typeof AuthenticatedSparePartsRoute
   '/stock-movement': typeof AuthenticatedStockMovementRoute
   '/supplier-invoices': typeof AuthenticatedSupplierInvoicesRoute
+  '/supplier-payments': typeof AuthenticatedSupplierPaymentsRoute
   '/supplier-performance': typeof AuthenticatedSupplierPerformanceRoute
   '/supplier-pos': typeof AuthenticatedSupplierPosRoute
   '/suppliers': typeof AuthenticatedSuppliersRoute
@@ -908,6 +926,7 @@ export interface FileRoutesById {
   '/_authenticated/compliance': typeof AuthenticatedComplianceRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/customer-invoices': typeof AuthenticatedCustomerInvoicesRoute
+  '/_authenticated/customer-ledger': typeof AuthenticatedCustomerLedgerRoute
   '/_authenticated/customer-requests': typeof AuthenticatedCustomerRequestsRoute
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/cycle-count': typeof AuthenticatedCycleCountRoute
@@ -969,6 +988,7 @@ export interface FileRoutesById {
   '/_authenticated/spare-parts': typeof AuthenticatedSparePartsRoute
   '/_authenticated/stock-movement': typeof AuthenticatedStockMovementRoute
   '/_authenticated/supplier-invoices': typeof AuthenticatedSupplierInvoicesRoute
+  '/_authenticated/supplier-payments': typeof AuthenticatedSupplierPaymentsRoute
   '/_authenticated/supplier-performance': typeof AuthenticatedSupplierPerformanceRoute
   '/_authenticated/supplier-pos': typeof AuthenticatedSupplierPosRoute
   '/_authenticated/suppliers': typeof AuthenticatedSuppliersRoute
@@ -1015,6 +1035,7 @@ export interface FileRouteTypes {
     | '/compliance'
     | '/crm'
     | '/customer-invoices'
+    | '/customer-ledger'
     | '/customer-requests'
     | '/customers'
     | '/cycle-count'
@@ -1076,6 +1097,7 @@ export interface FileRouteTypes {
     | '/spare-parts'
     | '/stock-movement'
     | '/supplier-invoices'
+    | '/supplier-payments'
     | '/supplier-performance'
     | '/supplier-pos'
     | '/suppliers'
@@ -1120,6 +1142,7 @@ export interface FileRouteTypes {
     | '/compliance'
     | '/crm'
     | '/customer-invoices'
+    | '/customer-ledger'
     | '/customer-requests'
     | '/customers'
     | '/cycle-count'
@@ -1181,6 +1204,7 @@ export interface FileRouteTypes {
     | '/spare-parts'
     | '/stock-movement'
     | '/supplier-invoices'
+    | '/supplier-payments'
     | '/supplier-performance'
     | '/supplier-pos'
     | '/suppliers'
@@ -1226,6 +1250,7 @@ export interface FileRouteTypes {
     | '/_authenticated/compliance'
     | '/_authenticated/crm'
     | '/_authenticated/customer-invoices'
+    | '/_authenticated/customer-ledger'
     | '/_authenticated/customer-requests'
     | '/_authenticated/customers'
     | '/_authenticated/cycle-count'
@@ -1287,6 +1312,7 @@ export interface FileRouteTypes {
     | '/_authenticated/spare-parts'
     | '/_authenticated/stock-movement'
     | '/_authenticated/supplier-invoices'
+    | '/_authenticated/supplier-payments'
     | '/_authenticated/supplier-performance'
     | '/_authenticated/supplier-pos'
     | '/_authenticated/suppliers'
@@ -1465,6 +1491,13 @@ declare module '@tanstack/react-router' {
       path: '/customer-invoices'
       fullPath: '/customer-invoices'
       preLoaderRoute: typeof AuthenticatedCustomerInvoicesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/customer-ledger': {
+      id: '/_authenticated/customer-ledger'
+      path: '/customer-ledger'
+      fullPath: '/customer-ledger'
+      preLoaderRoute: typeof AuthenticatedCustomerLedgerRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/customer-requests': {
@@ -1894,6 +1927,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSupplierInvoicesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/supplier-payments': {
+      id: '/_authenticated/supplier-payments'
+      path: '/supplier-payments'
+      fullPath: '/supplier-payments'
+      preLoaderRoute: typeof AuthenticatedSupplierPaymentsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/supplier-performance': {
       id: '/_authenticated/supplier-performance'
       path: '/supplier-performance'
@@ -2069,6 +2109,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedComplianceRoute: typeof AuthenticatedComplianceRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedCustomerInvoicesRoute: typeof AuthenticatedCustomerInvoicesRoute
+  AuthenticatedCustomerLedgerRoute: typeof AuthenticatedCustomerLedgerRoute
   AuthenticatedCustomerRequestsRoute: typeof AuthenticatedCustomerRequestsRoute
   AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedCycleCountRoute: typeof AuthenticatedCycleCountRoute
@@ -2130,6 +2171,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSparePartsRoute: typeof AuthenticatedSparePartsRoute
   AuthenticatedStockMovementRoute: typeof AuthenticatedStockMovementRoute
   AuthenticatedSupplierInvoicesRoute: typeof AuthenticatedSupplierInvoicesRoute
+  AuthenticatedSupplierPaymentsRoute: typeof AuthenticatedSupplierPaymentsRoute
   AuthenticatedSupplierPerformanceRoute: typeof AuthenticatedSupplierPerformanceRoute
   AuthenticatedSupplierPosRoute: typeof AuthenticatedSupplierPosRoute
   AuthenticatedSuppliersRoute: typeof AuthenticatedSuppliersRoute
@@ -2172,6 +2214,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedComplianceRoute: AuthenticatedComplianceRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedCustomerInvoicesRoute: AuthenticatedCustomerInvoicesRoute,
+  AuthenticatedCustomerLedgerRoute: AuthenticatedCustomerLedgerRoute,
   AuthenticatedCustomerRequestsRoute: AuthenticatedCustomerRequestsRoute,
   AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedCycleCountRoute: AuthenticatedCycleCountRoute,
@@ -2233,6 +2276,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSparePartsRoute: AuthenticatedSparePartsRoute,
   AuthenticatedStockMovementRoute: AuthenticatedStockMovementRoute,
   AuthenticatedSupplierInvoicesRoute: AuthenticatedSupplierInvoicesRoute,
+  AuthenticatedSupplierPaymentsRoute: AuthenticatedSupplierPaymentsRoute,
   AuthenticatedSupplierPerformanceRoute: AuthenticatedSupplierPerformanceRoute,
   AuthenticatedSupplierPosRoute: AuthenticatedSupplierPosRoute,
   AuthenticatedSuppliersRoute: AuthenticatedSuppliersRoute,

@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Landmark, TrendingUp, Receipt, PiggyBank } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Landmark, TrendingUp, Receipt, PiggyBank, FileText, ArrowDownToLine } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { ResourceView, type FormField } from "@/components/resource-view";
-import { Kpi, Panel, StatusBadge } from "@/components/ui-parts";
+import { PageHeader, Kpi, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
 import {
   Area,
   AreaChart,
@@ -14,7 +13,6 @@ import {
   YAxis,
 } from "recharts";
 import { useAuth } from "@/hooks/use-auth";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/finance")({
   head: () => ({
@@ -22,278 +20,253 @@ export const Route = createFileRoute("/_authenticated/finance")({
       { title: "Finance — FactoryOS AI" },
       {
         name: "description",
-        content: "GL, AP/AR, budgets, cost centers and executive financial analytics.",
+        content: "Revenue, receivables, payables and cash flow for this company.",
       },
     ],
   }),
   component: FinancePage,
 });
 
-// We build finance records from purchase_orders + production_orders since there's no invoices table yet
-const PURCHASE_FORM_FIELDS: FormField[] = [
-  {
-    key: "po_number",
-    label: "PO Number",
-    type: "text",
-    placeholder: "PUR-2026-0004",
-    required: true,
-  },
-  {
-    key: "total_amount",
-    label: "Amount ($)",
-    type: "number",
-    placeholder: "25000",
-    required: true,
-  },
-  { key: "expected_date", label: "Expected Date", type: "date" },
-  {
-    key: "status",
-    label: "Status",
-    type: "select",
-    defaultValue: "draft",
-    options: [
-      { value: "draft", label: "Draft" },
-      { value: "pending", label: "Pending" },
-      { value: "approved", label: "Approved" },
-      { value: "received", label: "Received" },
-    ],
-  },
-];
-
-const cashflow = Array.from({ length: 12 }, (_, i) => ({
-  m: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][i],
-  inflow: 1200 + i * 60 + Math.round(Math.random() * 200),
-  outflow: 950 + i * 45 + Math.round(Math.random() * 180),
-}));
-
-type FinanceRow = {
-  id: string;
-  po_number: string;
-  total_amount: number | null;
-  status: string;
-  expected_date: string | null;
-  created_at: string;
-  _type: string;
-};
-
 function FinancePage() {
-  const queryClient = useQueryClient();
-  const { companyId, roles } = useAuth();
-  const isAuditor = roles.includes("auditor");
+  const { companyId } = useAuth();
 
-  // Query purchase orders as financial records
-  const { data: purchaseOrders } = useQuery({
-    queryKey: ["fin-pos", companyId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("purchase_orders")
-        .select("*")
-        .order("created_at", { ascending: false });
-      return (data ?? []).map((p: any) => ({ ...p, _type: "purchase" }) as FinanceRow);
-    },
+  // REAL customer invoices.
+  const { data: invoices } = useQuery({
+    queryKey: ["fin-invoices", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("invoices")
+          .select("*, customers!left(name, business_name)")
+          .eq("company_id", companyId!)
+          .order("issue_date", { ascending: false })
+      ).data ?? [],
+    enabled: !!companyId,
   });
 
-  // Also query production orders to show revenue side
-  const { data: prodOrders } = useQuery({
-    queryKey: ["fin-prod", companyId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("production_orders")
-        .select("*")
-        .order("created_at", { ascending: false });
-      return (data ?? []).map(
-        (p: any) =>
-          ({
-            ...p,
-            po_number: p.order_number,
-            total_amount: Number(p.quantity ?? 0) * 42,
-            _type: "production",
-          }) as FinanceRow,
-      );
-    },
+  // REAL customer payments (money in).
+  const { data: payments } = useQuery({
+    queryKey: ["fin-payments", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("payments")
+          .select("*, customers!left(name, business_name)")
+          .eq("company_id", companyId!)
+          .eq("status", "completed")
+          .order("paid_at", { ascending: false })
+      ).data ?? [],
+    enabled: !!companyId,
   });
 
-  const allRecords = [...(purchaseOrders ?? []), ...(prodOrders ?? [])];
-
-  const totalRevenue = allRecords
-    .filter((r: any) => r.status === "received" || r.status === "completed")
-    .reduce((s, r) => s + Number(r.total_amount ?? 0), 0);
-  const arOutstanding = allRecords
-    .filter((r: any) => r.status === "pending" || r.status === "approved")
-    .reduce((s, r) => s + Number(r.total_amount ?? 0), 0);
-  const apOutstanding = allRecords
-    .filter((r: any) => r._type === "purchase" && r.status !== "received")
-    .reduce((s, r) => s + Number(r.total_amount ?? 0), 0);
-
-  const createMutation = useMutation({
-    mutationFn: async (formData: Record<string, string>) => {
-      const { error } = await supabase.from("purchase_orders").insert({
-        company_id: companyId!,
-        po_number: formData.po_number,
-        total_amount: parseFloat(formData.total_amount) || 0,
-        expected_date: formData.expected_date || null,
-        status: formData.status || "draft",
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fin-pos"] });
-      toast.success("Purchase order created");
-    },
-    onError: (err: any) => toast.error(err.message),
+  // REAL supplier invoices (money out, awaiting payment).
+  const { data: supplierInvoices } = useQuery({
+    queryKey: ["fin-sup-invoices", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("supplier_invoices")
+          .select("*, suppliers!left(name)")
+          .eq("company_id", companyId!)
+          .order("created_at", { ascending: false })
+      ).data ?? [],
+    enabled: !!companyId,
   });
 
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data: d }: { id: string; data: Record<string, string> }) => {
-      const { error } = await supabase
-        .from("purchase_orders")
-        .update({
-          po_number: d.po_number,
-          total_amount: parseFloat(d.total_amount) || 0,
-          expected_date: d.expected_date || null,
-          status: d.status || "draft",
-        })
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fin-pos"] });
-      toast.success("Purchase order updated");
-    },
-    onError: (err: any) => toast.error(err.message),
+  // REAL supplier payments (money out, paid).
+  const { data: supplierPayments } = useQuery({
+    queryKey: ["fin-sup-payments", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("supplier_payments")
+          .select("*, suppliers!left(name)")
+          .eq("company_id", companyId!)
+          .order("paid_at", { ascending: false })
+      ).data ?? [],
+    enabled: !!companyId,
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("purchase_orders").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fin-pos"] });
-      toast.success("Purchase order deleted");
-    },
-    onError: (err: any) => toast.error(err.message),
-  });
+  const now = new Date();
+  const monthKey = now.toISOString().slice(0, 7);
+
+  const totalRevenue = (payments ?? []).reduce((s: number, p: any) => s + Number(p.amount ?? 0), 0);
+  const monthInvoices = (invoices ?? []).filter((i: any) =>
+    i.issue_date?.startsWith(monthKey),
+  ).length;
+  const arOutstanding = (invoices ?? [])
+    .filter((i: any) => i.status === "sent" || i.status === "overdue" || i.status === "draft")
+    .reduce((s: number, i: any) => s + Number(i.total_amount ?? 0), 0);
+  const apOutstanding = (supplierInvoices ?? [])
+    .filter((i: any) => i.status === "pending")
+    .reduce((s: number, i: any) => s + Number(i.total_amount ?? 0), 0);
+  const moneyOut = (supplierPayments ?? []).reduce(
+    (s: number, p: any) => s + Number(p.amount ?? 0),
+    0,
+  );
+  const cashPosition = totalRevenue - moneyOut;
+  const pendingPayments = (supplierInvoices ?? []).filter((i: any) => i.status === "pending").length;
+
+  // Real cash-flow series: monthly money in vs money out.
+  const byMonth = new Map<string, { in: number; out: number }>();
+  for (const p of payments ?? []) {
+    const k = (p.paid_at ?? "").slice(0, 7);
+    if (!k) continue;
+    const m = byMonth.get(k) ?? { in: 0, out: 0 };
+    m.in += Number(p.amount ?? 0);
+    byMonth.set(k, m);
+  }
+  for (const p of supplierPayments ?? []) {
+    const k = (p.paid_at ?? "").slice(0, 7);
+    if (!k) continue;
+    const m = byMonth.get(k) ?? { in: 0, out: 0 };
+    m.out += Number(p.amount ?? 0);
+    byMonth.set(k, m);
+  }
+  const months = [...byMonth.keys()].sort();
+  const cashflow = months.map((m) => ({
+    m: new Date(m + "-01").toLocaleDateString(undefined, { month: "short" }),
+    inflow: byMonth.get(m)!.in,
+    outflow: byMonth.get(m)!.out,
+  }));
+
+  const fmt = (n: number) => `$${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k`;
 
   return (
     <div className="max-w-[1600px] mx-auto">
-      <ResourceView
+      <PageHeader
         eyebrow="Finance"
-        title="Financial Command"
-        sub="Purchase orders, revenue tracking, cash flow and executive financial analytics."
-        moduleName="finance"
-        rows={allRecords}
-        searchKeys={["po_number", "status"]}
-        formFields={isAuditor ? undefined : PURCHASE_FORM_FIELDS}
-        onSubmit={isAuditor ? undefined : async (formData, editingRow) => {
-          if (editingRow) await updateMutation.mutateAsync({ id: editingRow.id, data: formData });
-          else await createMutation.mutateAsync(formData);
-        }}
-        onDelete={isAuditor ? undefined : (row) => deleteMutation.mutateAsync(row.id)}
-        kpis={
-          <>
-            <Kpi
-              label="Revenue (Settled)"
-              value={`$${(totalRevenue / 1000).toFixed(0)}k`}
-              delta="+11.4%"
-              icon={TrendingUp}
-              tone="success"
-            />
-            <Kpi
-              label="Outstanding"
-              value={`$${(arOutstanding / 1000).toFixed(0)}k`}
-              icon={Receipt}
-              tone="warning"
-            />
-            <Kpi
-              label="AP Pending"
-              value={`$${(apOutstanding / 1000).toFixed(0)}k`}
-              icon={Landmark}
-              tone="info"
-            />
-            <Kpi
-              label="Cash Position"
-              value="$6.7M"
-              delta="+3.1%"
-              icon={PiggyBank}
-              tone="primary"
-            />
-          </>
-        }
-        columns={[
-          {
-            key: "po_number",
-            header: "Reference #",
-            render: (r) => <span className="font-mono text-xs font-medium">{r.po_number}</span>,
-          },
-          {
-            key: "_type",
-            header: "Type",
-            render: (r) => (
-              <span className="text-xs capitalize">{r._type === "purchase" ? "AP" : "AR"}</span>
-            ),
-          },
-          {
-            key: "total_amount",
-            header: "Amount",
-            render: (r) => (
-              <span className="font-mono text-xs">
-                ${Number(r.total_amount ?? 0).toLocaleString()}
-              </span>
-            ),
-          },
-          { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
-          {
-            key: "expected_date",
-            header: "Date",
-            hideOnMobile: true,
-            render: (r) => (r.expected_date ? new Date(r.expected_date).toLocaleDateString() : "—"),
-          },
-        ]}
+        title="Financial Overview"
+        sub="Live revenue, receivables, payables and cash flow from real invoices and payments."
       />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi
+          label="Total Revenue (lifetime)"
+          value={fmt(totalRevenue)}
+          icon={TrendingUp}
+          tone="success"
+        />
+        <Kpi
+          label="AR Outstanding"
+          value={fmt(arOutstanding)}
+          icon={Receipt}
+          tone="warning"
+        />
+        <Kpi
+          label="AP Outstanding"
+          value={fmt(apOutstanding)}
+          icon={Landmark}
+          tone="info"
+        />
+        <Kpi
+          label="Cash Position"
+          value={fmt(cashPosition)}
+          icon={PiggyBank}
+          tone={cashPosition >= 0 ? "primary" : "destructive"}
+        />
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-4">
+        <Kpi label="Invoices This Month" value={String(monthInvoices)} icon={FileText} tone="primary" />
+        <Kpi label="Supplier Payments Pending" value={String(pendingPayments)} icon={ArrowDownToLine} tone="warning" />
+        <Kpi label="Customer Payments Received" value={String(payments?.length ?? 0)} icon={TrendingUp} tone="success" />
+        <Kpi label="Supplier Payments Made" value={String(supplierPayments?.length ?? 0)} icon={Landmark} tone="info" />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Panel title="Cash Flow · Real Payments">
+          {cashflow.length === 0 ? (
+            <EmptyState title="No payments yet" sub="Cash flow appears once payments are recorded." />
+          ) : (
+            <div className="h-72">
+              <ResponsiveContainer>
+                <AreaChart data={cashflow}>
+                  <defs>
+                    <linearGradient id="fin-in" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="oklch(0.72 0.19 145)" stopOpacity={0.6} />
+                      <stop offset="100%" stopColor="oklch(0.72 0.19 145)" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="fin-out" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="oklch(0.62 0.23 25)" stopOpacity={0.5} />
+                      <stop offset="100%" stopColor="oklch(0.62 0.23 25)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="m" stroke="rgba(255,255,255,0.4)" fontSize={10} />
+                  <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "oklch(0.20 0.025 260)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 12,
+                      fontSize: 12,
+                    }}
+                  />
+                  <Area type="monotone" dataKey="inflow" stroke="oklch(0.72 0.19 145)" fill="url(#fin-in)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="outflow" stroke="oklch(0.62 0.23 25)" fill="url(#fin-out)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="Recent Customer Payments">
+          {(payments ?? []).length === 0 ? (
+            <EmptyState title="No customer payments yet" sub="Customer payments appear here." />
+          ) : (
+            <div className="divide-y divide-white/5 max-h-72 overflow-y-auto">
+              {(payments ?? []).slice(0, 8).map((p: any) => (
+                <div key={p.id} className="flex items-center justify-between py-2.5 text-sm">
+                  <div>
+                    <div className="font-medium">
+                      {p.customers?.business_name ?? p.customers?.name ?? "Customer"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground font-mono">
+                      {p.payment_number} · {p.paid_at ? new Date(p.paid_at).toLocaleDateString() : "—"}
+                    </div>
+                  </div>
+                  <div className="font-mono text-xs text-success">
+                    +${Number(p.amount ?? 0).toLocaleString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </div>
+
       <div className="mt-4">
-        <Panel title="Cash Flow · Last 12 Months">
-          <div className="h-72">
-            <ResponsiveContainer>
-              <AreaChart data={cashflow}>
-                <defs>
-                  <linearGradient id="fin-in" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="oklch(0.72 0.19 145)" stopOpacity={0.6} />
-                    <stop offset="100%" stopColor="oklch(0.72 0.19 145)" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="fin-out" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="oklch(0.62 0.23 25)" stopOpacity={0.5} />
-                    <stop offset="100%" stopColor="oklch(0.62 0.23 25)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="m" stroke="rgba(255,255,255,0.4)" fontSize={10} />
-                <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} />
-                <Tooltip
-                  contentStyle={{
-                    background: "oklch(0.20 0.025 260)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 12,
-                    fontSize: 12,
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="inflow"
-                  stroke="oklch(0.72 0.19 145)"
-                  fill="url(#fin-in)"
-                  strokeWidth={2}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="outflow"
-                  stroke="oklch(0.62 0.23 25)"
-                  fill="url(#fin-out)"
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+        <Panel title="Supplier Invoices Awaiting Payment">
+          {(supplierInvoices ?? []).length === 0 ? (
+            <EmptyState title="No supplier invoices" sub="Supplier invoices appear here once raised." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/5">
+                    {["Invoice #", "Supplier", "PO", "GST", "Total", "Status"].map((h) => (
+                      <th key={h} className="text-left text-[11px] uppercase tracking-wider text-muted-foreground py-2 px-2">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(supplierInvoices ?? []).slice(0, 8).map((i: any) => (
+                    <tr key={i.id} className="border-b border-white/5">
+                      <td className="py-2.5 px-2 font-mono text-xs">{i.invoice_number}</td>
+                      <td className="py-2.5 px-2">{i.suppliers?.name ?? "—"}</td>
+                      <td className="py-2.5 px-2 font-mono text-xs">{i.po_id?.slice(0, 8) ?? "—"}</td>
+                      <td className="py-2.5 px-2 font-mono text-xs">${Number(i.gst_amount ?? 0).toLocaleString()}</td>
+                      <td className="py-2.5 px-2 font-mono text-xs">${Number(i.total_amount ?? 0).toLocaleString()}</td>
+                      <td className="py-2.5 px-2">
+                        <StatusBadge status={i.status} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Panel>
       </div>
     </div>
