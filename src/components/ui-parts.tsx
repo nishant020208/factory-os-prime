@@ -119,6 +119,7 @@ export function StatusBadge({ status }: { status: string | null | undefined }) {
     down: "bg-destructive/15 text-destructive border-destructive/30",
     revoked: "bg-destructive/15 text-destructive border-destructive/30",
     accepted: "bg-success/15 text-success border-success/30",
+    inactive: "bg-destructive/15 text-destructive border-destructive/30",
   };
   return (
     <Badge

@@ -31,6 +31,20 @@ export const Route = createFileRoute("/_authenticated")({
     if (!rolesError && rolesData) {
       roles = rolesData.map((r) => r.role as AppRole);
     }
+    // Deactivated accounts (Company Admin set profiles.status = 'inactive')
+    // are blocked from the app entirely — not just hidden behind a button.
+    const { data: profileRow } = await supabase
+      .from("profiles")
+      .select("status")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    if (profileRow?.status === "inactive") {
+      await supabase.auth.signOut();
+      throw redirect({
+        to: "/auth",
+        search: { redirect: location.href, deactivated: "1" },
+      });
+    }
     const role = primaryRole(roles);
 
     if (

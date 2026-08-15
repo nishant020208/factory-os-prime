@@ -102,6 +102,7 @@ import { Route as AuthenticatedTaxesRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
 import { Route as AuthenticatedTrainingRouteImport } from './routes/_authenticated/training'
 import { Route as AuthenticatedTransfersRouteImport } from './routes/_authenticated/transfers'
+import { Route as AuthenticatedUsersRouteImport } from './routes/_authenticated/users'
 import { Route as AuthenticatedVendorComparisonRouteImport } from './routes/_authenticated/vendor-comparison'
 import { Route as AuthenticatedWarehouseRouteImport } from './routes/_authenticated/warehouse'
 import { Route as AuthenticatedWhitelistRouteImport } from './routes/_authenticated/whitelist'
@@ -613,6 +614,11 @@ const AuthenticatedTransfersRoute = AuthenticatedTransfersRouteImport.update({
   path: '/transfers',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedUsersRoute = AuthenticatedUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedVendorComparisonRoute =
   AuthenticatedVendorComparisonRouteImport.update({
     id: '/vendor-comparison',
@@ -782,6 +788,7 @@ export interface FileRoutesByFullPath {
   '/team': typeof AuthenticatedTeamRoute
   '/training': typeof AuthenticatedTrainingRoute
   '/transfers': typeof AuthenticatedTransfersRoute
+  '/users': typeof AuthenticatedUsersRoute
   '/vendor-comparison': typeof AuthenticatedVendorComparisonRoute
   '/warehouse': typeof AuthenticatedWarehouseRoute
   '/whitelist': typeof AuthenticatedWhitelistRoute
@@ -889,6 +896,7 @@ export interface FileRoutesByTo {
   '/team': typeof AuthenticatedTeamRoute
   '/training': typeof AuthenticatedTrainingRoute
   '/transfers': typeof AuthenticatedTransfersRoute
+  '/users': typeof AuthenticatedUsersRoute
   '/vendor-comparison': typeof AuthenticatedVendorComparisonRoute
   '/warehouse': typeof AuthenticatedWarehouseRoute
   '/whitelist': typeof AuthenticatedWhitelistRoute
@@ -998,6 +1006,7 @@ export interface FileRoutesById {
   '/_authenticated/team': typeof AuthenticatedTeamRoute
   '/_authenticated/training': typeof AuthenticatedTrainingRoute
   '/_authenticated/transfers': typeof AuthenticatedTransfersRoute
+  '/_authenticated/users': typeof AuthenticatedUsersRoute
   '/_authenticated/vendor-comparison': typeof AuthenticatedVendorComparisonRoute
   '/_authenticated/warehouse': typeof AuthenticatedWarehouseRoute
   '/_authenticated/whitelist': typeof AuthenticatedWhitelistRoute
@@ -1107,6 +1116,7 @@ export interface FileRouteTypes {
     | '/team'
     | '/training'
     | '/transfers'
+    | '/users'
     | '/vendor-comparison'
     | '/warehouse'
     | '/whitelist'
@@ -1214,6 +1224,7 @@ export interface FileRouteTypes {
     | '/team'
     | '/training'
     | '/transfers'
+    | '/users'
     | '/vendor-comparison'
     | '/warehouse'
     | '/whitelist'
@@ -1322,6 +1333,7 @@ export interface FileRouteTypes {
     | '/_authenticated/team'
     | '/_authenticated/training'
     | '/_authenticated/transfers'
+    | '/_authenticated/users'
     | '/_authenticated/vendor-comparison'
     | '/_authenticated/warehouse'
     | '/_authenticated/whitelist'
@@ -1997,6 +2009,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTransfersRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/users': {
+      id: '/_authenticated/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof AuthenticatedUsersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/vendor-comparison': {
       id: '/_authenticated/vendor-comparison'
       path: '/vendor-comparison'
@@ -2181,6 +2200,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
   AuthenticatedTrainingRoute: typeof AuthenticatedTrainingRoute
   AuthenticatedTransfersRoute: typeof AuthenticatedTransfersRoute
+  AuthenticatedUsersRoute: typeof AuthenticatedUsersRoute
   AuthenticatedVendorComparisonRoute: typeof AuthenticatedVendorComparisonRoute
   AuthenticatedWarehouseRoute: typeof AuthenticatedWarehouseRoute
   AuthenticatedWhitelistRoute: typeof AuthenticatedWhitelistRoute
@@ -2286,6 +2306,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTeamRoute: AuthenticatedTeamRoute,
   AuthenticatedTrainingRoute: AuthenticatedTrainingRoute,
   AuthenticatedTransfersRoute: AuthenticatedTransfersRoute,
+  AuthenticatedUsersRoute: AuthenticatedUsersRoute,
   AuthenticatedVendorComparisonRoute: AuthenticatedVendorComparisonRoute,
   AuthenticatedWarehouseRoute: AuthenticatedWarehouseRoute,
   AuthenticatedWhitelistRoute: AuthenticatedWhitelistRoute,

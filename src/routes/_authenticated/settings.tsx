@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   SaveAll,
@@ -42,7 +43,10 @@ import {
 } from "@/lib/notifications";
 import { applyApprovedProfileChange, profileFieldLabel } from "@/lib/profile-change";
 
+const settingsSearch = z.object({ tab: z.string().optional() });
+
 export const Route = createFileRoute("/_authenticated/settings")({
+  validateSearch: (s) => settingsSearch.parse(s),
   head: () => ({
     meta: [
       { title: "Profile — FactoryOS AI" },
@@ -265,7 +269,11 @@ function SettingsPage() {
   const queryClient = useQueryClient();
   const { profile, user, roles, companyId } = useAuth();
   const { locale, setLocale, t } = useI18n();
-  const [tab, setTab] = useState("profile");
+  // Allow deep-linking to a tab (e.g. /settings?tab=change-requests from nav)
+  const search = useSearch({ from: "/_authenticated/settings" });
+  const [tab, setTab] = useState<string>(
+    search.tab === "change-requests" ? "change-requests" : "profile",
+  );
 
   const role = (roles[0] ?? "production_operator") as AppRole;
   const isRoot = roles.includes("root_super_admin");

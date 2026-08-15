@@ -128,8 +128,14 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
       label: "People",
       items: [
         { to: "/employees", label: "Employees", icon: Users },
-        { to: "/roles", label: "Roles", icon: Shield },
+        { to: "/users", label: "Users & Roles", icon: Shield, badge: "New" },
         { to: "/whitelist", label: "Whitelist", icon: FileCheck2 },
+        {
+          to: "/settings?tab=change-requests",
+          label: "Pending Profile Requests",
+          icon: FileCheck2,
+          badge: "!",
+        },
       ],
     },
     {

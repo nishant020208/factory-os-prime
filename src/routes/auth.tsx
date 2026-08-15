@@ -28,7 +28,11 @@ import { ROLES, ROLE_MAP, type AppRole } from "@/lib/roles";
 import { notifyCompanyRegistrationRequest, notifyCustomerAccessRequest } from "@/lib/notifications";
 import { recordAccessLog } from "@/lib/access-log";
 
-const searchSchema = z.object({ role: z.string().optional(), redirect: z.string().optional() });
+const searchSchema = z.object({
+  role: z.string().optional(),
+  redirect: z.string().optional(),
+  deactivated: z.string().optional(),
+});
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s) => searchSchema.parse(s),
@@ -247,7 +251,7 @@ function GradientOrbs() {
 /*  AUTH PAGE — MAIN                                    */
 /* ───────────────────────────────────────────────────── */
 function AuthPage() {
-  const { role, redirect } = useSearch({ from: "/auth" });
+  const { role, redirect, deactivated } = useSearch({ from: "/auth" });
   const navigate = useNavigate();
   const selected = role && role in ROLE_MAP ? ROLE_MAP[role as AppRole] : null;
   const [showRegisterCompany, setShowRegisterCompany] = useState(false);
@@ -292,6 +296,12 @@ function AuthPage() {
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pb-16">
+        {deactivated && (
+          <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            Your account has been deactivated by your Company Admin. Contact them to
+            restore access.
+          </div>
+        )}
         <AnimatePresence mode="wait">
           {showRegisterCompany ? (
             <RegisterCompany key="register" onBack={() => setShowRegisterCompany(false)} />

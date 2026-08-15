@@ -4673,9 +4673,12 @@ export type Database = {
       is_hr_manager: { Args: never; Returns: boolean }
       is_main_admin: { Args: never; Returns: boolean }
       is_maintenance_engineer: { Args: never; Returns: boolean }
+      is_plant_manager: { Args: never; Returns: boolean }
+      is_production_manager: { Args: never; Returns: boolean }
       is_production_operator: { Args: never; Returns: boolean }
       is_root_admin: { Args: { _user_id?: string }; Returns: boolean }
       is_supplier_portal: { Args: never; Returns: boolean }
+      is_tenant_admin: { Args: never; Returns: boolean }
       public_scan_qr: {
         Args: { p_token: string }
         Returns: {

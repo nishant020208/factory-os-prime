@@ -30,7 +30,10 @@ const DEPT_FORM_FIELDS: FormField[] = [
 
 function DepartmentsPage() {
   const queryClient = useQueryClient();
-  const { companyId } = useAuth();
+  const { companyId, roles } = useAuth();
+  // Department configuration (add/edit/delete) is Company Admin / Plant
+  // Admin only — other roles read the same departments for their work.
+  const canManage = roles.includes("company_admin") || roles.includes("plant_admin");
 
   const { data } = useQuery({
     queryKey: ["departments", companyId],
@@ -96,12 +99,12 @@ function DepartmentsPage() {
       moduleName="departments"
       rows={data}
       searchKeys={["name", "code"]}
-      formFields={DEPT_FORM_FIELDS}
-      onSubmit={async (formData, editingRow) => {
+      formFields={canManage ? DEPT_FORM_FIELDS : undefined}
+      onSubmit={canManage ? async (formData, editingRow) => {
         if (editingRow) await updateMutation.mutateAsync({ id: editingRow.id, data: formData });
         else await createMutation.mutateAsync(formData);
-      }}
-      onDelete={(row) => deleteMutation.mutateAsync(row.id)}
+      } : undefined}
+      onDelete={canManage ? (row) => deleteMutation.mutateAsync(row.id) : undefined}
       kpis={
         <>
           <Kpi

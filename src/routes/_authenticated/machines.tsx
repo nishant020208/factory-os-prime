@@ -72,6 +72,12 @@ function MachinesPage() {
   const queryClient = useQueryClient();
   const { companyId, roles, user } = useAuth();
   const isAuditor = roles.includes("auditor");
+  // Roster management (add/edit/retire) is Company Admin / Plant Admin only.
+  // Maintenance Engineer keeps live status writes (Log Service) but cannot
+  // add or retire machines; every other role is read-only.
+  const isTenantAdmin = roles.includes("company_admin") || roles.includes("plant_admin");
+  const isMaintenance = roles.includes("maintenance_engineer");
+  const canManageRoster = isTenantAdmin;
 
   const { data } = useQuery({
     queryKey: ["machines"],
@@ -188,12 +194,12 @@ function MachinesPage() {
       moduleName="machines"
       rows={data}
       searchKeys={["name", "code", "type", "status"]}
-      formFields={isAuditor ? undefined : MACHINE_FORM_FIELDS}
-      onSubmit={isAuditor ? undefined : async (formData, editingRow) => {
+      formFields={canManageRoster ? MACHINE_FORM_FIELDS : undefined}
+      onSubmit={canManageRoster ? async (formData, editingRow) => {
         if (editingRow) await updateMutation.mutateAsync({ id: editingRow.id, data: formData });
         else await createMutation.mutateAsync(formData);
-      }}
-      onDelete={isAuditor ? undefined : (row) => deleteMutation.mutateAsync(row.id)}
+      } : undefined}
+      onDelete={canManageRoster ? (row) => deleteMutation.mutateAsync(row.id) : undefined}
       kpis={
         <>
           <Kpi label="Total Machines" value={String(data?.length ?? 0)} icon={Cog} tone="primary" />
@@ -264,7 +270,7 @@ function MachinesPage() {
           header: "Actions",
           hideOnMobile: true,
           render: (r) =>
-            !isAuditor ? (
+            isMaintenance || isTenantAdmin ? (
               <Button
                 variant="ghost"
                 size="sm"
