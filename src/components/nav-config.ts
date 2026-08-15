@@ -91,6 +91,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
       label: "System",
       items: [
         { to: "/platform/audit", label: "Audit Logs", icon: ScrollText },
+        { to: "/platform/security", label: "Security Center", icon: ShieldCheck, badge: "New" },
         { to: "/platform/reports", label: "Reports", icon: ClipboardList },
         { to: "/platform/settings", label: "Platform Settings", icon: Settings },
         { to: "/platform/profile", label: "Profile", icon: User },

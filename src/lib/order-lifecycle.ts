@@ -54,13 +54,21 @@ export async function createNotification({
   action,
 }: NotificationInput) {
   try {
-    await supabase.from("notifications").insert({
-      company_id: companyId,
-      user_id: userId || null,
-      title,
-      body,
-      severity,
-    });
+    // Never insert an untargeted (broadcast) notification row. A row with
+    // no to_role / no to_user is visible company-wide — the integration
+    // sweep flagged the legacy triggers that did this. This path is always
+    // called with userId === undefined from the order lifecycle; the real,
+    // correctly-targeted notifications fire via fireNotification() helpers
+    // (notifyOrderApproved / notifyOrderRejected).
+    if (userId) {
+      await supabase.from("notifications").insert({
+        company_id: companyId,
+        user_id: userId,
+        title,
+        body,
+        severity,
+      });
+    }
 
     // Only log to audit if action is provided (Root Admin passes null)
     if (action) {

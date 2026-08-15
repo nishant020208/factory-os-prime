@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       access_logs: {
@@ -4646,15 +4621,6 @@ export type Database = {
       current_company_id: { Args: never; Returns: string }
       current_supplier_company: { Args: never; Returns: string }
       current_supplier_id: { Args: never; Returns: string }
-      emit_notification: {
-        Args: {
-          _body: string
-          _company_id: string
-          _severity: string
-          _title: string
-        }
-        Returns: undefined
-      }
       get_active_companies: { Args: never; Returns: Json }
       get_platform_stats: { Args: never; Returns: Json }
       get_root_user_id: { Args: never; Returns: string }
@@ -4860,9 +4826,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: [

@@ -280,7 +280,7 @@ const rootBuilders: Builder[] = [
       id: "root-system-health",
       module: "platform",
       title: "System Health & Audit Summary",
-      sub: "Cross-tenant write activity (last 30 days) and login health across the platform.",
+      sub: "Platform-scoped audit events (company approvals, admin whitelisting, root actions) and login health across the platform.",
       columns: [
         { key: "entity", label: "Module / Entity" },
         { key: "actions", label: "Write Actions", align: "right" },
