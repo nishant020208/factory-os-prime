@@ -71,8 +71,19 @@ ok("SELECT inventory → blocked/empty", (inv.data?.length ?? 0) === 0, inv.erro
 const wo = await supabase.from("work_orders").select("id").limit(10);
 ok("SELECT work_orders → blocked/empty", (wo.data?.length ?? 0) === 0, wo.error?.message ?? `${wo.data?.length} rows`);
 
-const prod = await supabase.from("production_orders").select("id").limit(10);
-ok("SELECT production_orders → blocked/empty", (prod.data?.length ?? 0) === 0, prod.error?.message ?? `${prod.data?.length} rows`);
+const prod = await supabase.from("production_orders").select("id, sales_order_id");
+// production_orders_select_iso intentionally exposes only the customer's OWN
+// production orders (via their sales orders) for order tracking — a real
+// production order created for this customer's SO is visible, anything else
+// (other customers / company-wide rows) must not be.
+const ownSales = (await admin.from("sales_orders").select("id").eq("customer_id", customerId)).data ?? [];
+const ownSalesIds = ownSales.map((s) => s.id);
+const leaked = (prod.data ?? []).filter((r) => !ownSalesIds.includes(r.sales_order_id));
+ok(
+  "SELECT production_orders → only own sales-order rows, never others",
+  leaked.length === 0,
+  leaked.length ? `${leaked.length} leaked row(s)` : `${prod.data?.length ?? 0} rows, ${leaked.length} outside own scope`,
+);
 
 const machines = await supabase.from("machines").select("id").limit(10);
 ok("SELECT machines → blocked/empty", (machines.data?.length ?? 0) === 0, machines.error?.message ?? `${machines.data?.length} rows`);

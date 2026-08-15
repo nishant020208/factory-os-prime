@@ -82,13 +82,15 @@ export function Panel({
   title,
   right,
   children,
+  className = "",
 }: {
   title: string;
   right?: ReactNode;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <Card className="glass border-white/5 shadow-card">
+    <Card className={`glass border-white/5 shadow-card ${className}`}>
       <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {right}

@@ -965,6 +965,76 @@ export type Database = {
           },
         ]
       }
+      daily_reports: {
+        Row: {
+          attendance_summary: string | null
+          company_id: string
+          created_at: string
+          downtime_minutes: number
+          id: string
+          issues: string | null
+          notes: string | null
+          plant_id: string | null
+          report_date: string
+          status: string
+          submitted_by: string | null
+          units_completed: number
+          updated_at: string
+        }
+        Insert: {
+          attendance_summary?: string | null
+          company_id: string
+          created_at?: string
+          downtime_minutes?: number
+          id?: string
+          issues?: string | null
+          notes?: string | null
+          plant_id?: string | null
+          report_date?: string
+          status?: string
+          submitted_by?: string | null
+          units_completed?: number
+          updated_at?: string
+        }
+        Update: {
+          attendance_summary?: string | null
+          company_id?: string
+          created_at?: string
+          downtime_minutes?: number
+          id?: string
+          issues?: string | null
+          notes?: string | null
+          plant_id?: string | null
+          report_date?: string
+          status?: string
+          submitted_by?: string | null
+          units_completed?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_reports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_reports_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_reports_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dashboard_notes: {
         Row: {
           company_id: string
@@ -2617,6 +2687,7 @@ export type Database = {
           order_number: string
           priority: string | null
           quantity: number | null
+          sales_order_id: string | null
           start_date: string | null
           status: string
         }
@@ -2631,6 +2702,7 @@ export type Database = {
           order_number: string
           priority?: string | null
           quantity?: number | null
+          sales_order_id?: string | null
           start_date?: string | null
           status?: string
         }
@@ -2645,6 +2717,7 @@ export type Database = {
           order_number?: string
           priority?: string | null
           quantity?: number | null
+          sales_order_id?: string | null
           start_date?: string | null
           status?: string
         }
@@ -2668,6 +2741,13 @@ export type Database = {
             columns: ["material_id"]
             isOneToOne: false
             referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_planning_sales_order_id_fkey"
+            columns: ["sales_order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
             referencedColumns: ["id"]
           },
         ]

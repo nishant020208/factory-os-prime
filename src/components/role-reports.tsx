@@ -542,21 +542,25 @@ const plantBuilders: Builder[] = [
   async (ctx) => {
     const depts = [...ctx.lookups.departments.values()];
     const wos = await fetchAll("work_orders");
-    const pos = await fetchAll("production_orders");
-    const rows = depts.map((d) => ({
-      department: d.name,
-      work_orders: wos.filter((w) => w.department_id === d.id).length,
-      production_orders: pos.filter((p) => p.department_id === d.id).length,
-    }));
+    const rows = depts.map((d) => {
+      const deptWos = wos.filter((w) => w.department_id === d.id);
+      return {
+        department: d.name,
+        work_orders: deptWos.length,
+        completed: deptWos.filter((w) => w.status === "completed").length,
+        in_progress: deptWos.filter((w) => w.status === "in_progress").length,
+      };
+    });
     return {
       id: "plant-dept-output",
       module: "production",
       title: "Department Output",
-      sub: "Work orders and production orders per department (Carpentry / Upholstery / Finishing / Assembly).",
+      sub: "Work orders per department (Carpentry / Upholstery / Finishing / Assembly).",
       columns: [
         { key: "department", label: "Department" },
         { key: "work_orders", label: "Work Orders", align: "right" },
-        { key: "production_orders", label: "Production Orders", align: "right" },
+        { key: "in_progress", label: "In Progress", align: "right" },
+        { key: "completed", label: "Completed", align: "right" },
       ],
       rows,
       fileName: "plant-department-output",
@@ -565,6 +569,40 @@ const plantBuilders: Builder[] = [
         { label: "Total Work Orders", value: num(wos.length), tone: "info" },
       ],
       note: "Work orders are created when production starts — zero counts mean no orders have started yet.",
+    };
+  },
+  async (ctx) => {
+    const reports = await fetchAll("daily_reports");
+    const rows = reports.map((r) => ({
+      report_date: r.report_date,
+      submitted_by: ctx.lookups.profiles.get(r.submitted_by)?.full_name ?? "—",
+      units_completed: r.units_completed,
+      downtime_minutes: r.downtime_minutes ?? 0,
+      attendance_summary: r.attendance_summary ?? "—",
+      issues: r.issues ?? "—",
+      status: r.status ?? "submitted",
+    }));
+    return {
+      id: "plant-daily-report-history",
+      module: "plant",
+      title: "Daily Report History",
+      sub: "End-of-day reports submitted by the Plant Manager, acknowledged by Company Admin.",
+      columns: [
+        { key: "report_date", label: "Date" },
+        { key: "submitted_by", label: "Submitted By" },
+        { key: "units_completed", label: "Units", align: "right" },
+        { key: "downtime_minutes", label: "Downtime (min)", align: "right" },
+        { key: "attendance_summary", label: "Attendance" },
+        { key: "issues", label: "Issues" },
+        { key: "status", label: "Status" },
+      ],
+      rows,
+      fileName: "plant-daily-report-history",
+      summary: [
+        { label: "Reports", value: num(rows.length), tone: "primary" },
+        { label: "Units Completed", value: num(sumBy(rows, "units_completed")), tone: "info" },
+        { label: "Total Downtime (min)", value: num(sumBy(rows, "downtime_minutes")), tone: "warning" },
+      ],
     };
   },
   async (ctx) => {

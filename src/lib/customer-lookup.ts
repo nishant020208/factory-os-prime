@@ -37,3 +37,32 @@ export async function getCustomerUserId(customerId: string | null): Promise<stri
     return null;
   }
 }
+
+/**
+ * Resolve a specific user id holding a role within a company.
+ * Used for to_user targeting (never to_role broadcast) — e.g. the single
+ * Company Admin who should receive Daily Reports, or the Procurement
+ * Manager who should be told about a stock shortage.
+ *
+ * Returns null if no holder exists (caller may fall back to role-wide
+ * targeting for internal roles, which is safe and never a cross-tenant
+ * broadcast).
+ */
+export async function getRoleUserId(
+  companyId: string | null,
+  role: string,
+): Promise<string | null> {
+  if (!companyId) return null;
+  try {
+    const { data } = await supabase
+      .from("user_roles")
+      .select("user_id")
+      .eq("company_id", companyId)
+      .eq("role", role as never)
+      .limit(1)
+      .maybeSingle();
+    return data?.user_id ?? null;
+  } catch {
+    return null;
+  }
+}

@@ -13,6 +13,7 @@
  * If a role isn't listed as a receiver for a trigger, it must not receive it.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { getRoleUserId } from "@/lib/customer-lookup";
 
 export type NotificationSeverity = "info" | "warning" | "success" | "error";
 
@@ -1290,6 +1291,47 @@ export async function notifyAdvancePaymentQRGenerated(
     `An advance payment of $${amount.toLocaleString()} is required for order ${orderNumber}. Scan the QR code to pay.`,
     "info",
     "sales_orders",
+    null,
+  );
+}
+
+/** Plant Manager submits a Daily Report → the specific Company Admin */
+export async function notifyDailyReportSubmitted(
+  companyId: string,
+  reportDate: string,
+  submittedByName: string,
+  reportId: string,
+) {
+  const adminUserId = await getRoleUserId(companyId, "company_admin");
+  const [ntRole, ntUser] = resolveTarget("company_admin", adminUserId);
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
+    "📋 Daily Report Submitted",
+    `${submittedByName} submitted the ${reportDate} plant report. Review units, attendance and downtime.`,
+    "info",
+    "daily_reports",
+    reportId,
+  );
+}
+
+/** Production Manager triggers the procurement branch → the specific Procurement Manager */
+export async function notifyProcurementTriggered(
+  companyId: string,
+  orderNumber: string,
+  materialName: string,
+) {
+  const procurementUserId = await getRoleUserId(companyId, "procurement_manager");
+  const [ntRole, ntUser] = resolveTarget("procurement_manager", procurementUserId);
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
+    "📦 Procurement Required",
+    `Stock insufficient for ${materialName} (order ${orderNumber}). Create a purchase requisition.`,
+    "warning",
+    "inventory",
     null,
   );
 }
