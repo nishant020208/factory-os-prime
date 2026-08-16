@@ -5,6 +5,7 @@ import { HeartPulse, Target, Phone, Mail, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge } from "@/components/ui-parts";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoneyK } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/crm")({
   head: () => ({
@@ -91,7 +92,7 @@ function CRMPage() {
         <Kpi label="Active Leads" value={String(LEADS.length)} icon={Target} tone="info" />
         <Kpi
           label="Pipeline Value"
-          value={`$${(pipelineValue / 1000).toFixed(0)}k`}
+          value={fmtMoneyK(pipelineValue)}
           icon={TrendingUp}
           tone="success"
         />

@@ -18,6 +18,7 @@ import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -151,7 +152,7 @@ function CustomerInvoicesPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
         <Kpi
           label="Total Billed"
-          value={`$${(total / 1000).toFixed(1)}k`}
+          value={fmtMoneyK(total)}
           icon={Receipt}
           tone="primary"
         />

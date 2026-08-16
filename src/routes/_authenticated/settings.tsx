@@ -20,7 +20,7 @@ import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   Select,
   SelectContent,
@@ -42,6 +42,8 @@ import {
   notifyChangeRequestToRoot,
 } from "@/lib/notifications";
 import { applyApprovedProfileChange, profileFieldLabel } from "@/lib/profile-change";
+import { usePreferences, type TimeFormat, type NotificationsPref } from "@/lib/preferences";
+import { AvatarUpload } from "@/components/avatar-upload";
 
 const settingsSearch = z.object({ tab: z.string().optional() });
 
@@ -269,6 +271,7 @@ function SettingsPage() {
   const queryClient = useQueryClient();
   const { profile, user, roles, companyId } = useAuth();
   const { locale, setLocale, t } = useI18n();
+  const { prefs, update: updatePrefs } = usePreferences();
   // Allow deep-linking to a tab (e.g. /settings?tab=change-requests from nav)
   const search = useSearch({ from: "/_authenticated/settings" });
   const [tab, setTab] = useState<string>(
@@ -524,6 +527,18 @@ function SettingsPage() {
       const req = changeRequests?.find((r: any) => r.id === requestId);
       if (!req) return;
 
+      // Self-approval is blocked at the DB level (pcr_update_approver requires
+      // requested_by <> auth.uid()) — reject it explicitly in the UI too, so the
+      // user never sees a silent no-op. Their own request already escalated to
+      // Root Super Admin at submit time.
+      if (req.requested_by === user?.id) {
+        toast.error(
+          "You cannot approve your own change request — it was escalated to " +
+            (isRoot ? "the platform level" : "Root Super Admin"),
+        );
+        return;
+      }
+
       if (action === "approved") {
         const applyError = await applyApprovedProfileChange(req);
         if (applyError) {
@@ -532,7 +547,7 @@ function SettingsPage() {
         }
       }
 
-      const { error } = await supabase
+      const { data: updatedRows, error } = await supabase
         .from("profile_change_requests")
         .update({
           status: action,
@@ -540,8 +555,15 @@ function SettingsPage() {
           reviewed_at: new Date().toISOString(),
           rejection_reason: action === "rejected" ? (rejectionInput[requestId] ?? "Not approved by Company Admin") : null,
         })
-        .eq("id", requestId);
+        .eq("id", requestId)
+        .select("id");
       if (error) throw error;
+      // Row-count check: if the RLS/guard filtered the update to 0 rows the
+      // request did NOT change — surface it instead of faking success.
+      if (!updatedRows || updatedRows.length === 0) {
+        toast.error("This request could not be updated — you may not have permission to review it.");
+        return;
+      }
 
       const label = profileFieldLabel(req.field_name);
       if (action === "approved") {
@@ -581,12 +603,12 @@ function SettingsPage() {
     supplierRow?.contact_email ||
     profile?.email ||
     "";
-  const initials = currentName
-    .split(" ")
-    .map((w: string) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  // Own requests are never approvable by their requester — they escalated to
+  // the approver above (Root for Company Admin, Company Admin otherwise).
+  const approvableRequests = (changeRequests ?? []).filter(
+    (r: any) => r.requested_by !== user?.id,
+  );
+  const pendingApprovals = approvableRequests.filter((r: any) => r.status === "pending");
 
   const renderField = (f: FieldDef, mode: "self" | "gated") => {
     const pending = pendingByField[f.key];
@@ -594,6 +616,23 @@ function SettingsPage() {
     const isPending = !!pending;
 
     const input = (() => {
+      // Profile photo is self-editable and uploaded (drag-drop + click) rather
+      // than typed as a URL — Bug 3 fix, works for every role.
+      if (f.key === "profiles.avatar_url" && mode === "self" && user) {
+        return (
+          <AvatarUpload
+            userId={user.id}
+            currentUrl={profile?.avatar_url ?? null}
+            onSaved={(url) => {
+              setValues((s) => ({ ...s, [f.key]: url ?? "" }));
+              setBaseValues((s) => ({ ...s, [f.key]: url ?? "" }));
+              queryClient.invalidateQueries({ queryKey: ["profile"] });
+              queryClient.invalidateQueries({ queryKey: ["auth-state"] });
+              queryClient.invalidateQueries({ queryKey: ["change-requests"] });
+            }}
+          />
+        );
+      }
       if (isPending) {
         return (
           <Input value={pending.new_value ?? val} disabled className="h-10 opacity-60" />
@@ -720,9 +759,9 @@ function SettingsPage() {
             <TabsTrigger value="change-requests">
               <Shield className="h-4 w-4 mr-1.5" />
               {isRoot ? "Pending Requests (Root)" : "Change Requests"}
-              {(changeRequests?.filter((r: any) => r.status === "pending").length ?? 0) > 0 && (
+              {pendingApprovals.length > 0 && (
                 <span className="ml-1.5 h-4 w-4 rounded-full bg-amber-500 text-[10px] font-medium text-white flex items-center justify-center">
-                  {changeRequests?.filter((r: any) => r.status === "pending").length}
+                  {pendingApprovals.length}
                 </span>
               )}
             </TabsTrigger>
@@ -733,11 +772,13 @@ function SettingsPage() {
         <TabsContent value="profile">
           <Panel title="Personal Information">
             <div className="flex items-center gap-4 mb-6">
-              <Avatar className="h-16 w-16">
-                <AvatarFallback className="bg-primary/15 text-primary text-lg">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                name={currentName}
+                email={currentEmail}
+                url={profile?.avatar_url ?? null}
+                className="h-16 w-16"
+                fallbackClassName="bg-primary/15 text-primary text-lg"
+              />
               <div className="min-w-0">
                 <div className="font-medium truncate">{currentName}</div>
                 <div className="text-xs text-muted-foreground truncate">{currentEmail}</div>
@@ -828,13 +869,24 @@ function SettingsPage() {
           )}
         </TabsContent>
 
-        {/* ── Preferences Tab ── */}
+        {/* ── Preferences Tab ──
+             Bug 2 fix: these selects are bound to the persisted per-user
+             preferences (profiles.preferences jsonb + localStorage) and applied
+             app-wide on change — language re-renders shared UI labels via the
+             i18n provider, theme restyles the whole app via the theme provider,
+             and the time format flows into every safeDate() timestamp. */}
         <TabsContent value="preferences">
           <Panel title="Preferences">
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Notifications</Label>
-                <Select defaultValue="all">
+                <Select
+                  value={prefs.notifications}
+                  onValueChange={(v) => {
+                    void updatePrefs({ notifications: v as NotificationsPref });
+                    toast.success("Notification preference saved");
+                  }}
+                >
                   <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
@@ -847,36 +899,49 @@ function SettingsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Theme</Label>
-                <Select defaultValue="system">
+                <Select
+                  value={prefs.theme}
+                  onValueChange={(v) => {
+                    void updatePrefs({ theme: v as "dark" | "light" | "aesthetic" });
+                    toast.success("Theme updated app-wide");
+                  }}
+                >
                   <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="system">System</SelectItem>
                     <SelectItem value="dark">Dark</SelectItem>
                     <SelectItem value="light">Light</SelectItem>
+                    <SelectItem value="aesthetic">Aesthetic</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Time Format</Label>
-                <Select defaultValue="12h">
+                <Select
+                  value={prefs.timeFormat}
+                  onValueChange={(v) => {
+                    void updatePrefs({ timeFormat: v as TimeFormat });
+                    toast.success("Time format applied to all timestamps");
+                  }}
+                >
                   <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="12h">12-hour</SelectItem>
                     <SelectItem value="24h">24-hour</SelectItem>
+                    <SelectItem value="auto">Browser default</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">{t("Language")}</Label>
                 <Select
-                  value={locale}
+                  value={prefs.locale}
                   onValueChange={(v) => {
-                    setLocale(v as Locale);
-                    toast.success("Language updated");
+                    void updatePrefs({ locale: v as Locale });
+                    toast.success("Language updated — shared labels re-render app-wide");
                   }}
                 >
                   <SelectTrigger className="h-10">
@@ -936,7 +1001,7 @@ function SettingsPage() {
         {/* ── Change Requests Tab (Company Admin / Root) ── */}
         <TabsContent value="change-requests">
           <Panel title={isRoot ? "Pending Profile Requests — Root Review" : "Pending Profile Requests"}>
-            {(!changeRequests || changeRequests.length === 0) && (
+            {approvableRequests.length === 0 && (
               <div className="text-sm text-muted-foreground py-8 text-center">
                 {isRoot
                   ? "No pending requests. When a Company Admin requests a profile change, it appears here."
@@ -944,7 +1009,7 @@ function SettingsPage() {
               </div>
             )}
             <div className="divide-y divide-white/5">
-              {(changeRequests ?? []).map((req: any) => (
+              {approvableRequests.map((req: any) => (
                 <div key={req.id} className="py-3 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 text-sm flex-wrap">

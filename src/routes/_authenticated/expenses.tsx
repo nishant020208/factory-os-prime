@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -132,8 +133,8 @@ function ExpensesPage() {
         }
       />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Total Expenses" value={`$${(total / 1000).toFixed(1)}k`} icon={DollarSign} tone="primary" />
-        <Kpi label="This Month" value={`$${(monthTotal / 1000).toFixed(1)}k`} icon={PiggyBank} tone="info" />
+        <Kpi label="Total Expenses" value={fmtMoneyK(total)} icon={DollarSign} tone="primary" />
+        <Kpi label="This Month" value={fmtMoneyK(monthTotal)} icon={PiggyBank} tone="info" />
         <Kpi label="Entries" value={String(expenses?.length ?? 0)} icon={FileText} tone="success" />
         <Kpi label="Categories" value={String(new Set((expenses ?? []).map((e: any) => e.category)).size)} icon={DollarSign} tone="warning" />
       </div>

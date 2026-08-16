@@ -33,7 +33,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -173,21 +173,17 @@ function FactorySidebar() {
 
 function UserBadge({ collapsed }: { collapsed: boolean }) {
   const { profile, roles } = useAuth();
-  const initials = (profile?.full_name ?? profile?.email ?? "?")
-    .split(/[.\s@]/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase())
-    .join("");
   const role = primaryRole(roles);
   const roleLabel = role ? ROLE_MAP[role]?.label : "User";
   return (
     <div className="flex items-center gap-2 p-2">
-      <Avatar className="h-8 w-8">
-        <AvatarFallback className="text-xs bg-primary/20 text-primary">
-          {initials || "U"}
-        </AvatarFallback>
-      </Avatar>
+      <UserAvatar
+        name={profile?.full_name}
+        email={profile?.email}
+        url={profile?.avatar_url}
+        className="h-8 w-8"
+        fallbackClassName="text-xs bg-primary/20 text-primary"
+      />
       {!collapsed && (
         <div className="min-w-0 flex-1">
           <div className="text-xs font-medium truncate">
@@ -373,11 +369,13 @@ function TopBar() {
                 type="button"
                 className="flex items-center gap-1 sm:gap-2 hover:bg-card rounded-lg px-1 sm:px-2 h-9"
               >
-                <Avatar className="h-7 w-7">
-                  <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                    {(profile?.full_name ?? profile?.email ?? "U").slice(0, 1).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  name={profile?.full_name}
+                  email={profile?.email}
+                  url={profile?.avatar_url}
+                  className="h-7 w-7"
+                  fallbackClassName="text-xs bg-primary/20 text-primary"
+                />
                 <ChevronDown className="hidden sm:block h-3.5 w-3.5 text-muted-foreground" />
               </button>
             </DropdownMenuTrigger>

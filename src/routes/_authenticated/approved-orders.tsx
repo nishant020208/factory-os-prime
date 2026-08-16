@@ -28,6 +28,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { notifyAdvancePaymentQRGenerated } from "@/lib/notifications";
 import { getCustomerUserId } from "@/lib/customer-lookup";
 import { toast } from "sonner";
@@ -122,7 +123,7 @@ function ApprovedOrdersPage() {
           status: "active",
           qr_data: order.id,
           label: order.order_number,
-          sub_label: `Advance: $${advanceAmount.toFixed(2)} (${percent}%)`,
+          sub_label: `Advance: ${fmtMoney(advanceAmount)} (${percent}%)`,
         })
         .select("token")
         .single();
@@ -211,7 +212,7 @@ function ApprovedOrdersPage() {
         <Kpi label="Advance Paid" value={String(paid)} icon={CheckCircle2} tone="success" />
         <Kpi
           label="Total Value"
-          value={`$${(totalValue / 1000).toFixed(0)}k`}
+          value={fmtMoneyK(totalValue)}
           icon={ShoppingCart}
           tone="primary"
         />

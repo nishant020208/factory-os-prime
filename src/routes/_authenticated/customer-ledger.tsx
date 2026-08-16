@@ -4,6 +4,7 @@ import { Users, Receipt, CheckCircle2, Clock, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoneyK } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/customer-ledger")({
   head: () => ({
@@ -90,9 +91,9 @@ function CustomerLedgerPage() {
         sub="Per-customer running balance — the same numbers the Customer Portal shows in its Invoices/Payments tabs."
       />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="Total Billed" value={`$${(totalBilled / 1000).toFixed(1)}k`} icon={Receipt} tone="primary" />
-        <Kpi label="Total Collected" value={`$${(totalPaid / 1000).toFixed(1)}k`} icon={CheckCircle2} tone="success" />
-        <Kpi label="Outstanding" value={`$${(totalOutstanding / 1000).toFixed(1)}k`} icon={Clock} tone="warning" />
+        <Kpi label="Total Billed" value={fmtMoneyK(totalBilled)} icon={Receipt} tone="primary" />
+        <Kpi label="Total Collected" value={fmtMoneyK(totalPaid)} icon={CheckCircle2} tone="success" />
+        <Kpi label="Outstanding" value={fmtMoneyK(totalOutstanding)} icon={Clock} tone="warning" />
         <Kpi label="Customers" value={String(ledger.length)} icon={Users} tone="info" />
       </div>
 

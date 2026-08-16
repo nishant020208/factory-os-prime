@@ -28,6 +28,7 @@ import {
   DOMAIN_LABELS,
   ROLE_DOMAIN_MAP,
 } from "@/lib/role-scope";
+import { fmtMoney } from "@/lib/currency";
 
 export interface CopilotTurn {
   role: "user" | "ai";
@@ -369,7 +370,7 @@ async function findEntity(
               : "";
           const amount =
             row.total_amount != null || row.amount != null
-              ? ` · $${Number(row.total_amount ?? row.amount ?? 0).toLocaleString()}`
+              ? ` · ${fmtMoney(Number(row.total_amount ?? row.amount ?? 0))}`
               : "";
           const due = row.due_date ? ` · due ${new Date(row.due_date).toLocaleDateString()}` : "";
           return `🔎 Found it — **${row[col] ?? probe.table}** (${probe.table.replace(/_/g, " ")}): status **${status}**${pct}${amount}${due}.`;
@@ -380,6 +381,92 @@ async function findEntity(
     }
   }
   return `I couldn't find a record matching **${ref}** in your role's data. Double-check the number, or ask about the general area (e.g. "show my orders").`;
+}
+
+/* ────────────────────────────────────────────────────────── */
+/*  SPECIFIC-ITEM ANSWERS — precision over generic summaries   */
+/*  (Bug 4 fix: "what's my Teak Wood stock?" returns the REAL  */
+/*  live quantity, not a warehouse rollup)                     */
+/* ────────────────────────────────────────────────────────── */
+
+const MATERIAL_KEYWORDS = [
+  "teak",
+  "plywood",
+  "upholstery fabric",
+  "fabric",
+  "foam",
+  "hinges",
+  "screws",
+  "polish",
+  "drawer slides",
+  "adhesive",
+  "lumber",
+  "wood",
+];
+
+/**
+ * Answer a named-material stock question with the real quantity from the
+ * inventory/materials tables. Returns null when the question isn't a material
+ * stock question (so the generic role summary still runs).
+ */
+async function materialStockAnswer(question: string): Promise<string | null> {
+  const q = question.toLowerCase();
+  if (!/\b(stock|quantity|level|left|available|inventory|units|qty)\b/.test(q)) return null;
+  const hit = MATERIAL_KEYWORDS.find((m) => q.includes(m));
+  if (!hit) return null;
+
+  try {
+    // 1. Find the material row (materials.name is the real source of the name).
+    const { data: mats } = await scoped(
+      supabase
+        .from("materials")
+        .select("id, name, unit, unit_cost")
+        .ilike("name", `%${hit}%`)
+        .limit(1),
+    );
+    const mat = (mats as any[] | null)?.[0];
+    if (!mat) {
+      return `I couldn't find a material matching **${hit}** in your live materials list. Ask me about one of: Teak Wood, Plywood Sheet, Upholstery Fabric, Foam, Hinges, Screws, Polish, Drawer Slides, Adhesive.`;
+    }
+
+    // 2. Sum real quantities from inventory — either via inventory.material_id
+    //    or via the product row that shares the material's name (legacy seeds).
+    let qty = 0;
+    const { data: byMaterial } = await scoped(
+      supabase
+        .from("inventory")
+        .select("quantity, material_id")
+        .eq("material_id", mat.id),
+    );
+    const rows = (byMaterial as any[] | null) ?? [];
+    if (rows.length) {
+      qty = rows.reduce((s: number, r: any) => s + Number(r.quantity ?? 0), 0);
+    } else {
+      const { data: prods } = await scoped(
+        supabase
+          .from("products")
+          .select("id, reorder_level, unit")
+          .ilike("name", `%${hit}%`)
+          .limit(1),
+      );
+      const prod = (prods as any[] | null)?.[0];
+      if (prod) {
+        const { data: invs } = await scoped(
+          supabase.from("inventory").select("quantity").eq("product_id", prod.id),
+        );
+        qty = ((invs as any[] | null) ?? []).reduce(
+          (s: number, r: any) => s + Number(r.quantity ?? 0),
+          0,
+        );
+        const reorder = Number(prod.reorder_level ?? 0);
+        const flag = qty <= reorder ? `⚠️ **low** — at/below the reorder threshold of ${reorder}` : `healthy (reorder threshold ${reorder})`;
+        return `📦 **${mat.name}** — real live stock: **${qty} ${prod.unit ?? mat.unit ?? "units"}** · ${flag}.\n\nThis is read from the live inventory table — the same number Warehouse sees on the Raw Material Stock screen.`;
+      }
+    }
+    return `📦 **${mat.name}** — real live stock: **${qty} ${mat.unit ?? "units"}** across all warehouses. This is read live from the inventory table.`;
+  } catch {
+    return null;
+  }
 }
 
 /* ────────────────────────────────────────────────────────── */
@@ -633,7 +720,7 @@ async function roleDataAnswer(
       );
       if (asked) {
         return {
-          text: `📦 **Order ${asked.order_number}** — status: **${label(asked.status)}**\n\n- Product: ${asked.product ?? "—"} × ${asked.quantity ?? "—"}\n- Priority: ${label(asked.priority)}\n- Order total: $${Number(asked.order_total ?? 0).toLocaleString()} · Advance: ${label(asked.advance_payment_status)} · Balance due: $${Number(asked.balance_due ?? 0).toLocaleString()}\n- Delivery date: ${asked.delivery_date ? new Date(asked.delivery_date).toLocaleDateString() : "—"}\n\nTrack it live in **Orders → Order Tracking**.`,
+          text: `📦 **Order ${asked.order_number}** — status: **${label(asked.status)}**\n\n- Product: ${asked.product ?? "—"} × ${asked.quantity ?? "—"}\n- Priority: ${label(asked.priority)}\n- Order total: ${fmtMoney(Number(asked.order_total ?? 0))} · Advance: ${label(asked.advance_payment_status)} · Balance due: ${fmtMoney(Number(asked.balance_due ?? 0))}\n- Delivery date: ${asked.delivery_date ? new Date(asked.delivery_date).toLocaleDateString() : "—"}\n\nTrack it live in **Orders → Order Tracking**.`,
           conf: 97,
         };
       }
@@ -750,7 +837,7 @@ async function roleDataAnswer(
       ).length;
       const totalOut = invoices.reduce((s: number, i: any) => s + Number(i.total_amount ?? 0), 0);
       return {
-        text: `💰 **Finance**\n\n- Invoices: **${invoices.length}** (${outstanding} outstanding)\n- Outstanding value: **$${totalOut.toLocaleString()}**\n\n${invoices
+        text: `💰 **Finance**\n\n- Invoices: **${invoices.length}** (${outstanding} outstanding)\n- Outstanding value: **${fmtMoney(totalOut)}**\n\n${invoices
           .slice(0, 3)
           .map((i: any) => `- ${i.invoice_number ?? "INV"} · ${label(i.status)}`)
           .join(
@@ -970,6 +1057,13 @@ export async function answerCopilot(opts: {
   if (intent === "math" && payload) {
     const result = evaluateMath(payload);
     if (result) return { text: result, conf: 100 };
+  }
+
+  // 4.5 Precision step (Bug 4 fix): a named-material stock question returns the
+  //    REAL live quantity from the inventory table — never a generic rollup.
+  if (intent === "data" && (role === "warehouse_manager" || role === "procurement_manager" || role === "company_admin" || role === "plant_manager" || role === "auditor")) {
+    const specific = await materialStockAnswer(lower);
+    if (specific) return { text: specific, conf: 96 };
   }
 
   // 5. Follow-up resolution — "and production?" continues the last topic

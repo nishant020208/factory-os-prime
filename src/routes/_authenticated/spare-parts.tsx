@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney } from "@/lib/currency";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -133,7 +134,7 @@ function SparePartsPage() {
         <Kpi label="Parts" value={String(parts?.length ?? 0)} icon={Boxes} tone="primary" />
         <Kpi label="Total Qty" value={String(totalQty)} icon={Wrench} tone="info" />
         <Kpi label="Low Stock" value={String(lowStock)} icon={AlertTriangle} tone="destructive" />
-        <Kpi label="Stock Value" value={`$${totalValue.toLocaleString()}`} icon={Boxes} tone="success" />
+        <Kpi label="Stock Value" value={fmtMoney(totalValue)} icon={Boxes} tone="success" />
       </div>
 
       <div className="mt-4">

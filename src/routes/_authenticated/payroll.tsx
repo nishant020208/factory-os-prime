@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoneyK } from "@/lib/currency";
 import { notifyPayrollPaid } from "@/lib/notifications";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -235,7 +236,7 @@ function PayrollPage() {
       />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Kpi label="Headcount" value={String(headcount)} icon={Users} tone="primary" />
-        <Kpi label="Gross (Total)" value={`$${(grossTotal / 1000).toFixed(0)}k`} icon={DollarSign} tone="success" />
+        <Kpi label="Gross (Total)" value={fmtMoneyK(grossTotal)} icon={DollarSign} tone="success" />
         <Kpi label="Paid" value={`${processed}/${totalRecords}`} icon={CheckCircle2} tone="info" />
         <Kpi label="Pending" value={String(totalRecords - processed)} icon={Clock} tone="warning" />
       </div>

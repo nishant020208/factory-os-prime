@@ -6,6 +6,7 @@ import { PageHeader, Kpi, Panel, EmptyState } from "@/components/ui-parts";
 import { Button } from "@/components/ui/button";
 import { downloadCsv, todayStamp } from "@/lib/report-utils";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/taxes")({
@@ -119,9 +120,9 @@ function TaxesPage() {
         }
       />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi label="GST Collected" value={`$${(collected / 1000).toFixed(1)}k`} icon={TrendingUp} tone="success" />
-        <Kpi label="GST Paid" value={`$${(paid / 1000).toFixed(1)}k`} icon={TrendingDown} tone="warning" />
-        <Kpi label="Net GST" value={`$${(net / 1000).toFixed(1)}k`} icon={Scale} tone={net >= 0 ? "primary" : "destructive"} />
+        <Kpi label="GST Collected" value={fmtMoneyK(collected)} icon={TrendingUp} tone="success" />
+        <Kpi label="GST Paid" value={fmtMoneyK(paid)} icon={TrendingDown} tone="warning" />
+        <Kpi label="Net GST" value={fmtMoneyK(net)} icon={Scale} tone={net >= 0 ? "primary" : "destructive"} />
         <Kpi label="Periods Tracked" value={String(periods.length)} icon={FileText} tone="info" />
       </div>
 

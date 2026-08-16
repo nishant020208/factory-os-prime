@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { currencySymbol, getAppCurrency } from "@/lib/currency";
 
 /** Current date as YYYY-MM-DD, used in download filenames. */
 export function todayStamp(): string {
@@ -132,10 +133,18 @@ export function downloadPdf(
 
 /* ---------------- formatting helpers ---------------- */
 
-export function money(v: unknown, currency = "₹"): string {
+/**
+ * Format an amount in the company's current currency (read from the shared
+ * app-wide registry). Pass an explicit `currency` only for historical records
+ * that carry their own transaction currency.
+ */
+export function money(v: unknown, currency?: string): string {
   const n = Number(v);
   if (!isFinite(n)) return "—";
-  return `${currency}${n.toLocaleString("en-IN", {
+  const code = currency || getAppCurrency();
+  const symbol = currencySymbol(code);
+  const locale = code === "INR" ? "en-IN" : "en-US";
+  return `${symbol}${n.toLocaleString(locale, {
     maximumFractionDigits: 2,
     minimumFractionDigits: 0,
   })}`;

@@ -6,6 +6,7 @@ import { ResourceView, type FormField } from "@/components/resource-view";
 import { Kpi, StatusBadge } from "@/components/ui-parts";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/bom")({
   head: () => ({
@@ -109,7 +110,7 @@ function BomPage() {
           <Kpi label="Level 2" value={String(level2)} icon={Cpu} tone="warning" />
           <Kpi
             label="Total Cost"
-            value={`$${Math.round(totalCost).toLocaleString()}`}
+            value={fmtMoney(Math.round(totalCost))}
             icon={DollarSign}
             tone="success"
           />

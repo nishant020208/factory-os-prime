@@ -55,6 +55,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { primaryRole } from "@/lib/route-access";
 import { safeDate } from "@/lib/utils";
+import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import type { AppRole } from "@/lib/roles";
 import { ROLE_MAP } from "@/lib/roles";
 import { getDashboardNotes, saveDashboardNote } from "@/lib/order-lifecycle";
@@ -1634,20 +1635,20 @@ function FinanceDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Kpi
           label="Revenue (collected)"
-          value={`$${(totalRevenue / 1000).toFixed(1)}k`}
+          value={fmtMoneyK(totalRevenue)}
           icon={TrendingUp}
           tone="success"
         />
         <Kpi label="Invoices" value={String(invoices.length)} icon={Landmark} tone="primary" />
         <Kpi
           label="Outstanding"
-          value={`$${(outstanding / 1000).toFixed(1)}k`}
+          value={fmtMoneyK(outstanding)}
           icon={ClipboardList}
           tone="warning"
         />
         <Kpi
           label="Paid to Suppliers"
-          value={`$${(moneyOut / 1000).toFixed(1)}k`}
+          value={fmtMoneyK(moneyOut)}
           icon={ClipboardList}
           tone="info"
         />
@@ -1670,7 +1671,7 @@ function FinanceDashboard() {
           dashboardType="finance_manager"
           items={[
             { t: `${invoices.filter((i: any) => i.status !== "paid").length} invoice(s) awaiting payment`, c: 84 },
-            { t: `${paidCount} invoice(s) paid, $${totalRevenue.toLocaleString()} collected`, c: 71 },
+            { t: `${paidCount} invoice(s) paid, ${fmtMoney(totalRevenue)} collected`, c: 71 },
           ]}
         />
       </div>
@@ -1996,7 +1997,7 @@ function CustomerDashboard() {
         <Kpi label="Delivered" value={String(delivered)} icon={ShieldCheck} tone="success" />
         <Kpi
           label="Outstanding Value"
-          value={`$${(outstanding / 1000).toFixed(0)}k`}
+          value={fmtMoneyK(outstanding)}
           icon={Landmark}
           tone="warning"
         />
@@ -2127,7 +2128,7 @@ function SupplierDashboard() {
         <Kpi label="Inbound Shipments" value={String(inbound)} icon={Truck} tone="info" />
         <Kpi
           label="Payments Received"
-          value={`$${totalPaid.toLocaleString()}`}
+          value={fmtMoney(totalPaid)}
           icon={Landmark}
           tone="warning"
         />

@@ -19,6 +19,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+import { setAppCurrency } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/company")({
   head: () => ({
@@ -103,6 +104,9 @@ function CompanyPage() {
         registration_number: company.registration_number ?? "",
         plan_tier: company.plan_tier ?? "starter",
       });
+      // Register the real company currency app-wide so every money renderer
+      // (reports, finance, procurement, customer portal) uses it.
+      setAppCurrency(company.currency);
     }
   }, [company]);
 
@@ -129,7 +133,10 @@ function CompanyPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-company"] });
-      toast.success("Company updated");
+      // Bug 5: currency change propagates to every currency-displaying
+      // component on next render via the shared registry — no per-page fixes.
+      setAppCurrency(form.currency);
+      toast.success("Company updated — currency symbol updated app-wide");
     },
     onError: (err: any) => toast.error(err.message),
   });

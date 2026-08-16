@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoneyK } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/finance")({
   head: () => ({
@@ -130,7 +131,7 @@ function FinancePage() {
     outflow: byMonth.get(m)!.out,
   }));
 
-  const fmt = (n: number) => `$${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k`;
+  const fmt = (n: number) => fmtMoneyK(n);
 
   return (
     <div className="max-w-[1600px] mx-auto">

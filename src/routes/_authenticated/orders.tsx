@@ -18,6 +18,7 @@ import { ResourceView, type FormField } from "@/components/resource-view";
 import { Kpi, StatusBadge } from "@/components/ui-parts";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
 import { useState } from "react";
 import {
@@ -81,7 +82,7 @@ function getOrderFormFields(customers: any[], products: any[], isCustomer: boole
     required: true,
     options: (products ?? []).map((p: any) => ({
       value: p.id,
-      label: `${p.name} — $${Number(p.unit_price).toLocaleString()} / unit`,
+      label: `${p.name} — ${fmtMoney(Number(p.unit_price))} / unit`,
     })),
   });
 
@@ -500,7 +501,7 @@ function OrdersPage() {
             <Kpi label="Delivered" value={String(delivered)} icon={CheckCircle2} tone="success" />
             <Kpi
               label="Revenue"
-              value={`$${(totalRevenue / 1000).toFixed(0)}k`}
+              value={fmtMoneyK(totalRevenue)}
               icon={DollarSign}
               tone="primary"
             />

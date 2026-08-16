@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney } from "@/lib/currency";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -155,7 +156,7 @@ function SupplierInvoicesPage() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
-        <Kpi label="Total Raised" value={`$${totalRaised.toLocaleString()}`} icon={Receipt} tone="primary" />
+        <Kpi label="Total Raised" value={fmtMoney(totalRaised)} icon={Receipt} tone="primary" />
         <Kpi label="Pending" value={String(pending)} icon={FileText} tone="warning" />
         <Kpi label="All Invoices" value={String(invoices?.length ?? 0)} icon={Receipt} tone="info" />
       </div>

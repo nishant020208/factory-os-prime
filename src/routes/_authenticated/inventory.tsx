@@ -44,6 +44,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { toast } from "sonner";
 import { useState } from "react";
 import { safeDate } from "@/lib/utils";
+import { fmtMoney } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/inventory")({
   head: () => ({
@@ -209,7 +210,7 @@ function InventoryPage() {
         />
         <Kpi
           label="Inventory value"
-          value={`$${Math.round(value).toLocaleString()}`}
+          value={fmtMoney(Math.round(value))}
           delta="+1.1%"
           icon={Boxes}
           tone="success"

@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney } from "@/lib/currency";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -122,8 +123,8 @@ function SupplierPaymentsPage() {
       />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Kpi label="Awaiting Payment" value={String(pendingInvoices.length)} icon={Clock} tone="warning" />
-        <Kpi label="Due Amount" value={`$${pendingTotal.toLocaleString()}`} icon={Landmark} tone="info" />
-        <Kpi label="Paid to Suppliers" value={`$${paidTotal.toLocaleString()}`} icon={Wallet} tone="success" />
+        <Kpi label="Due Amount" value={fmtMoney(pendingTotal)} icon={Landmark} tone="info" />
+        <Kpi label="Paid to Suppliers" value={fmtMoney(paidTotal)} icon={Wallet} tone="success" />
         <Kpi label="Payments Released" value={String(released?.length ?? 0)} icon={CheckCircle2} tone="primary" />
       </div>
 

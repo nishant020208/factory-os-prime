@@ -29,13 +29,13 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { notifyOnCreate } from "@/lib/module-notifications";
+import { fmtMoney } from "@/lib/currency";
 
 type Row = Record<string, unknown> & { id: string; company_id?: string };
 
 function fmt(kind: ColumnDef["kind"], v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
-  if (kind === "currency")
-    return `$${Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  if (kind === "currency") return fmtMoney(Number(v));
   if (kind === "number") return String(Number(v).toLocaleString());
   if (kind === "date") {
     const d = new Date(String(v));

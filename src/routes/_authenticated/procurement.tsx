@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ResourceView, type FormField } from "@/components/resource-view";
 import { Kpi, StatusBadge } from "@/components/ui-parts";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/procurement")({
@@ -137,7 +138,7 @@ function ProcurementPage() {
           />
           <Kpi
             label="Commit Value"
-            value={`$${(total / 1000).toFixed(0)}k`}
+            value={fmtMoneyK(total)}
             delta="+6.4%"
             icon={DollarSign}
             tone="success"

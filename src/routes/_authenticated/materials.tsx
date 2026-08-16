@@ -41,6 +41,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useState } from "react";
 import { safeDate } from "@/lib/utils";
+import { fmtMoney } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/materials")({
   head: () => ({
@@ -185,7 +186,7 @@ function MaterialsPage() {
         />
         <Kpi
           label="Avg Unit Cost"
-          value={`$${(totalValue / (materials?.length ?? 1)).toFixed(2)}`}
+          value={fmtMoney(totalValue / (materials?.length ?? 1))}
           icon={DollarSign}
           tone="info"
         />

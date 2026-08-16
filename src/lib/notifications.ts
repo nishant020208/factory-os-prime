@@ -14,8 +14,17 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { getRoleUserId } from "@/lib/customer-lookup";
+import { fmtMoney } from "@/lib/currency";
 
 export type NotificationSeverity = "info" | "warning" | "success" | "error";
+
+/**
+ * Amount text for notification bodies, formatted in the company's current
+ * currency via the shared registry (Bug 5 fix — no hardcoded $ anywhere).
+ */
+function moneyText(v: number): string {
+  return fmtMoney(v);
+}
 
 export interface AppNotification {
   id: string;
@@ -555,7 +564,7 @@ export async function notifyPOEscalation(
     "company_admin",
     null,
     "💰 PO Approval Required",
-    `Purchase Order ${poNumber} for $${amount.toLocaleString()} exceeds the approval threshold.`,
+    `Purchase Order ${poNumber} for ${moneyText(amount)} exceeds the approval threshold.`,
     "warning",
     "purchase_orders",
     poId,
@@ -654,7 +663,7 @@ export async function notifyAdvancePaymentReceived(
     "production_manager",
     null,
     "💰 Advance Payment Received",
-    `Payment of $${amount.toLocaleString()} received for order ${orderNumber}. Production can start.`,
+    `Payment of ${moneyText(amount)} received for order ${orderNumber}. Production can start.`,
     "success",
     "sales_orders",
     orderId,
@@ -664,7 +673,7 @@ export async function notifyAdvancePaymentReceived(
     "finance_manager",
     null,
     "💰 Payment Received",
-    `Advance payment of $${amount.toLocaleString()} received for order ${orderNumber}. Reconcile.`,
+    `Advance payment of ${moneyText(amount)} received for order ${orderNumber}. Reconcile.`,
     "success",
     "sales_orders",
     orderId,
@@ -1169,7 +1178,7 @@ export async function notifyPayrollPaid(
     ntRole,
     ntUser,
     "💸 Payroll Released",
-    `Your salary for ${period} ($${amount.toLocaleString()}) has been paid.`,
+    `Your salary for ${period} (${moneyText(amount)}) has been paid.`,
     "success",
     "payroll",
     null,
@@ -1248,7 +1257,7 @@ export async function notifySupplierPaymentReleased(
     ntRole,
     ntUser,
     "💰 Payment Released",
-    `Payment of $${amount.toLocaleString()} for PO ${poNumber} has been released.`,
+    `Payment of ${moneyText(amount)} for PO ${poNumber} has been released.`,
     "success",
     "purchase_orders",
     null,
@@ -1288,7 +1297,7 @@ export async function notifyAdvancePaymentQRGenerated(
     ntRole,
     ntUser,
     "📱 Advance Payment Required",
-    `An advance payment of $${amount.toLocaleString()} is required for order ${orderNumber}. Scan the QR code to pay.`,
+    `An advance payment of ${moneyText(amount)} is required for order ${orderNumber}. Scan the QR code to pay.`,
     "info",
     "sales_orders",
     null,

@@ -19,6 +19,7 @@ import { Kpi, StatusBadge, PageHeader, Panel } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoneyK } from "@/lib/currency";
 import { notifyInvoiceGenerated, notifyPaymentStatusChanged } from "@/lib/notifications";
 import { getCustomerUserId } from "@/lib/customer-lookup";
 import { toast } from "sonner";
@@ -318,7 +319,7 @@ function InvoicesPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
           <Kpi
             label="Total Billed"
-            value={`$${(total / 1000).toFixed(1)}k`}
+            value={fmtMoneyK(total)}
             icon={Receipt}
             tone="primary"
           />
@@ -469,7 +470,7 @@ function InvoicesPage() {
           <>
             <Kpi
               label="Total Invoiced"
-              value={`$${(total / 1000).toFixed(0)}k`}
+              value={fmtMoneyK(total)}
               icon={Receipt}
               tone="primary"
             />

@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ResourceView, type FormField } from "@/components/resource-view";
 import { Kpi, StatusBadge } from "@/components/ui-parts";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/products")({
@@ -161,7 +162,7 @@ function ProductsPage() {
           />
           <Kpi
             label="Catalog Value"
-            value={`$${(totalValue / 1000).toFixed(0)}k`}
+            value={fmtMoneyK(totalValue)}
             delta="+8.1%"
             icon={DollarSign}
             tone="success"
@@ -187,11 +188,11 @@ function ProductsPage() {
           header: "Unit",
           render: (r) => <span className="text-muted-foreground">{r.unit}</span>,
         },
-        { key: "unit_cost", header: "Cost", render: (r) => `$${Number(r.unit_cost).toFixed(2)}` },
+        { key: "unit_cost", header: "Cost", render: (r) => fmtMoney(Number(r.unit_cost)) },
         {
           key: "unit_price",
           header: "Price",
-          render: (r) => `$${Number(r.unit_price).toFixed(2)}`,
+          render: (r) => fmtMoney(Number(r.unit_price)),
         },
         {
           key: "reorder_level",

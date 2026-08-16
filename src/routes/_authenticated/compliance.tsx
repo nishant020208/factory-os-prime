@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { fmtMoney } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/compliance")({
   head: () => ({
@@ -118,7 +119,7 @@ function CompliancePage() {
         <Kpi label="Overdue invoices" value={String(kpis.overdue)} icon={AlertTriangle} tone="destructive" />
         <Kpi label="QC failures" value={String(kpis.failed)} icon={ClipboardCheck} tone="destructive" />
         <Kpi label="Zero-stock SKUs" value={String(kpis.zeroStock)} icon={Boxes} tone="warning" />
-        <Kpi label="Paid total" value={`$${kpis.paidTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Wallet} tone="info" />
+        <Kpi label="Paid total" value={fmtMoney(kpis.paidTotal)} icon={Wallet} tone="info" />
       </div>
 
       {loading ? (
@@ -181,7 +182,7 @@ function CompliancePage() {
               rows={p.map((r) => [
                 String(r.payment_number ?? "—"),
                 String(r.customer_id ?? "—").slice(0, 8),
-                <span key="a" className="tabular-nums">${Number(r.amount ?? 0).toLocaleString()}</span>,
+                <span key="a" className="tabular-nums">{fmtMoney(Number(r.amount ?? 0))}</span>,
                 String(r.method ?? "—"),
                 <StatusBadge key="s" status={String(r.status ?? "")} />,
                 r.paid_at ? safeDate(String(r.paid_at), true) : "—",

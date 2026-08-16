@@ -6,6 +6,8 @@ import { RouteLoading } from "@/components/route-loading";
 import { canAccess, homeForRole, primaryRole } from "@/lib/route-access";
 import type { AppRole } from "@/lib/roles";
 import { I18nProvider } from "@/lib/i18n";
+import { PreferencesProvider } from "@/lib/preferences";
+import { CurrencyProvider } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -126,9 +128,13 @@ function Layout() {
   const forceLocale = role === "root_super_admin" ? ("en" as const) : undefined;
   return (
     <I18nProvider forceLocale={forceLocale}>
-      <AppShell>
-        <Outlet />
-      </AppShell>
+      <CurrencyProvider>
+        <PreferencesProvider>
+          <AppShell>
+            <Outlet />
+          </AppShell>
+        </PreferencesProvider>
+      </CurrencyProvider>
     </I18nProvider>
   );
 }

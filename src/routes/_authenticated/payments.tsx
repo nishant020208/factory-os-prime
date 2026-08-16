@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { notifyPaymentStatusChanged } from "@/lib/notifications";
 import { getCustomerUserId } from "@/lib/customer-lookup";
 import { toast } from "sonner";
@@ -137,13 +138,12 @@ function FinancePayments() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        <Kpi label="Total Received" value={`$${totalReceived.toLocaleString()}`} icon={CreditCard} tone="success" />
+        <Kpi label="Total Received" value={fmtMoney(totalReceived)} icon={CreditCard} tone="success" />
         <Kpi
           label="This Month"
-          value={`$${(payments ?? [])
+          value={fmtMoney((payments ?? [])
             .filter((p: any) => (p.paid_at ?? "").startsWith(thisMonth))
-            .reduce((s: number, p: any) => s + Number(p.amount ?? 0), 0)
-            .toLocaleString()}`}
+            .reduce((s: number, p: any) => s + Number(p.amount ?? 0), 0))}
           icon={DollarSign}
           tone="primary"
         />
@@ -307,7 +307,7 @@ function SupplierPaymentsView() {
         actions={<ModuleCopilot moduleName="payments" />}
       />
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
-        <Kpi label="Total Paid" value={`$${totalPaid.toLocaleString()}`} icon={CreditCard} tone="success" />
+        <Kpi label="Total Paid" value={fmtMoney(totalPaid)} icon={CreditCard} tone="success" />
         <Kpi label="All Payments" value={String(payments?.length ?? 0)} icon={CheckCircle2} tone="primary" />
       </div>
       <Panel title={`${payments?.length ?? 0} Payments`}>

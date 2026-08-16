@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/supplier-performance")({
   head: () => ({
@@ -120,7 +121,7 @@ function SupplierPerformancePage() {
     },
     {
       label: "Pending Payments",
-      value: `$${pendingPayments.reduce((s, p) => s + Number(p.amount ?? 0), 0).toLocaleString()}`,
+      value: fmtMoney(pendingPayments.reduce((s, p) => s + Number(p.amount ?? 0), 0)),
       sub: `${pendingPayments.length} awaiting release`,
     },
   ];

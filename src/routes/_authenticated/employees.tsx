@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney } from "@/lib/currency";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -211,7 +212,7 @@ function EmployeesPage() {
                       <td className="py-2.5 px-2 text-muted-foreground">{deptName(r.department_id)}</td>
                       <td className="py-2.5 px-2 text-xs font-mono">{r.hire_date?.slice(0, 10) ?? "—"}</td>
                       <td className="py-2.5 px-2 text-xs font-mono">
-                        {Number(r.salary ?? 0) > 0 ? `$${Number(r.salary).toLocaleString()}` : "—"}
+                        {Number(r.salary ?? 0) > 0 ? fmtMoney(Number(r.salary)) : "—"}
                       </td>
                       <td className="py-2.5 px-2">
                         <StatusBadge status={r.status} />
