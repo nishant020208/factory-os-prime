@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       access_logs: {
@@ -2140,6 +2165,7 @@ export type Database = {
           created_by: string
           defect_category: string
           description: string | null
+          failed_parameters: Json | null
           id: string
           inspection_id: string | null
           ncr_number: string
@@ -2155,6 +2181,7 @@ export type Database = {
           created_by: string
           defect_category: string
           description?: string | null
+          failed_parameters?: Json | null
           id?: string
           inspection_id?: string | null
           ncr_number: string
@@ -2170,6 +2197,7 @@ export type Database = {
           created_by?: string
           defect_category?: string
           description?: string | null
+          failed_parameters?: Json | null
           id?: string
           inspection_id?: string | null
           ncr_number?: string
@@ -3267,50 +3295,129 @@ export type Database = {
           },
         ]
       }
-      quality_inspections: {
+      quality_inspection_parameters: {
         Row: {
+          acceptable_range: string | null
+          category: string
           company_id: string
           created_at: string
+          id: string
+          inspection_id: string
+          measured_value: string | null
+          notes: string | null
+          parameter_name: string
+          photo_url: string | null
+          result: string
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          acceptable_range?: string | null
+          category: string
+          company_id: string
+          created_at?: string
+          id?: string
+          inspection_id: string
+          measured_value?: string | null
+          notes?: string | null
+          parameter_name: string
+          photo_url?: string | null
+          result?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          acceptable_range?: string | null
+          category?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          inspection_id?: string
+          measured_value?: string | null
+          notes?: string | null
+          parameter_name?: string
+          photo_url?: string | null
+          result?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_inspection_parameters_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_inspection_parameters_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "quality_inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_inspections: {
+        Row: {
+          batch_reference: string | null
+          company_id: string
+          created_at: string
+          customer_order_id: string | null
           defects_found: number | null
           id: string
           inspection_number: string
           inspection_type: string
           inspector_id: string | null
           notes: string | null
+          overall_notes: string | null
           product_id: string | null
           production_order_id: string | null
           quantity_checked: number | null
           result: string
         }
         Insert: {
+          batch_reference?: string | null
           company_id: string
           created_at?: string
+          customer_order_id?: string | null
           defects_found?: number | null
           id?: string
           inspection_number: string
           inspection_type?: string
           inspector_id?: string | null
           notes?: string | null
+          overall_notes?: string | null
           product_id?: string | null
           production_order_id?: string | null
           quantity_checked?: number | null
           result?: string
         }
         Update: {
+          batch_reference?: string | null
           company_id?: string
           created_at?: string
+          customer_order_id?: string | null
           defects_found?: number | null
           id?: string
           inspection_number?: string
           inspection_type?: string
           inspector_id?: string | null
           notes?: string | null
+          overall_notes?: string | null
           product_id?: string | null
           production_order_id?: string | null
           quantity_checked?: number | null
           result?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "quality_inspections_customer_order_id_fkey"
+            columns: ["customer_order_id"]
+            isOneToOne: false
+            referencedRelation: "customer_orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quality_inspections_inspector_id_fkey"
             columns: ["inspector_id"]
@@ -4826,6 +4933,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: [

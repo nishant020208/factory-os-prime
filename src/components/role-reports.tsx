@@ -1281,54 +1281,61 @@ const qualityBuilders: Builder[] = [
     };
   },
   async () => {
-    const inspections = await fetchAll("quality_inspections");
-    const map = new Map<string, number>();
-    for (const i of inspections) {
-      const raw = String(i.defects_found ?? "");
-      const parts = raw
-        .split(/[,;]/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (!parts.length) continue;
-      for (const p of parts) map.set(p, (map.get(p) ?? 0) + 1);
+    // Real parameter-level defect breakdown from quality_inspection_parameters
+    const params = await fetchAll("quality_inspection_parameters");
+    const failed = params.filter((p) => p.result === "fail");
+    const byParam = new Map<string, { count: number; category: string }>();
+    for (const p of failed) {
+      const existing = byParam.get(p.parameter_name) ?? { count: 0, category: p.category };
+      existing.count++;
+      byParam.set(p.parameter_name, existing);
     }
-    const rows = [...map.entries()]
-      .map(([category, count]) => ({ category, count }))
+    const rows = [...byParam.entries()]
+      .map(([parameter_name, { count, category }]) => ({ parameter_name, category, count }))
       .sort((a, b) => b.count - a.count);
     return {
       id: "qi-defect-categories",
       module: "quality",
-      title: "Defect Category Breakdown",
-      sub: "Defect types found across inspections (surface scratch, uneven polish, wobbly joints, etc.).",
+      title: "Parameter Failure Breakdown",
+      sub: "Which specific QC parameters fail most often — real itemized defect data from structured inspections.",
       columns: [
-        { key: "category", label: "Defect Category" },
-        { key: "count", label: "Occurrences", align: "right" },
+        { key: "parameter_name", label: "Parameter" },
+        { key: "category", label: "Category" },
+        { key: "count", label: "Failures", align: "right" },
       ],
       rows,
-      fileName: "quality-defect-categories",
-      summary: [{ label: "Distinct Defect Types", value: num(rows.length), tone: "primary" }],
-      note: "No defects recorded yet.",
+      fileName: "quality-parameter-failures",
+      summary: [{ label: "Distinct Failing Parameters", value: num(rows.length), tone: "primary" }],
+      note: rows.length === 0 ? "No parameter failures recorded yet — will populate as inspections with itemized data accumulate." : undefined,
     };
   },
   async (ctx) => {
     const inspections = await fetchAll("quality_inspections");
-    const rows = inspections
-      .filter((i) => i.result === "fail")
-      .map((i) => ({
+    const params = await fetchAll("quality_inspection_parameters");
+    const failed = inspections.filter((i) => i.result === "fail" || i.result === "conditional_pass");
+    const rows = failed.map((i) => {
+      const failParams = params
+        .filter((p) => p.inspection_id === i.id && p.result === "fail")
+        .map((p) => `${p.parameter_name}: ${p.measured_value ?? "—"}${p.unit ? p.unit : ""} (range: ${p.acceptable_range ?? "—"})`)
+        .join('; ');
+      return {
         inspection_number: i.inspection_number,
         product: ctx.lookups.products.get(i.product_id)?.name ?? "—",
-        defects_found: i.defects_found ?? "—",
+        result: i.result,
+        failed_parameters: failParams || `${i.defects_found ?? 0} defects (pre-parameter system)`,
         created_at: i.created_at,
-      }));
+      };
+    });
     return {
       id: "qi-rework",
       module: "quality",
       title: "Rework Turnaround",
-      sub: "Failed batches — candidates for rework, with the defects that caused the failure.",
+      sub: "Failed batches — candidates for rework, with the SPECIFIC parameters that failed.",
       columns: [
         { key: "inspection_number", label: "Inspection #" },
         { key: "product", label: "Product" },
-        { key: "defects_found", label: "Defects" },
+        { key: "result", label: "Result" },
+        { key: "failed_parameters", label: "Failed Parameters" },
         { key: "created_at", label: "Failed" },
       ],
       rows,
@@ -1340,7 +1347,7 @@ const qualityBuilders: Builder[] = [
           tone: rows.length ? "destructive" : "success",
         },
       ],
-      note: "No failed batches — nothing in rework.",
+      note: rows.length === 0 ? "No failed batches — nothing in rework." : undefined,
     };
   },
   async (ctx) => {

@@ -138,6 +138,13 @@ function FinalInspectionPage() {
         await notifyQualityPassed(companyId, inspectWo.wo_number ?? "Batch", inspectWo.id);
       } else {
         // 2) Fail → create NCR + CAPA, notify Production Manager + Operator
+        // Collect specific failed parameters for the NCR
+        const failedParams = CHECKLIST.filter((c) => checks[c] === false).map((c) => ({
+          parameter_name: c,
+          category: "final_checklist",
+          notes: `Checklist item failed: ${c}`,
+        }));
+
         const { data: ncr, error: ncrErr } = await supabase
           .from("ncr")
           .insert({
@@ -147,11 +154,12 @@ function FinalInspectionPage() {
             inspection_id: insp.id,
             batch_number: inspectWo.wo_number ?? null,
             defect_category: defectCategory,
-            description: notes || `${failCount} checklist item(s) failed`,
+            description: notes || `${failCount} checklist item(s) failed: ${failedParams.map((p) => p.parameter_name).join(', ')}`,
             severity: failCount >= 3 ? "high" : "medium",
             status: "open",
             assigned_to: inspectWo.operator_id ?? null,
             created_by: user.id,
+            failed_parameters: failedParams,
           })
           .select("id")
           .single();

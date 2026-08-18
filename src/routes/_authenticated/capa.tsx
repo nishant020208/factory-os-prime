@@ -420,6 +420,11 @@ function CAPAPage() {
                     {n.description && (
                       <div className="text-xs text-muted-foreground mt-1 italic">"{n.description}"</div>
                     )}
+                    {n.failed_parameters && Array.isArray(n.failed_parameters) && n.failed_parameters.length > 0 && (
+                      <div className="text-[10px] text-red-400 mt-1">
+                        Failed: {n.failed_parameters.map((fp: any) => fp.parameter_name).join(', ')}
+                      </div>
+                    )}
                   </div>
                   {n.status !== "closed" && (
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => closeNcr.mutate(n.id)}>
