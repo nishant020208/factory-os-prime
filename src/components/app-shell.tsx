@@ -210,6 +210,7 @@ function TopBar() {
   const role = useMemo(() => primaryRole(roles), [roles]);
   const sections = useMemo(() => navForRole(role), [role]);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -363,7 +364,7 @@ function TopBar() {
             )}
           </Button>
 
-          <DropdownMenu>
+          <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -389,7 +390,7 @@ function TopBar() {
               <DropdownMenuSeparator />
               {role !== "root_super_admin" && (
                 <DropdownMenuItem asChild>
-                  <Link to="/settings">
+                  <Link to="/settings" onClick={() => setDropdownOpen(false)}>
                     <Settings className="h-3.5 w-3.5 mr-2" />
                     {t("Settings")}
                   </Link>
@@ -397,14 +398,14 @@ function TopBar() {
               )}
               {role === "root_super_admin" && (
                 <DropdownMenuItem asChild>
-                  <Link to="/platform/settings">
+                  <Link to="/platform/settings" onClick={() => setDropdownOpen(false)}>
                     <Settings className="h-3.5 w-3.5 mr-2" />
                     Platform Settings
                   </Link>
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={signOut} className="text-destructive">
+              <DropdownMenuItem onClick={() => { setDropdownOpen(false); signOut(); }} className="text-destructive">
                 <LogOut className="h-3.5 w-3.5 mr-2" />
                 {t("Sign out")}
               </DropdownMenuItem>
