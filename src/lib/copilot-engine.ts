@@ -29,6 +29,7 @@ import {
   ROLE_DOMAIN_MAP,
 } from "@/lib/role-scope";
 import { fmtMoney } from "@/lib/currency";
+import { askCerebras } from "@/lib/cerebras";
 
 export interface CopilotTurn {
   role: "user" | "ai";
@@ -955,6 +956,163 @@ async function roleDataAnswer(
 }
 
 /* ────────────────────────────────────────────────────────── */
+/*  DATA GATHERING — collect role-scoped context for Cerebras   */
+/* ────────────────────────────────────────────────────────── */
+
+/**
+ * Gathers live data from Supabase based on the user's question and role.
+ * Returns a structured text context string that Cerebras uses to ground its answer.
+ * Only fetches data from tables the role is allowed to access.
+ */
+async function gatherRoleData(
+  role: string | null,
+  companyId: string | null,
+  userId: string | null,
+  question: string,
+): Promise<string> {
+  const allowed = new Set(ROLE_DOMAIN_MAP[role ?? ""] ?? []);
+  const parts: string[] = [];
+  const q = question.toLowerCase();
+
+  // Helper to safely query a table
+  async function safeQuery(table: string, cols = "*", filters?: (q: any) => any): Promise<any[]> {
+    try {
+      let query = scoped(supabase.from(table as never).select(cols).order("created_at", { ascending: false }).limit(8));
+      if (filters) query = filters(query);
+      const { data } = await query;
+      return (data as any[]) ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  // Detect which domains the question touches
+  const mentions = (terms: string[]) => terms.some((t) => q.includes(t));
+
+  // Customer portal — only their own orders
+  if (role === "customer_portal") {
+    const customerId = await resolveCustomerId(userId);
+    if (customerId) {
+      const orders = await safeQuery("customer_orders", "*", (query) => query.eq("customer_id", customerId));
+      if (orders.length) {
+        parts.push(`YOUR ORDERS (${orders.length}):\n${orders.map((o: any) => `  ${o.order_number} | ${o.product} | Qty: ${o.quantity} | Status: ${o.status} | Total: ${fmtMoney(Number(o.order_total ?? 0))} | Delivery: ${o.delivery_date ?? "—"}`).join("\n")}`);
+      }
+      const shipments = await safeQuery("shipments", "*", (query) => query.eq("customer_id", customerId));
+      if (shipments.length) {
+        parts.push(`YOUR SHIPMENTS (${shipments.length}):\n${shipments.map((s: any) => `  ${s.shipment_number} | Status: ${s.status} | Carrier: ${s.carrier ?? "—"} | Tracking: ${s.tracking_number ?? "—"}`).join("\n")}`);
+      }
+    }
+  }
+  // Supplier portal — only their own POs
+  else if (role === "supplier_portal") {
+    const supplierId = await resolveSupplierId(userId);
+    if (supplierId) {
+      const pos = await safeQuery("purchase_orders", "*", (query) => query.eq("supplier_id", supplierId));
+      if (pos.length) {
+        parts.push(`YOUR PURCHASE ORDERS (${pos.length}):\n${pos.map((p: any) => `  ${p.po_number} | Status: ${p.status} | Amount: ${fmtMoney(Number(p.total_amount ?? 0))}`).join("\n")}`);
+      }
+    }
+  }
+  // Internal roles — gather from allowed domains
+  else {
+    if (allowed.has("orders") || mentions(["order", "customer order", "sales"])) {
+      const orders = await safeQuery("customer_orders");
+      if (orders.length) {
+        const pending = orders.filter((o: any) => o.status === "pending_approval").length;
+        const inProd = orders.filter((o: any) => o.status === "in_production").length;
+        parts.push(`CUSTOMER ORDERS (${orders.length} total, ${pending} pending approval, ${inProd} in production):\n${orders.slice(0, 5).map((o: any) => `  ${o.order_number} | ${o.product} | Qty: ${o.quantity} | Status: ${o.status}`).join("\n")}`);
+      }
+    }
+    if (allowed.has("production") || mentions(["production", "work order", "manufacturing"])) {
+      const prodOrders = await safeQuery("production_orders");
+      const workOrders = await safeQuery("work_orders");
+      if (prodOrders.length) {
+        parts.push(`PRODUCTION ORDERS (${prodOrders.length}):\n${prodOrders.slice(0, 5).map((p: any) => `  ${p.order_number} | Status: ${p.status} | Priority: ${p.priority} | Progress: ${p.progress ?? 0}%`).join("\n")}`);
+      }
+      if (workOrders.length) {
+        parts.push(`WORK ORDERS (${workOrders.length}):\n${workOrders.slice(0, 5).map((w: any) => `  ${w.wo_number} | Status: ${w.status} | Progress: ${w.progress_percent ?? 0}%`).join("\n")}`);
+      }
+    }
+    if (allowed.has("inventory") || mentions(["inventory", "stock", "warehouse"])) {
+      const inv = await safeQuery("inventory");
+      if (inv.length) {
+        parts.push(`INVENTORY (${inv.length} items):\n${inv.slice(0, 5).map((i: any) => `  ${i.product_id?.slice(0, 8)} | Qty: ${i.quantity}`).join("\n")}`);
+      }
+    }
+    if (allowed.has("machines") || allowed.has("maintenance") || mentions(["machine", "maintenance"])) {
+      const machines = await safeQuery("machines");
+      if (machines.length) {
+        const down = machines.filter((m: any) => ["down", "maintenance"].includes(m.status));
+        parts.push(`MACHINES (${machines.length} total, ${down.length} down/in maintenance):\n${machines.slice(0, 5).map((m: any) => `  ${m.name} | Code: ${m.code} | Status: ${m.status}`).join("\n")}`);
+      }
+    }
+    if (allowed.has("quality") || mentions(["quality", "inspection", "defect"])) {
+      const insp = await safeQuery("quality_inspections");
+      if (insp.length) {
+        parts.push(`QUALITY INSPECTIONS (${insp.length}):\n${insp.slice(0, 5).map((i: any) => `  ${i.inspection_number} | Result: ${i.result} | Defects: ${i.defects_found ?? 0}`).join("\n")}`);
+      }
+    }
+    if (allowed.has("finance") || mentions(["invoice", "payment", "finance"])) {
+      const invoices = await safeQuery("invoices");
+      if (invoices.length) {
+        parts.push(`INVOICES (${invoices.length}):\n${invoices.slice(0, 5).map((i: any) => `  ${i.invoice_number} | Status: ${i.status} | Amount: ${fmtMoney(Number(i.total_amount ?? 0))}`).join("\n")}`);
+      }
+    }
+    if (allowed.has("suppliers") || mentions(["supplier", "purchase order", "procurement"])) {
+      const pos = await safeQuery("purchase_orders");
+      const suppliers = await safeQuery("suppliers");
+      if (pos.length) {
+        parts.push(`PURCHASE ORDERS (${pos.length}):\n${pos.slice(0, 5).map((p: any) => `  ${p.po_number} | Status: ${p.status} | Amount: ${fmtMoney(Number(p.total_amount ?? 0))}`).join("\n")}`);
+      }
+      if (suppliers.length) {
+        parts.push(`SUPPLIERS (${suppliers.length}):\n${suppliers.slice(0, 5).map((s: any) => `  ${s.name} | Status: ${s.status} | Rating: ${s.rating ?? 0}`).join("\n")}`);
+      }
+    }
+    if (allowed.has("hr") || allowed.has("attendance") || mentions(["employee", "hr", "attendance"])) {
+      const employees = await safeQuery("employees");
+      if (employees.length) {
+        parts.push(`EMPLOYEES (${employees.length}):\n${employees.slice(0, 5).map((e: any) => `  ${e.full_name} | Dept: ${e.department ?? "—"} | Status: ${e.status}`).join("\n")}`);
+      }
+    }
+    if (allowed.has("dispatch") || mentions(["shipment", "dispatch", "delivery"])) {
+      const shipments = await safeQuery("shipments");
+      if (shipments.length) {
+        parts.push(`SHIPMENTS (${shipments.length}):\n${shipments.slice(0, 5).map((s: any) => `  ${s.shipment_number} | Status: ${s.status} | Carrier: ${s.carrier ?? "—"}`).join("\n")}`);
+      }
+    }
+    if (allowed.has("products") || mentions(["product", "catalog"])) {
+      const products = await safeQuery("products");
+      if (products.length) {
+        parts.push(`PRODUCTS (${products.length}):\n${products.slice(0, 5).map((p: any) => `  ${p.name} | SKU: ${p.sku} | Price: ${fmtMoney(Number(p.unit_price ?? 0))}`).join("\n")}`);
+      }
+    }
+    if (role === "root_super_admin") {
+      const companies = await safeQuery("companies");
+      const registrations = await safeQuery("company_registrations");
+      if (companies.length) {
+        parts.push(`COMPANIES (${companies.length}):\n${companies.map((c: any) => `  ${c.name} | Status: ${c.status}`).join("\n")}`);
+      }
+      if (registrations.length) {
+        parts.push(`REGISTRATIONS (${registrations.length}):\n${registrations.map((r: any) => `  ${r.company_name} | Status: ${r.status} | Email: ${r.email}`).join("\n")}`);
+      }
+    }
+    if (role === "company_admin") {
+      // Company admin gets a broader picture
+      const employees = await safeQuery("employees");
+      const customers = await safeQuery("customers");
+      if (employees.length) parts.push(`EMPLOYEES: ${employees.length} total`);
+      if (customers.length) parts.push(`CUSTOMERS: ${customers.length} total`);
+    }
+  }
+
+  if (parts.length === 0) {
+    return `No specific data found for this question in your role's scope. Your allowed domains: ${getAllowedLabels(role).join(", ")}.`;
+  }
+
+  return parts.join("\n\n");
+}
+
+/* ────────────────────────────────────────────────────────── */
 /*  MAIN ENTRY POINT                                           */
 /* ────────────────────────────────────────────────────────── */
 
@@ -1088,13 +1246,29 @@ export async function answerCopilot(opts: {
     }
   }
 
-  // 6. Role-scoped data answer
+  // 6. Gather role-scoped live data and route through Cerebras
   try {
+    const dataContext = await gatherRoleData(role, companyId, userId, lower);
+    const cerebrasResult = await askCerebras({
+      question,
+      role: role ?? "company_admin",
+      dataContext,
+      history,
+    });
+    if (cerebrasResult) {
+      return { text: cerebrasResult.text, conf: 95 };
+    }
+    // Fallback to local engine if Cerebras unavailable
     return await roleDataAnswer(role, companyId, userId, lower);
   } catch {
-    return {
-      text: "I hit an error fetching live data. Please try again — or open the relevant module tab to see the data directly.",
-      conf: 70,
-    };
+    // If Cerebras fails, fall back to local engine
+    try {
+      return await roleDataAnswer(role, companyId, userId, lower);
+    } catch {
+      return {
+        text: "I hit an error fetching live data. Please try again — or open the relevant module tab to see the data directly.",
+        conf: 70,
+      };
+    }
   }
 }
