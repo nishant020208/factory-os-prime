@@ -59,6 +59,178 @@ import { navForRole } from "@/components/nav-config";
 import { primaryRole, homeForRole } from "@/lib/route-access";
 import { useI18n } from "@/lib/i18n";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ROLE_DOMAIN_MAP } from "@/lib/role-scope";
+
+/* ────────────────────────────────────────────────────────── */
+/*  ROLE-SPECIFIC COPILOT COMMANDS                            */
+/* ────────────────────────────────────────────────────────── */
+
+type CopilotCmd = { label: string; value: string; to?: string; action?: () => void };
+
+/** Maps each role to its relevant Copilot quick-commands */
+const copilotCommands: Record<string, CopilotCmd[]> = {
+  root_super_admin: [
+    { label: "View all companies", value: "companies list tenants", to: "/platform" },
+    { label: "Check pending registrations", value: "registrations pending approval", to: "/platform/pending" },
+    { label: "Platform audit logs", value: "audit platform actions", to: "/platform/audit" },
+    { label: "Whitelist management", value: "whitelist manage admins", to: "/platform/whitelist" },
+    { label: "Platform security", value: "security settings access", to: "/platform/security" },
+  ],
+  company_admin: [
+    { label: "Show today's production orders", value: "show production today orders manufacturing", to: "/production" },
+    { label: "Which machines need maintenance?", value: "which machines need maintenance downtime repair", to: "/maintenance" },
+    { label: "Show low inventory items", value: "show low inventory stock reorder shortage", to: "/inventory" },
+    { label: "Create a purchase order", value: "create purchase order buy procurement supplier", to: "/procurement" },
+    { label: "Run quality inspection", value: "check quality inspection defect yield pass fail", to: "/quality" },
+    { label: "Dispatch customer shipment", value: "dispatch shipment delivery customer shipping", to: "/dispatch" },
+    { label: "View invoices and payments", value: "finance invoice payment revenue accounting", to: "/finance" },
+    { label: "View customer orders", value: "customer order sales tracking", to: "/customers" },
+    { label: "Manage employees", value: "employee hr people payroll attendance", to: "/employees" },
+    { label: "Approve pending orders", value: "approve pending customer orders", to: "/approved-orders" },
+    { label: "Whitelist staff", value: "whitelist staff invite", to: "/whitelist" },
+    { label: "View analytics & KPIs", value: "analytics kpi reports intelligence data", to: "/analytics" },
+    { label: "Open AI Center", value: "ai center copilot insights predictions", to: "/ai-center" },
+    { label: "Generate reports", value: "reports production quality finance maintenance", to: "/reports" },
+  ],
+  plant_manager: [
+    { label: "Show today's production schedule", value: "show production schedule today", to: "/production" },
+    { label: "Check machine status", value: "check machine status operational down", to: "/machines" },
+    { label: "Staff attendance today", value: "staff attendance present absent today", to: "/attendance" },
+    { label: "View work orders at my plant", value: "work orders plant status progress", to: "/work-orders" },
+    { label: "Submit daily report", value: "daily report units completed issues", to: "/daily-reports" },
+    { label: "Quality status at my plant", value: "quality inspection pass fail defects", to: "/quality" },
+    { label: "Inventory levels at my plant", value: "inventory stock levels", to: "/inventory" },
+    { label: "Report machine issue", value: "report machine issue maintenance", to: "/maintenance" },
+  ],
+  plant_admin: [
+    { label: "Plant overview", value: "plant overview status departments", to: "/plant-overview" },
+    { label: "Department management", value: "departments list manage", to: "/departments" },
+    { label: "Machine status", value: "machine status maintenance", to: "/machines" },
+    { label: "Production at my plant", value: "production orders plant", to: "/production" },
+    { label: "Inventory at my plant", value: "inventory stock plant", to: "/inventory" },
+    { label: "Quality at my plant", value: "quality inspection plant", to: "/quality" },
+  ],
+  production_manager: [
+    { label: "Show production orders", value: "show production orders status", to: "/production" },
+    { label: "Manage work orders", value: "work orders create assign schedule", to: "/work-orders" },
+    { label: "Check approved customer orders", value: "approved customer orders ready production", to: "/approved-orders" },
+    { label: "View Bill of Materials", value: "bom bill of materials components", to: "/bom" },
+    { label: "Machine availability", value: "machines available operational", to: "/machines" },
+    { label: "Material stock levels", value: "material stock inventory levels", to: "/inventory" },
+    { label: "Quality feedback", value: "quality defects inspection results", to: "/quality" },
+    { label: "Production planning", value: "production planning schedule", to: "/production-planning" },
+  ],
+  production_operator: [
+    { label: "My assigned work orders", value: "my work orders assigned progress", to: "/work-orders" },
+    { label: "Update work order progress", value: "update progress percent complete", to: "/work-orders" },
+    { label: "Report machine issue", value: "report machine issue breakdown", to: "/maintenance" },
+    { label: "Check my machine status", value: "check machine operational status", to: "/machines" },
+  ],
+  warehouse_manager: [
+    { label: "Show inventory levels", value: "show inventory stock levels", to: "/inventory" },
+    { label: "Low stock items", value: "low stock reorder items", to: "/inventory" },
+    { label: "Pending shipments", value: "pending shipments dispatch", to: "/dispatch" },
+    { label: "Finished goods", value: "finished goods ready ship", to: "/finished-goods" },
+    { label: "Raw material stock", value: "raw material stock teak plywood", to: "/inventory" },
+    { label: "Stock movement log", value: "stock movement transfer history", to: "/stock-movement" },
+  ],
+  procurement_manager: [
+    { label: "Purchase orders", value: "purchase orders status", to: "/procurement" },
+    { label: "Supplier list", value: "suppliers list vendors", to: "/suppliers" },
+    { label: "Material requirements", value: "material requirements plan", to: "/materials" },
+    { label: "RFQ management", value: "rfq request for quotation", to: "/rfq" },
+    { label: "Goods receipt", value: "goods receipt received deliveries", to: "/goods-receipt" },
+    { label: "Inventory levels", value: "inventory stock material levels", to: "/inventory" },
+  ],
+  quality_inspector: [
+    { label: "Run quality inspection", value: "quality inspection check defects", to: "/quality" },
+    { label: "Defect tracking", value: "defects ncr tracking", to: "/defects" },
+    { label: "CAPA actions", value: "capa corrective preventive action", to: "/capa" },
+    { label: "Incoming inspection", value: "incoming inspection material", to: "/incoming-inspection" },
+    { label: "Final inspection", value: "final inspection batch pass fail", to: "/final-inspection" },
+    { label: "Quality certificates", value: "quality certificates issued", to: "/quality-certificates" },
+  ],
+  maintenance_engineer: [
+    { label: "Machine status overview", value: "machines status operational down maintenance", to: "/machines" },
+    { label: "Maintenance tickets", value: "maintenance tickets open assigned", to: "/maintenance" },
+    { label: "Breakdown reports", value: "breakdown reports recent", to: "/breakdowns" },
+    { label: "Spare parts inventory", value: "spare parts stock inventory", to: "/spare-parts" },
+    { label: "Report machine issue", value: "report machine issue breakdown", to: "/maintenance" },
+  ],
+  finance_manager: [
+    { label: "View invoices", value: "invoices outstanding payments", to: "/invoices" },
+    { label: "Payment records", value: "payments received history", to: "/payments" },
+    { label: "Expense tracking", value: "expenses budget tracking", to: "/expenses" },
+    { label: "Tax management", value: "taxes gst input output", to: "/taxes" },
+    { label: "Supplier invoices", value: "supplier invoices pending", to: "/supplier-invoices" },
+    { label: "Profit & Loss overview", value: "profit loss revenue expenses", to: "/finance" },
+  ],
+  hr_manager: [
+    { label: "Employee list", value: "employees list staff", to: "/employees" },
+    { label: "Attendance today", value: "attendance present absent today", to: "/attendance" },
+    { label: "Leave requests", value: "leave requests pending approval", to: "/leaves" },
+    { label: "Payroll overview", value: "payroll salary deductions", to: "/payroll" },
+    { label: "Training records", value: "training courses certifications", to: "/training" },
+    { label: "Performance reviews", value: "performance reviews ratings", to: "/performance" },
+  ],
+  customer_portal: [
+    { label: "My orders", value: "my orders status tracking", to: "/orders" },
+    { label: "Order tracking", value: "track order delivery status", to: "/orders" },
+    { label: "My invoices", value: "my invoices payments due", to: "/customer-invoices" },
+    { label: "My shipments", value: "my shipments delivery tracking", to: "/shipments" },
+    { label: "Support tickets", value: "support tickets my issues", to: "/support" },
+  ],
+  supplier_portal: [
+    { label: "My purchase orders", value: "my purchase orders received", to: "/supplier-pos" },
+    { label: "Supplier invoices", value: "my invoices payments", to: "/supplier-invoices" },
+    { label: "My deliveries", value: "my deliveries shipments tracking", to: "/deliveries" },
+    { label: "Payment history", value: "payment history received", to: "/supplier-payments" },
+  ],
+  auditor: [
+    { label: "Audit logs", value: "audit logs activity trail", to: "/audit" },
+    { label: "Compliance status", value: "compliance status regulations", to: "/compliance" },
+    { label: "Production overview", value: "production overview orders status", to: "/production" },
+    { label: "Finance overview", value: "finance invoices payments", to: "/finance" },
+    { label: "Generate audit report", value: "audit report generate export", to: "/reports" },
+  ],
+};
+
+/** Role-specific search bar placeholders */
+const copilotPlaceholder: Record<string, string> = {
+  root_super_admin: 'Ask about companies, registrations, platform health…',
+  company_admin: 'Ask Copilot — "show production", "approve orders", "staff count"…',
+  plant_manager: 'Ask Copilot — "production schedule", "machine status", "daily report"…',
+  plant_admin: 'Ask Copilot — "plant overview", "departments", "machines"…',
+  production_manager: 'Ask Copilot — "production orders", "work orders", "BOM"…',
+  production_operator: 'Ask Copilot — "my work orders", "machine status"…',
+  warehouse_manager: 'Ask Copilot — "stock levels", "shipments", "low inventory"…',
+  procurement_manager: 'Ask Copilot — "purchase orders", "suppliers", "RFQ"…',
+  quality_inspector: 'Ask Copilot — "inspections", "defects", "CAPA"…',
+  maintenance_engineer: 'Ask Copilot — "machine status", "maintenance tickets", "breakdowns"…',
+  finance_manager: 'Ask Copilot — "invoices", "payments", "expenses"…',
+  hr_manager: 'Ask Copilot — "employees", "attendance", "payroll"…',
+  customer_portal: 'Ask Copilot — "my orders", "shipment status", "invoices"…',
+  supplier_portal: 'Ask Copilot — "my POs", "deliveries", "payments"…',
+  auditor: 'Ask Copilot — "audit logs", "compliance", "cross-module summary"…',
+};
+
+/** Role-specific empty-state messages */
+const copilotEmpty: Record<string, string> = {
+  root_super_admin: 'No results. Try "companies", "registrations", or "platform status".',
+  company_admin: 'No results. Try "production", "approve orders", or "staff count".',
+  plant_manager: 'No results. Try "production schedule", "machine status", or "daily report".',
+  production_manager: 'No results. Try "work orders", "production schedule", or "BOM".',
+  production_operator: 'No results. Try "my work orders" or "machine status".',
+  warehouse_manager: 'No results. Try "stock levels", "shipments", or "low inventory".',
+  procurement_manager: 'No results. Try "purchase orders", "suppliers", or "RFQ".',
+  quality_inspector: 'No results. Try "inspections", "defects", or "CAPA".',
+  maintenance_engineer: 'No results. Try "machine status", "maintenance", or "breakdowns".',
+  finance_manager: 'No results. Try "invoices", "payments", or "expenses".',
+  hr_manager: 'No results. Try "employees", "attendance", or "payroll".',
+  customer_portal: 'No results. Try "my orders", "shipment", or "invoices".',
+  supplier_portal: 'No results. Try "my POs", "deliveries", or "payments".',
+  auditor: 'No results. Try "audit logs", "compliance", or "reports".',
+};
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { loading } = useAuth();
@@ -416,205 +588,27 @@ function TopBar() {
 
       <CommandDialog open={cmdOpen} onOpenChange={setCmdOpen}>
         <CommandInput
-          placeholder={'Ask Copilot — "show production", "create supplier", "export inventory"…'}
+          placeholder={copilotPlaceholder[role ?? ""] ?? copilotPlaceholder.company_admin}
         />
         <CommandList>
           <CommandEmpty>
-            No results. Try "show production", "create supplier", or "export inventory".
+            {copilotEmpty[role ?? ""] ?? copilotEmpty.company_admin}
           </CommandEmpty>
-          <CommandGroup heading="🏭 ERP Workflow Commands">
-            <CommandItem
-              value="show production today orders manufacturing"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/production" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Show today's production orders</span>
-            </CommandItem>
-            <CommandItem
-              value="which machines need maintenance downtime repair"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/maintenance" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Which machines need maintenance?</span>
-            </CommandItem>
-            <CommandItem
-              value="show low inventory stock reorder shortage"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/inventory" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Show low inventory items</span>
-            </CommandItem>
-            <CommandItem
-              value="create purchase order buy procurement supplier"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/procurement" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Create a purchase order</span>
-            </CommandItem>
-            <CommandItem
-              value="check quality inspection defect yield pass fail"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/quality" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Run quality inspection</span>
-            </CommandItem>
-            <CommandItem
-              value="dispatch shipment delivery customer shipping"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/dispatch" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Dispatch customer shipment</span>
-            </CommandItem>
-            <CommandItem
-              value="finance invoice payment revenue accounting"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/finance" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>View invoices and payments</span>
-            </CommandItem>
-            <CommandItem
-              value="customer order sales tracking"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/customers" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>View customer orders</span>
-            </CommandItem>
-            <CommandItem
-              value="employee hr people payroll attendance"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/employees" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Manage employees</span>
-            </CommandItem>
-            <CommandItem
-              value="create new supplier vendor"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/suppliers" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Add a new supplier</span>
-            </CommandItem>
-            <CommandItem
-              value="summarize today activities overview status"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/dashboard" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Summarize today's activities</span>
-            </CommandItem>
-            <CommandItem
-              value="analytics kpi reports intelligence data"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/analytics" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>View analytics & KPIs</span>
-            </CommandItem>
-            <CommandItem
-              value="ai center copilot insights predictions"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/ai-center" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Open AI Center</span>
-            </CommandItem>
-            <CommandItem
-              value="export inventory data csv download"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/inventory" });
-                toast.success("Navigate to Inventory → click Export CSV");
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Export inventory data</span>
-            </CommandItem>
-            <CommandItem
-              value="create warehouse new storage"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/warehouse" });
-                toast.success('Click "New" to add a warehouse');
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Create a new warehouse</span>
-            </CommandItem>
-            <CommandItem
-              value="work order production schedule plan"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/work-orders" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Manage work orders</span>
-            </CommandItem>
-            <CommandItem
-              value="bom bill of materials product assembly"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/bom" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>View Bill of Materials</span>
-            </CommandItem>
-            <CommandItem
-              value="products catalog sku manage"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/products" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Manage product catalog</span>
-            </CommandItem>
-            <CommandItem
-              value="reports production quality finance maintenance"
-              onSelect={() => {
-                setCmdOpen(false);
-                router.navigate({ to: "/reports" });
-              }}
-            >
-              <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
-              <span>Generate reports</span>
-            </CommandItem>
+          <CommandGroup heading="🤖 Copilot Commands">
+            {(copilotCommands[role ?? ""] ?? copilotCommands.company_admin).map((cmd) => (
+              <CommandItem
+                key={cmd.value}
+                value={cmd.value}
+                onSelect={() => {
+                  setCmdOpen(false);
+                  if (cmd.action) cmd.action();
+                  else router.navigate({ to: cmd.to! });
+                }}
+              >
+                <BrainCircuit className="h-4 w-4 mr-2 text-primary" />
+                <span>{cmd.label}</span>
+              </CommandItem>
+            ))}
           </CommandGroup>
           {sections.map((s) => (
             <CommandGroup key={s.label} heading={s.label}>
