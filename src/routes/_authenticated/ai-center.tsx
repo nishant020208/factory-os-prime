@@ -29,6 +29,24 @@ import {
 } from "@/lib/role-scope";
 import { answerCopilot } from "@/lib/copilot-engine";
 
+const copilotPlaceholder: Record<string, string> = {
+  root_super_admin: 'Ask about companies, registrations, platform health…',
+  company_admin: 'Ask Copilot — "show production", "approve orders", "staff count"…',
+  plant_manager: 'Ask Copilot — "production schedule", "machine status", "daily report"…',
+  plant_admin: 'Ask Copilot — "plant overview", "departments", "machines"…',
+  production_manager: 'Ask Copilot — "production orders", "work orders", "BOM"…',
+  production_operator: 'Ask Copilot — "my work orders", "machine status"…',
+  warehouse_manager: 'Ask Copilot — "stock levels", "shipments", "low inventory"…',
+  procurement_manager: 'Ask Copilot — "purchase orders", "suppliers", "RFQ"…',
+  quality_inspector: 'Ask Copilot — "inspections", "defects", "CAPA"…',
+  maintenance_engineer: 'Ask Copilot — "machine status", "maintenance tickets", "breakdowns"…',
+  finance_manager: 'Ask Copilot — "invoices", "payments", "expenses"…',
+  hr_manager: 'Ask Copilot — "employees", "attendance", "payroll"…',
+  customer_portal: 'Ask Copilot — "my orders", "shipment status", "invoices"…',
+  supplier_portal: 'Ask Copilot — "my POs", "deliveries", "payments"…',
+  auditor: 'Ask Copilot — "audit logs", "compliance", "cross-module summary"…',
+};
+
 export const Route = createFileRoute("/_authenticated/ai-center")({
   head: () => ({
     meta: [
@@ -62,10 +80,22 @@ function AICenter() {
   const allowedLabels = getAllowedLabels(role).join(", ");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
+  const greetingMap: Record<string, string> = {
+    root_super_admin: `Hi, I'm your **Platform Copilot** — powered by Cerebras AI. I can help with platform-wide data: companies, registrations, and platform health. What would you like to know?`,
+    company_admin: `Hi, I'm your **Company Copilot** — powered by Cerebras AI. I have full cross-module visibility across your company: orders, production, inventory, quality, maintenance, finance, HR, suppliers and more. What would you like to check?`,
+    production_manager: `Hi, I'm your **Production Copilot** — powered by Cerebras AI. I can help with production orders, work orders, BOM, machines, inventory and quality data. What do you need?`,
+    warehouse_manager: `Hi, I'm your **Warehouse Copilot** — powered by Cerebras AI. I can help with inventory, stock levels, products, and dispatch/shipments. What's on your mind?`,
+    quality_inspector: `Hi, I'm your **Quality Copilot** — powered by Cerebras AI. I can help with inspections, defects, CAPA, and quality parameters. What would you like to check?`,
+    maintenance_engineer: `Hi, I'm your **Maintenance Copilot** — powered by Cerebras AI. I can help with machine status, maintenance tickets, breakdowns and spare parts. What do you need?`,
+    finance_manager: `Hi, I'm your **Finance Copilot** — powered by Cerebras AI. I can help with invoices, payments, expenses, budgets and taxes. What would you like to know?`,
+    hr_manager: `Hi, I'm your **HR Copilot** — powered by Cerebras AI. I can help with employees, attendance, leaves, payroll and training. What do you need?`,
+    customer_portal: `Hi, I'm your **Customer Copilot** — powered by Cerebras AI. I can help with your orders, shipments, invoices and support tickets. What would you like to check?`,
+    supplier_portal: `Hi, I'm your **Supplier Copilot** — powered by Cerebras AI. I can help with your purchase orders, deliveries, invoices and payments. What do you need?`,
+  };
   const [msgs, setMsgs] = useState<{ role: "user" | "ai"; text: string; conf?: number }[]>([
     {
       role: "ai",
-      text: `Hi, I'm your FactoryOS Copilot. I'm scoped to **${role?.replace(/_/g, " ")}** data. I can help you with: **${allowedLabels}**.`,
+      text: greetingMap[role ?? ""] ?? `Hi, I'm your FactoryOS Copilot — powered by Cerebras AI. I'm scoped to **${role?.replace(/_/g, " ")}** data. I can help you with: **${allowedLabels}**.`,
       conf: 100,
     },
   ]);
@@ -160,7 +190,7 @@ function AICenter() {
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Ask Copilot about production, OEE, suppliers, quality…"
+              placeholder={copilotPlaceholder[role ?? ""] ?? "Ask Copilot a question…"}
               className="bg-background/40 h-11"
             />
             <Button
