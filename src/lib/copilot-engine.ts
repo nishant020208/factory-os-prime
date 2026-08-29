@@ -29,7 +29,7 @@ import {
   ROLE_DOMAIN_MAP,
 } from "@/lib/role-scope";
 import { fmtMoney } from "@/lib/currency";
-import { askCerebras } from "@/lib/cerebras";
+import { askCerebras, askCerebrasStream } from "@/lib/cerebras";
 
 export interface CopilotTurn {
   role: "user" | "ai";
@@ -1267,6 +1267,89 @@ export async function answerCopilot(opts: {
     } catch {
       return {
         text: "I hit an error fetching live data. Please try again — or open the relevant module tab to see the data directly.",
+        conf: 70,
+      };
+    }
+  }
+}
+
+/**
+ * Streaming variant of answerCopilot. Calls onToken(chunk) for each token
+ * from Cerebras, then returns the full answer. Falls back to local engine
+ * if Cerebras is unavailable.
+ */
+export async function answerCopilotStream(opts: {
+  question: string;
+  role: string | null;
+  companyId: string | null;
+  userId?: string | null;
+  history?: CopilotTurn[];
+  onToken: (chunk: string) => void;
+}): Promise<CopilotAnswer> {
+  const { onToken, ...rest } = opts;
+  const { question, role, companyId, userId = null, history = [] } = rest;
+  const lower = question.toLowerCase();
+
+  // Same gating as answerCopilot: social, scope, entity lookup all apply
+  _scopeCompanyId = role === "root_super_admin" ? null : companyId;
+
+  const { intent, payload } = detectIntent(question);
+  if (intent === "whichrole") return { text: getRoleIdentityCard(role), conf: 100 };
+  if (intent === "action") {
+    const readOnly = isReadOnlyRole(role);
+    return {
+      text: readOnly
+        ? `🚫 Your **${ROLE_LABELS[role ?? ""] ?? "role"}** access is strictly read-only.`
+        : `I'm advisory only — I read live data and guide you, but I never create, edit, approve or delete records on your behalf.`,
+      conf: 100,
+    };
+  }
+  if (["greeting", "thanks", "farewell", "whoami", "howareyou"].includes(intent)) {
+    return { text: socialReply(intent, role), conf: 100 };
+  }
+  if (intent === "help") {
+    const allowed = getAllowedLabels(role);
+    return {
+      text: `I'm your **role-scoped** data assistant. I can answer with live numbers about: **${allowed.join(", ")}**.`,
+      conf: 100,
+    };
+  }
+  if (role && role !== "root_super_admin" && !companyId) {
+    return {
+      text: "🔒 I can't determine which company your account belongs to, so I won't return any data.",
+      conf: 100,
+    };
+  }
+  const blockedDomain = checkRoleScope(role, question);
+  if (blockedDomain) {
+    const domainLabel = DOMAIN_LABELS[blockedDomain] ?? blockedDomain;
+    return {
+      text: `🚫 **Access Restricted** — you asked about **${domainLabel}**, which is outside your role's scope.`,
+      conf: 100,
+    };
+  }
+
+  // Try Cerebras streaming
+  try {
+    const dataContext = await gatherRoleData(role, companyId, userId, lower);
+    const cerebrasResult = await askCerebrasStream({
+      question,
+      role: role ?? "company_admin",
+      dataContext,
+      history,
+      onToken,
+    });
+    if (cerebrasResult) {
+      return { text: cerebrasResult.text, conf: 95 };
+    }
+    // Fallback: collect tokens from local engine (non-streaming, but show at once)
+    return await roleDataAnswer(role, companyId, userId, lower);
+  } catch {
+    try {
+      return await roleDataAnswer(role, companyId, userId, lower);
+    } catch {
+      return {
+        text: "I hit an error fetching live data. Please try again.",
         conf: 70,
       };
     }
