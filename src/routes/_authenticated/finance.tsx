@@ -178,7 +178,7 @@ function FinancePage() {
           {cashflow.length === 0 ? (
             <EmptyState title="No payments yet" sub="Cash flow appears once payments are recorded." />
           ) : (
-            <div className="h-72">
+            <div className="h-48 sm:h-72">
               <ResponsiveContainer>
                 <AreaChart data={cashflow}>
                   <defs>
