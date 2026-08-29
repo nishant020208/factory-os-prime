@@ -27,7 +27,8 @@ import {
   DOMAIN_LABELS,
   ROLE_DOMAIN_MAP,
 } from "@/lib/role-scope";
-import { answerCopilot } from "@/lib/copilot-engine";
+import { answerCopilot, answerCopilotStream } from "@/lib/copilot-engine";
+import { hasCerebrasKey } from "@/lib/cerebras";
 
 const copilotPlaceholder: Record<string, string> = {
   root_super_admin: 'Ask about companies, registrations, platform health…',
@@ -80,6 +81,8 @@ function AICenter() {
   const allowedLabels = getAllowedLabels(role).join(", ");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const cerebrasReady = hasCerebrasKey();
   const greetingMap: Record<string, string> = {
     root_super_admin: `Hi, I'm your **Platform Copilot** — powered by Cerebras AI. I can help with platform-wide data: companies, registrations, and platform health. What would you like to know?`,
     company_admin: `Hi, I'm your **Company Copilot** — powered by Cerebras AI. I have full cross-module visibility across your company: orders, production, inventory, quality, maintenance, finance, HR, suppliers and more. What would you like to check?`,
@@ -108,18 +111,38 @@ function AICenter() {
     setMsgs(nextMsgs);
     setQ("");
     setBusy(true);
+    setStreaming(true);
 
-    // Conversational answer — real data, role-scoped, multi-turn memory
+    // Add a placeholder message that we'll update token-by-token
+    const placeholderIdx = nextMsgs.length;
+    setMsgs((m) => [...m, { role: "ai", text: "", conf: 0 }]);
+
     (async () => {
-      const { text, conf } = await answerCopilot({
+      const { text, conf } = await answerCopilotStream({
         question,
         role,
         companyId,
         userId: user?.id ?? null,
-        history: msgs, // prior turns give follow-up context like "and the inventory?"
+        history: msgs,
+        onToken: (chunk) => {
+          setMsgs((m) => {
+            const updated = [...m];
+            if (updated[placeholderIdx]) {
+              updated[placeholderIdx] = { ...updated[placeholderIdx], text: updated[placeholderIdx].text + chunk };
+            }
+            return updated;
+          });
+        },
       });
-      setMsgs((m) => [...m, { role: "ai", text, conf }]);
+      setMsgs((m) => {
+        const updated = [...m];
+        if (updated[placeholderIdx]) {
+          updated[placeholderIdx] = { role: "ai", text, conf };
+        }
+        return updated;
+      });
       setBusy(false);
+      setStreaming(false);
     })();
   }
 
@@ -155,9 +178,20 @@ function AICenter() {
         <Panel
           title="Copilot"
           right={
-            <span className="text-[10px] text-primary flex items-center gap-1">
-              <Sparkles className="h-3 w-3" /> Explainable AI
-            </span>
+            <div className="flex items-center gap-3">
+              <span className={`text-[10px] flex items-center gap-1 ${cerebrasReady ? 'text-green-400' : 'text-yellow-400'}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${cerebrasReady ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
+                {cerebrasReady ? 'Cerebras Connected' : 'Cerebras Not Configured'}
+              </span>
+              {streaming && (
+                <span className="text-[10px] text-primary flex items-center gap-1 animate-pulse">
+                  <Sparkles className="h-3 w-3" /> Streaming...
+                </span>
+              )}
+              <span className="text-[10px] text-primary flex items-center gap-1">
+                <Sparkles className="h-3 w-3" /> Explainable AI
+              </span>
+            </div>
           }
         >
           <div className="h-80 overflow-y-auto space-y-3 pr-2">
@@ -181,6 +215,9 @@ function AICenter() {
                   </div>
                   <div className="whitespace-pre-wrap leading-relaxed">
                     {m.text.replace(/\*\*/g, "")}
+                    {streaming && i === msgs.length - 1 && m.role === "ai" && (
+                      <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5" />
+                    )}
                   </div>
                 </div>
               </motion.div>
