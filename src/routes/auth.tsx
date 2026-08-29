@@ -174,7 +174,7 @@ function FloatingParticles() {
 
         const isAesthetic = document.documentElement.getAttribute("data-theme") === "aesthetic";
         const color = isAesthetic
-          ? `oklch(0.79 0.17 75 / ${p.alpha})`
+          ? `oklch(0.74 0.1 65 / ${p.alpha})`
           : `oklch(0.58 0.22 259 / ${p.alpha})`;
 
         ctx!.beginPath();
@@ -185,7 +185,7 @@ function FloatingParticles() {
         ctx!.beginPath();
         ctx!.arc(p.x, p.y, p.size * 2.5, 0, Math.PI * 2);
         ctx!.fillStyle = isAesthetic
-          ? `oklch(0.79 0.17 75 / ${p.alpha * 0.12})`
+          ? `oklch(0.74 0.1 65 / ${p.alpha * 0.12})`
           : `oklch(0.58 0.22 259 / ${p.alpha * 0.12})`;
         ctx!.fill();
       }
