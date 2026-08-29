@@ -11,7 +11,7 @@
  */
 
 const CEREBRAS_API_URL = "https://api.cerebras.ai/v1/chat/completions";
-const CEREBRAS_MODEL = "llama-3.3-70b";
+const CEREBRAS_MODEL = "gpt-oss-120b";
 
 function getCerebrasKey(): string {
   const key = (import.meta as any).env?.VITE_CEREBRAS_API_KEY as string | undefined;
@@ -21,6 +21,12 @@ function getCerebrasKey(): string {
     );
   }
   return key;
+}
+
+/** Check if the Cerebras API key is configured (used by status indicator). */
+export function hasCerebrasKey(): boolean {
+  const key = (import.meta as any).env?.VITE_CEREBRAS_API_KEY as string | undefined;
+  return !!key && key.length > 10;
 }
 
 /* ────────────────────────────────────────────────────────── */
@@ -140,25 +146,17 @@ export interface CerebrasResponse {
   model: string;
 }
 
-/**
- * Send a question to Cerebras with role-scoped system prompt and live data context.
- * Returns the generated text, or null on error (caller falls back to local engine).
- */
-export async function askCerebras(opts: {
+/** Build the messages array (shared by streaming + non-streaming). */
+function buildMessages(opts: {
   question: string;
   role: string;
   dataContext?: string;
   history?: Array<{ role: "user" | "ai"; text: string }>;
-}): Promise<CerebrasResponse | null> {
+}): CerebrasMessage[] | null {
   const { question, role, dataContext, history = [] } = opts;
-
   const systemPrompt = ROLE_SYSTEM_PROMPTS[role];
-  if (!systemPrompt) {
-    // Unknown role — fall back to local engine
-    return null;
-  }
+  if (!systemPrompt) return null;
 
-  // Build the context message with live data
   const contextParts: string[] = [];
   if (dataContext) {
     contextParts.push(`LIVE DATA CONTEXT (from FactoryOS database):\n${dataContext}`);
@@ -175,7 +173,6 @@ export async function askCerebras(opts: {
     { role: "system", content: contextParts.join("\n") },
   ];
 
-  // Add conversation history for multi-turn context (limited to last 6 turns)
   const recentHistory = history.slice(-6);
   for (const turn of recentHistory) {
     messages.push({
@@ -183,9 +180,22 @@ export async function askCerebras(opts: {
       content: turn.text,
     });
   }
-
-  // Add the current question
   messages.push({ role: "user", content: question });
+  return messages;
+}
+
+/**
+ * Send a question to Cerebras (non-streaming).
+ * Returns the generated text, or null on error (caller falls back to local engine).
+ */
+export async function askCerebras(opts: {
+  question: string;
+  role: string;
+  dataContext?: string;
+  history?: Array<{ role: "user" | "ai"; text: string }>;
+}): Promise<CerebrasResponse | null> {
+  const messages = buildMessages(opts);
+  if (!messages) return null;
 
   try {
     const apiKey = getCerebrasKey();
@@ -212,12 +222,88 @@ export async function askCerebras(opts: {
     const text = data?.choices?.[0]?.message?.content;
     if (!text) return null;
 
-    return {
-      text: text.trim(),
-      model: CEREBRAS_MODEL,
-    };
+    return { text: text.trim(), model: CEREBRAS_MODEL };
   } catch (err) {
     console.warn("[Cerebras] Request failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Streaming variant — calls onToken(chunk) for each SSE chunk and returns
+ * the full concatenated text when the stream ends.
+ * Returns null on error so the caller can fall back to the local engine.
+ */
+export async function askCerebrasStream(opts: {
+  question: string;
+  role: string;
+  dataContext?: string;
+  history?: Array<{ role: "user" | "ai"; text: string }>;
+  onToken: (chunk: string) => void;
+}): Promise<CerebrasResponse | null> {
+  const { onToken, ...rest } = opts;
+  const messages = buildMessages(rest);
+  if (!messages) return null;
+
+  try {
+    const apiKey = getCerebrasKey();
+    const res = await fetch(CEREBRAS_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: CEREBRAS_MODEL,
+        messages,
+        max_tokens: 1024,
+        temperature: 0.3,
+        stream: true,
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn(`[Cerebras Stream] API returned ${res.status}: ${await res.text()}`);
+      return null;
+    }
+
+    if (!res.body) return null;
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data:")) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === "[DONE]") break;
+
+        try {
+          const chunk = JSON.parse(payload);
+          const delta = chunk?.choices?.[0]?.delta?.content;
+          if (delta) {
+            fullText += delta;
+            onToken(delta);
+          }
+        } catch {
+          /* skip malformed SSE lines */
+        }
+      }
+    }
+
+    return fullText ? { text: fullText.trim(), model: CEREBRAS_MODEL } : null;
+  } catch (err) {
+    console.warn("[Cerebras Stream] Request failed:", err);
     return null;
   }
 }
