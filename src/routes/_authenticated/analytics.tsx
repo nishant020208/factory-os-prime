@@ -5,7 +5,7 @@ import { TrendingUp, BarChart3, PieChart, Activity, BrainCircuit, Zap } from "lu
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel } from "@/components/ui-parts";
 import { useAuth } from "@/hooks/use-auth";
-import { fmtMoneyK } from "@/lib/currency";
+import { fmtMoneyK, fmtNumberShort } from "@/lib/currency";
 import {
   AreaChart,
   Area,
@@ -173,7 +173,7 @@ function AnalyticsPage() {
                 </defs>
                 <CartesianGrid stroke="rgba(255,255,255,0.05)" />
                 <XAxis dataKey="month" stroke="rgba(255,255,255,0.4)" fontSize={10} />
-                <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} />
+                <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} tickFormatter={fmtNumberShort} />
                 <Tooltip
                   contentStyle={{
                     background: "oklch(0.20 0.025 260)",
@@ -275,7 +275,7 @@ function AnalyticsPage() {
               <LineChart data={revenueProjection}>
                 <CartesianGrid stroke="rgba(255,255,255,0.05)" />
                 <XAxis dataKey="month" stroke="rgba(255,255,255,0.4)" fontSize={10} />
-                <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} />
+                <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} tickFormatter={fmtMoneyK} />
                 <Tooltip
                   contentStyle={{
                     background: "oklch(0.20 0.025 260)",
