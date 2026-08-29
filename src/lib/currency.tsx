@@ -62,16 +62,91 @@ export function fmtMoney(v: unknown, code?: string | null): string {
 }
 
 /**
- * Abbreviated amount ("$12.5k") in the app-wide currency — used by KPI
- * cards that would overflow with a full figure.
+ * Abbreviated amount in the app-wide currency — used by KPI cards,
+ * chart axis labels, and stat cards where full figures would overflow.
+ *
+ * Branches abbreviation system based on company currency:
+ *  - INR → Indian system: K (thousand), L (lakh = 100K), Cr (crore = 10M)
+ *  - Others → Western system: K (thousand), M (million), B (billion)
+ *
+ * Rounding: 2 decimals for Cr/L/M/B, whole numbers for K, raw below 1K.
+ * This is DISPLAY ONLY — never used in exports/CSV/PDF.
  */
 export function fmtMoneyK(v: unknown): string {
   const n = Number(v);
   if (!isFinite(n)) return "—";
   const symbol = currencySymbol();
-  if (Math.abs(n) >= 1_000_000) return `${symbol}${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  if (Math.abs(n) >= 1_000) return `${symbol}${(n / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+  const code = getAppCurrency();
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+
+  if (code === "INR") {
+    // Indian numbering system
+    if (abs >= 1_00_00_000) {
+      // Crore (10M)
+      return `${sign}${symbol}${(abs / 1_00_00_000).toFixed(2).replace(/\.?0+$/, "")} Cr`;
+    }
+    if (abs >= 1_00_000) {
+      // Lakh (100K)
+      return `${sign}${symbol}${(abs / 1_00_000).toFixed(2).replace(/\.?0+$/, "")} L`;
+    }
+    if (abs >= 1_000) {
+      // Thousand — whole number
+      return `${sign}${symbol}${Math.round(abs / 1_000)}K`;
+    }
+    return fmtMoney(n);
+  }
+
+  // Western numbering system
+  if (abs >= 1_000_000_000) {
+    return `${sign}${symbol}${(abs / 1_000_000_000).toFixed(2).replace(/\.?0+$/, "")}B`;
+  }
+  if (abs >= 1_000_000) {
+    return `${sign}${symbol}${(abs / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M`;
+  }
+  if (abs >= 1_000) {
+    return `${sign}${symbol}${Math.round(abs / 1_000)}K`;
+  }
   return fmtMoney(n);
+}
+
+/**
+ * Abbreviated plain number (no currency symbol) — for chart axes,
+ * quantities, and non-monetary counts. Same Indian/Western branching
+ * as fmtMoneyK based on company currency.
+ *
+ * Rounding: 2 decimals for Cr/L/M/B, whole numbers for K, raw below 1K.
+ */
+export function fmtNumberShort(v: unknown): string {
+  const n = Number(v);
+  if (!isFinite(n)) return "—";
+  const code = getAppCurrency();
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+
+  if (code === "INR") {
+    if (abs >= 1_00_00_000) {
+      return `${sign}${(abs / 1_00_00_000).toFixed(2).replace(/\.?0+$/, "")} Cr`;
+    }
+    if (abs >= 1_00_000) {
+      return `${sign}${(abs / 1_00_000).toFixed(2).replace(/\.?0+$/, "")} L`;
+    }
+    if (abs >= 1_000) {
+      return `${sign}${Math.round(abs / 1_000)}K`;
+    }
+    return n.toLocaleString("en-IN");
+  }
+
+  if (abs >= 1_000_000_000) {
+    return `${sign}${(abs / 1_000_000_000).toFixed(2).replace(/\.?0+$/, "")}B`;
+  }
+  if (abs >= 1_000_000) {
+    return `${sign}${(abs / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M`;
+  }
+  if (abs >= 1_000) {
+    return `${sign}${Math.round(abs / 1_000)}K`;
+  }
+  return n.toLocaleString("en-US");
 }
 
 interface CurrencyCtx {
