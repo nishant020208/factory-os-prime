@@ -36,12 +36,14 @@ export function Kpi({
   delta,
   icon: Icon,
   tone = "primary",
+  title,
 }: {
   label: string;
   value: string;
   delta?: string;
   icon?: LucideIcon;
   tone?: "primary" | "success" | "warning" | "info" | "destructive";
+  title?: string;
 }) {
   const toneMap: Record<string, string> = {
     primary: "text-primary bg-primary/15 border-primary/20",
@@ -65,7 +67,7 @@ export function Kpi({
           </div>
         )}
       </div>
-      <div className="mt-3 text-2xl sm:text-3xl font-semibold tabular-nums">{value}</div>
+      <div className="mt-3 text-2xl sm:text-3xl font-semibold tabular-nums" title={title}>{value}</div>
       {delta && (
         <div
           className={`mt-1 text-xs inline-flex items-center gap-0.5 ${up ? "text-success" : "text-destructive"}`}
