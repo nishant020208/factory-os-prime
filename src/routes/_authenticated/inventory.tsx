@@ -229,7 +229,7 @@ function InventoryPage() {
 
       <div className="mt-4">
         <Panel title="Stock levels · top SKUs">
-          <div className="h-56">
+          <div className="h-40 sm:h-56">
             <ResponsiveContainer>
               <BarChart data={chartData}>
                 <CartesianGrid stroke="rgba(255,255,255,0.05)" />
