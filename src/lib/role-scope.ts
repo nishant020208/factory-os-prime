@@ -78,7 +78,7 @@ export const ROLE_DOMAIN_MAP: Record<string, string[]> = {
   ],
   hr_manager: ["hr", "leaves", "training", "performance", "payroll", "attendance", "recruitment"],
   customer_portal: ["orders", "dispatch", "finance", "documents", "crm", "support"],
-  supplier_portal: ["suppliers", "inventory", "dispatch", "finance"],
+  supplier_portal: ["suppliers", "inventory", "dispatch", "finance", "orders", "procurement"],
   auditor: [
     "production",
     "inventory",
