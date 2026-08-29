@@ -810,7 +810,7 @@ function FloatingParticles() {
 
         const isAesthetic = document.documentElement.getAttribute("data-theme") === "aesthetic";
         const color = isAesthetic
-          ? `oklch(0.79 0.17 75 / ${p.alpha})`
+          ? `oklch(0.74 0.1 65 / ${p.alpha})`
           : `oklch(0.58 0.22 259 / ${p.alpha})`;
 
         ctx!.beginPath();
@@ -822,7 +822,7 @@ function FloatingParticles() {
         ctx!.beginPath();
         ctx!.arc(p.x, p.y, p.size * 2.5, 0, Math.PI * 2);
         ctx!.fillStyle = isAesthetic
-          ? `oklch(0.79 0.17 75 / ${p.alpha * 0.15})`
+          ? `oklch(0.74 0.1 65 / ${p.alpha * 0.15})`
           : `oklch(0.58 0.22 259 / ${p.alpha * 0.15})`;
         ctx!.fill();
       }
@@ -3692,11 +3692,11 @@ function LiquidBackground() {
       // Colors — more blobs, richer opacity
       const blobs = isAesthetic
         ? [
-            { r: 0.79, g: 0.45, b: 0.14, a: 0.18, phase: 0.0 }, // amber
-            { r: 0.31, g: 0.82, b: 0.77, a: 0.15, phase: 1.8 }, // teal
-            { r: 0.65, g: 0.35, b: 0.8, a: 0.12, phase: 3.2 }, // violet
-            { r: 0.9, g: 0.6, b: 0.3, a: 0.1, phase: 4.5 }, // gold
-            { r: 0.2, g: 0.7, b: 0.85, a: 0.1, phase: 5.8 }, // sky
+            { r: 0.85, g: 0.63, b: 0.4, a: 0.15, phase: 0.0 }, // honey amber
+            { r: 0.55, g: 0.42, b: 0.31, a: 0.12, phase: 1.8 }, // deep brown
+            { r: 0.91, g: 0.76, b: 0.62, a: 0.1, phase: 3.2 }, // cream gold
+            { r: 0.4, g: 0.3, b: 0.22, a: 0.1, phase: 4.5 }, // warm charcoal
+            { r: 0.6, g: 0.45, b: 0.35, a: 0.08, phase: 5.8 }, // warm brown
           ]
         : [
             { r: 0.33, g: 0.39, b: 0.96, a: 0.16, phase: 0.0 }, // blue
@@ -3767,7 +3767,7 @@ function LiquidBackground() {
       );
       cursorGrad.addColorStop(
         0,
-        isAesthetic ? "oklch(0.79 0.17 75 / 0.20)" : "oklch(0.58 0.22 259 / 0.18)",
+        isAesthetic ? "oklch(0.74 0.1 65 / 0.20)" : "oklch(0.58 0.22 259 / 0.18)",
       );
       cursorGrad.addColorStop(1, "oklch(0 0 0 / 0)");
       ctx!.fillStyle = cursorGrad;
