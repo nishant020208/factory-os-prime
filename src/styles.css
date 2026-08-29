@@ -7,7 +7,7 @@
 /*
  * FactoryOS AI — Premium Enterprise Design System
  * Dark-first, glassmorphism, Apple/Linear/Stripe/Tesla-inspired.
- * Three themes: dark (navy), light (warm paper), aesthetic (amber/teal).
+ * Three themes: dark (navy), light (warm paper), aesthetic (warm studio / wood-inspired).
  * All colors in oklch. Semantic tokens only — never hardcode in components.
  * 8pt spacing scale. Typography scale with display, UI, and mono fonts.
  */
@@ -228,91 +228,95 @@
 
 /* ============================================================ */
 /*  THEME — AESTHETIC  (data-theme="aesthetic")                 */
-/*  Warm off-black, amber + teal accents, glassmorphism.        */
+/*  "Warm Studio" — natural wood tones, soft linen, honey       */
+/*  accents. Premium furniture-showroom feel vs factory control. */
+/*  Semantic status colors (red/green/amber) are RESERVED and   */
+/*  kept untouched — only base/surface/accent palette changes.  */
 /* ============================================================ */
 [data-theme="aesthetic"] {
   --radius: 0.875rem;
 
-  /* Warm off-black base */
-  --background: oklch(0.12 0.03 10); /* #141013 deep warm */
-  --foreground: oklch(0.95 0.01 50);
-  --card: oklch(0.17 0.04 15); /* slightly lighter warm */
-  --card-foreground: oklch(0.95 0.01 50);
-  --popover: oklch(0.15 0.03 12);
-  --popover-foreground: oklch(0.95 0.01 50);
+  /* Backgrounds — warm near-black with walnut undertone */
+  --background: oklch(0.115 0.02 50); /* #1C1815 dark walnut */
+  --foreground: oklch(0.93 0.01 70); /* #F5EFE7 warm off-white */
+  --card: oklch(0.16 0.025 45); /* #28221D warm charcoal-brown */
+  --card-foreground: oklch(0.93 0.01 70);
+  --popover: oklch(0.15 0.025 48);
+  --popover-foreground: oklch(0.93 0.01 70);
 
-  /* Amber + Teal brand */
-  --primary: oklch(0.79 0.17 75); /* amber #F5A623 */
-  --primary-foreground: oklch(0.12 0.03 10);
-  --secondary: oklch(0.72 0.14 190); /* teal #4FD1C5 */
-  --secondary-foreground: oklch(0.12 0.03 10);
-  --muted: oklch(0.2 0.03 20);
-  --muted-foreground: oklch(0.6 0.05 60);
-  --accent: oklch(0.72 0.14 190); /* teal */
-  --accent-foreground: oklch(0.12 0.03 10);
+  /* Brand — honey amber primary, deep warm brown secondary */
+  --primary: oklch(0.74 0.1 65); /* #D9A066 honey/amber */
+  --primary-foreground: oklch(0.14 0.02 50);
+  --secondary: oklch(0.48 0.07 55); /* #8C6A4F deep warm brown */
+  --secondary-foreground: oklch(0.93 0.01 70);
+  --muted: oklch(0.2 0.02 48);
+  --muted-foreground: oklch(0.62 0.04 60); /* #A89A8C warm grey-brown */
+  --accent: oklch(0.82 0.08 65); /* #E8C39E soft cream-gold */
+  --accent-foreground: oklch(0.14 0.02 50);
 
-  /* Status (adjusted for warm base) */
-  --destructive: oklch(0.65 0.22 25);
-  --destructive-foreground: oklch(0.12 0.03 10);
-  --success: oklch(0.72 0.18 145);
-  --success-foreground: oklch(0.12 0.03 10);
-  --warning: oklch(0.79 0.17 75);
-  --warning-foreground: oklch(0.12 0.03 10);
-  --info: oklch(0.72 0.16 210);
-  --info-foreground: oklch(0.12 0.03 10);
+  /* Status — RESERVED semantic colors, unchanged */
+  --destructive: oklch(0.62 0.23 25); /* #EF4444 red — errors/fail */
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.72 0.19 145); /* #22C55E green — success/pass */
+  --success-foreground: oklch(0.15 0.02 260);
+  --warning: oklch(0.75 0.16 55); /* #F59E0B orange-amber — warnings */
+  --warning-foreground: oklch(0.14 0.02 50);
+  --info: oklch(0.68 0.12 230); /* #06B6D4 cool blue — info */
+  --info-foreground: oklch(0.93 0.01 70);
 
-  /* Borders — frosted glass look */
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.79 0.17 75 / 50%);
+  /* Borders — low-opacity warm brown */
+  --border: oklch(0.55 0.06 55 / 18%);
+  --input: oklch(0.55 0.06 55 / 22%);
+  --ring: oklch(0.74 0.1 65 / 50%);
 
-  /* Charts */
-  --chart-1: oklch(0.79 0.17 75); /* amber */
-  --chart-2: oklch(0.72 0.14 190); /* teal */
-  --chart-3: oklch(0.65 0.15 300); /* violet */
-  --chart-4: oklch(0.72 0.18 145); /* green */
-  --chart-5: oklch(0.62 0.15 30); /* rust */
+  /* Charts — warm-harmonized palette */
+  --chart-1: oklch(0.74 0.1 65); /* honey */
+  --chart-2: oklch(0.48 0.07 55); /* deep brown */
+  --chart-3: oklch(0.65 0.12 30); /* warm rust */
+  --chart-4: oklch(0.72 0.19 145); /* green */
+  --chart-5: oklch(0.68 0.12 230); /* info blue */
 
-  /* Sidebar — deeper warm */
-  --sidebar: oklch(0.09 0.03 10);
-  --sidebar-foreground: oklch(0.88 0.02 50);
-  --sidebar-primary: oklch(0.79 0.17 75);
-  --sidebar-primary-foreground: oklch(0.12 0.03 10);
-  --sidebar-accent: oklch(0.72 0.14 190);
-  --sidebar-accent-foreground: oklch(0.12 0.03 10);
-  --sidebar-border: oklch(1 0 0 / 6%);
-  --sidebar-ring: oklch(0.79 0.17 75 / 50%);
+  /* Sidebar — deeper warm walnut */
+  --sidebar: oklch(0.09 0.02 50);
+  --sidebar-foreground: oklch(0.85 0.02 60);
+  --sidebar-primary: oklch(0.74 0.1 65);
+  --sidebar-primary-foreground: oklch(0.14 0.02 50);
+  --sidebar-accent: oklch(0.22 0.03 50);
+  --sidebar-accent-foreground: oklch(0.93 0.01 70);
+  --sidebar-border: oklch(0.55 0.06 55 / 10%);
+  --sidebar-ring: oklch(0.74 0.1 65 / 50%);
 
-  /* Glass + mesh aesthetic look */
-  --gradient-primary: linear-gradient(135deg, oklch(0.79 0.17 75) 0%, oklch(0.72 0.14 190) 100%);
+  /* Warm ambient gradients — soft wood-grain atmosphere */
+  --gradient-primary: linear-gradient(135deg, oklch(0.74 0.1 65) 0%, oklch(0.48 0.07 55) 100%);
   --gradient-aurora:
-    radial-gradient(1200px 600px at 10% -10%, oklch(0.79 0.17 75 / 0.15), transparent 60%),
-    radial-gradient(1000px 500px at 90% 10%, oklch(0.72 0.14 190 / 0.12), transparent 60%),
-    radial-gradient(800px 400px at 50% 100%, oklch(0.65 0.15 300 / 0.1), transparent 60%);
+    radial-gradient(1200px 600px at 10% -10%, oklch(0.74 0.1 65 / 0.1), transparent 60%),
+    radial-gradient(1000px 500px at 90% 10%, oklch(0.48 0.07 55 / 0.08), transparent 60%),
+    radial-gradient(800px 400px at 50% 100%, oklch(0.65 0.12 30 / 0.06), transparent 60%);
   --gradient-mesh: conic-gradient(
     from 180deg at 50% 50%,
-    oklch(0.79 0.17 75 / 0.12),
-    oklch(0.72 0.14 190 / 0.1),
-    oklch(0.65 0.15 300 / 0.08),
-    oklch(0.79 0.17 75 / 0.12)
+    oklch(0.74 0.1 65 / 0.08),
+    oklch(0.48 0.07 55 / 0.06),
+    oklch(0.65 0.12 30 / 0.05),
+    oklch(0.74 0.1 65 / 0.08)
   );
 
   --shadow-elegant: 0 10px 40px -12px oklch(0 0 0 / 0.5);
-  --shadow-glow: 0 0 40px oklch(0.79 0.17 75 / 0.3);
-  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.06) inset, 0 12px 40px -20px oklch(0 0 0 / 0.6);
-  --shadow-elevated: 0 20px 60px -20px oklch(0 0 0 / 0.7), 0 1px 0 oklch(1 0 0 / 0.06) inset;
+  --shadow-glow: 0 0 40px oklch(0.74 0.1 65 / 0.2);
+  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 12px 40px -20px oklch(0 0 0 / 0.5);
+  --shadow-elevated: 0 20px 60px -20px oklch(0 0 0 / 0.6), 0 1px 0 oklch(1 0 0 / 0.04) inset;
 
   --bg-base: var(--background);
   --bg-elevated: var(--card);
+  /* Subtle warm horizontal texture — like linen grain */
   --bg-texture: repeating-linear-gradient(
     0deg,
     transparent,
     transparent 40px,
-    oklch(1 0 0 / 0.015) 40px,
-    oklch(1 0 0 / 0.015) 41px
+    oklch(1 0 0 / 0.012) 40px,
+    oklch(1 0 0 / 0.012) 41px
   );
-  --accent-glow: oklch(0.79 0.17 75 / 0.25);
-  --border-gradient: linear-gradient(135deg, oklch(1 0 0 / 12%), oklch(1 0 0 / 4%));
+  --accent-glow: oklch(0.74 0.1 65 / 0.2);
+  --border-gradient: linear-gradient(135deg, oklch(0.55 0.06 55 / 15%), oklch(0.55 0.06 55 / 5%));
 }
 
 @layer base {
@@ -551,6 +555,21 @@
   @media (width >= 640px) {
     grid-template-columns: repeat(4, 1fr);
   }
+}
+
+/* Chart containers: responsive height + overflow handling */
+@utility chart-container {
+  width: 100%;
+  min-height: 200px;
+  @media (width < 640px) {
+    min-height: 160px;
+  }
+}
+
+/* Touch-friendly tap targets — minimum 44px for interactive elements */
+@utility touch-target {
+  min-height: 44px;
+  min-width: 44px;
 }
 
 /* Sidebar breaks in mid-sized screens — keep it as overlay */
