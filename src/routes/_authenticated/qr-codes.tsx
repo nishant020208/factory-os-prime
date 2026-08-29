@@ -138,7 +138,7 @@ function QrCodesPage() {
       />
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
           <div className="text-xs text-muted-foreground">Total</div>
           <div className="text-2xl font-bold mt-0.5">{(codes ?? []).length}</div>
