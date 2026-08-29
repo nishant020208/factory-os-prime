@@ -44,7 +44,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { toast } from "sonner";
 import { useState } from "react";
 import { safeDate } from "@/lib/utils";
-import { fmtMoney } from "@/lib/currency";
+import { fmtMoney, fmtMoneyK, fmtNumberShort } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/inventory")({
   head: () => ({
@@ -203,17 +203,19 @@ function InventoryPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Kpi
           label="Total on-hand"
-          value={totalOnHand.toLocaleString()}
+          value={fmtNumberShort(totalOnHand)}
           delta="+2.3%"
           icon={Boxes}
           tone="primary"
+          title={totalOnHand.toLocaleString()}
         />
         <Kpi
           label="Inventory value"
-          value={fmtMoney(Math.round(value))}
+          value={fmtMoneyK(Math.round(value))}
           delta="+1.1%"
           icon={Boxes}
           tone="success"
+          title={fmtMoney(Math.round(value))}
         />
         <Kpi
           label="Low-stock SKUs"
@@ -232,7 +234,7 @@ function InventoryPage() {
               <BarChart data={chartData}>
                 <CartesianGrid stroke="rgba(255,255,255,0.05)" />
                 <XAxis dataKey="sku" stroke="rgba(255,255,255,0.4)" fontSize={10} />
-                <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} />
+                <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} tickFormatter={fmtNumberShort} />
                 <Tooltip
                   contentStyle={{
                     background: "oklch(0.20 0.025 260)",
@@ -274,13 +276,13 @@ function InventoryPage() {
                     <TableCell>{r.product_name}</TableCell>
                     <TableCell className="text-muted-foreground">{r.warehouse_name}</TableCell>
                     <TableCell className="tabular-nums">
-                      {Number(r.quantity ?? 0).toLocaleString()}
+                      {fmtNumberShort(r.quantity ?? 0)}
                     </TableCell>
                     <TableCell className="tabular-nums">
-                      {Math.round(Number(r.quantity ?? 0) * 0.15).toLocaleString()}
+                      {fmtNumberShort(Math.round(Number(r.quantity ?? 0) * 0.15))}
                     </TableCell>
                     <TableCell className="tabular-nums">
-                      {Number(r.reorder_level).toLocaleString()}
+                      {fmtNumberShort(r.reorder_level)}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={r.low ? "critical" : "active"} />
