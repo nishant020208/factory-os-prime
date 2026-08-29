@@ -55,7 +55,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { primaryRole } from "@/lib/route-access";
 import { safeDate } from "@/lib/utils";
-import { fmtMoney, fmtMoneyK } from "@/lib/currency";
+import { fmtMoney, fmtMoneyK, fmtNumberShort } from "@/lib/currency";
 import type { AppRole } from "@/lib/roles";
 import { ROLE_MAP } from "@/lib/roles";
 import { getDashboardNotes, saveDashboardNote } from "@/lib/order-lifecycle";
@@ -410,7 +410,7 @@ function Shell({
 
 function OutputChart({ data }: { data: ReturnType<typeof trend> }) {
   return (
-    <div className="h-64">
+    <div className="h-44 sm:h-64">
       <ResponsiveContainer>
         <AreaChart data={data}>
           <defs>
@@ -936,7 +936,7 @@ function CompanyAdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         <Panel title="OEE · Today">
-          <div className="h-56">
+          <div className="h-36 sm:h-56">
             <ResponsiveContainer>
               <LineChart data={oeeSeries}>
                 <CartesianGrid stroke="rgba(255,255,255,0.05)" />
@@ -977,7 +977,7 @@ function CompanyAdminDashboard() {
           </div>
         </Panel>
         <Panel title="Product Mix">
-          <div className="h-56">
+          <div className="h-36 sm:h-56">
             <ResponsiveContainer>
               <PieChart>
                 <Pie
@@ -1004,12 +1004,12 @@ function CompanyAdminDashboard() {
           </div>
         </Panel>
         <Panel title="Scrap · 14 days">
-          <div className="h-56">
+          <div className="h-36 sm:h-56">
             <ResponsiveContainer>
               <BarChart data={outputTrend}>
                 <CartesianGrid stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="d" stroke="rgba(255,255,255,0.4)" fontSize={10} />
-                <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} />
+                <XAxis dataKey="d" stroke="rgba(255,255,255,0.4)" fontSize={10} tickFormatter={(v: number) => String(v)} />
+                <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} tickFormatter={fmtNumberShort} />
                 <Tooltip
                   contentStyle={{
                     background: "oklch(0.20 0.025 260)",
