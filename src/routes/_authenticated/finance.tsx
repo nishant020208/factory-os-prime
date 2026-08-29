@@ -193,7 +193,7 @@ function FinancePage() {
                   </defs>
                   <CartesianGrid stroke="rgba(255,255,255,0.05)" />
                   <XAxis dataKey="m" stroke="rgba(255,255,255,0.4)" fontSize={10} />
-                  <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} />
+                  <YAxis stroke="rgba(255,255,255,0.4)" fontSize={10} tickFormatter={fmtMoneyK} />
                   <Tooltip
                     contentStyle={{
                       background: "oklch(0.20 0.025 260)",
