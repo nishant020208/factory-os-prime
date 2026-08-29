@@ -158,7 +158,7 @@ function AnalyticsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <Panel title="Production Trend · 12 Months">
-          <div className="h-64">
+          <div className="h-44 sm:h-64">
             <ResponsiveContainer>
               <AreaChart data={prodTrend}>
                 <defs>
@@ -205,7 +205,7 @@ function AnalyticsPage() {
         </Panel>
 
         <Panel title="Machine Status">
-          <div className="h-64">
+          <div className="h-44 sm:h-64">
             <ResponsiveContainer>
               <RePie>
                 <Pie
@@ -236,7 +236,7 @@ function AnalyticsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <Panel title="Machine Utilization">
-          <div className="h-64">
+          <div className="h-44 sm:h-64">
             <ResponsiveContainer>
               <BarChart data={machineUtil}>
                 <CartesianGrid stroke="rgba(255,255,255,0.05)" />
@@ -270,7 +270,7 @@ function AnalyticsPage() {
         </Panel>
 
         <Panel title="Revenue Projection">
-          <div className="h-64">
+          <div className="h-44 sm:h-64">
             <ResponsiveContainer>
               <LineChart data={revenueProjection}>
                 <CartesianGrid stroke="rgba(255,255,255,0.05)" />
