@@ -257,7 +257,7 @@ function WorkOrderDetail({
       <div>
         <Label>Progress</Label>
         <Progress className="mt-2" value={order.progress_percent} />
-        <div className="mt-3 grid grid-cols-4 gap-2">
+        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[25, 50, 75, 100].map((n) => (
             <Button
               key={n}
