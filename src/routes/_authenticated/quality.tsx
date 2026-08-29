@@ -762,7 +762,7 @@ function QualityPage() {
                 {(inspections ?? []).length === 0 ? (
                   <EmptyState title="No inspections yet" sub="Record your first inspection to see yield trends." />
                 ) : (
-                  <div className="h-64">
+                  <div className="h-44 sm:h-64">
                     <ResponsiveContainer>
                       <AreaChart data={trend}>
                         <defs>
