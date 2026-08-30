@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -67,7 +67,7 @@ import {
   ROLE_DOMAIN_MAP,
 } from "@/lib/role-scope";
 import { answerCopilot, answerCopilotStream } from "@/lib/copilot-engine";
-import { hasCerebrasKey } from "@/lib/cerebras";
+import { hasCerebrasKey, checkCerebrasHealth } from "@/lib/cerebras";
 
 const copilotPlaceholder: Record<string, string> = {
   root_super_admin: 'Ask about companies, registrations, platform health…',
@@ -121,7 +121,13 @@ function AICenter() {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [streaming, setStreaming] = useState(false);
-  const cerebrasReady = hasCerebrasKey();
+  const [cerebrasStatus, setCerebrasStatus] = useState<{ connected: boolean; message: string }>({ connected: false, message: "Checking..." });
+  const cerebrasReady = cerebrasStatus.connected;
+
+  // Check Cerebras health on mount
+  useEffect(() => {
+    checkCerebrasHealth().then(setCerebrasStatus);
+  }, []);
   const greetingMap: Record<string, string> = {
     root_super_admin: `Hi, I'm your **Platform Copilot** — powered by Cerebras AI. I can help with platform-wide data: companies, registrations, and platform health. What would you like to know?`,
     company_admin: `Hi, I'm your **Company Copilot** — powered by Cerebras AI. I have full cross-module visibility across your company: orders, production, inventory, quality, maintenance, finance, HR, suppliers and more. What would you like to check?`,
@@ -218,9 +224,9 @@ function AICenter() {
           title="Copilot"
           right={
             <div className="flex items-center gap-3">
-              <span className={`text-[10px] flex items-center gap-1 ${cerebrasReady ? 'text-green-400' : 'text-yellow-400'}`}>
+              <span className={`text-[10px] flex items-center gap-1 ${cerebrasReady ? 'text-green-400' : 'text-yellow-400'}`} title={cerebrasStatus.message}>
                 <span className={`h-1.5 w-1.5 rounded-full ${cerebrasReady ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
-                {cerebrasReady ? 'Cerebras Connected' : 'Cerebras Not Configured'}
+                {cerebrasReady ? 'Cerebras Connected' : `Cerebras: ${cerebrasStatus.message}`}
               </span>
               {streaming && (
                 <span className="text-[10px] text-primary flex items-center gap-1 animate-pulse">

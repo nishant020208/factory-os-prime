@@ -29,6 +29,35 @@ export function hasCerebrasKey(): boolean {
   return !!key && key.length > 10;
 }
 
+/** Check if Cerebras API is actually reachable and has credits. */
+export async function checkCerebrasHealth(): Promise<{ connected: boolean; message: string }> {
+  if (!hasCerebrasKey()) {
+    return { connected: false, message: "API key not configured" };
+  }
+  try {
+    const key = (import.meta as any).env?.VITE_CEREBRAS_API_KEY as string;
+    const res = await fetch(CEREBRAS_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: CEREBRAS_MODEL,
+        messages: [{ role: "user", content: "Hi" }],
+        max_tokens: 5,
+      }),
+    });
+    if (res.ok) return { connected: true, message: "Connected" };
+    const data = await res.json().catch(() => ({}));
+    const msg = (data as any)?.message ?? `HTTP ${res.status}`;
+    if (res.status === 402) return { connected: false, message: "No credits — add billing at cerebras.ai" };
+    return { connected: false, message: msg };
+  } catch (err) {
+    return { connected: false, message: "Network error" };
+  }
+}
+
 /* ────────────────────────────────────────────────────────── */
 /*  ROLE-SPECIFIC SYSTEM PROMPTS                              */
 /* ────────────────────────────────────────────────────────── */
