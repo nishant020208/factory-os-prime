@@ -12,6 +12,7 @@ import {
   Truck,
   ShieldCheck,
   AlertTriangle,
+  ArrowDownToLine,
 } from "lucide-react";
 
 export const Route = createFileRoute("/scan")({
@@ -62,6 +63,12 @@ const TYPE_META: Record<
     label: "Shipment",
     color: "text-purple-400",
     bg: "from-purple-500/20 to-purple-900/10",
+  },
+  inbound_shipment: {
+    icon: ArrowDownToLine,
+    label: "Inbound Shipment",
+    color: "text-cyan-400",
+    bg: "from-cyan-500/20 to-cyan-900/10",
   },
   package: {
     icon: PackageCheck,
