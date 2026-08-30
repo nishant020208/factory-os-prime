@@ -677,6 +677,34 @@ function QualityPage() {
         .update({ result: overallResult })
         .eq("id", inspection.id);
 
+      // On pass: create quality certificate + QR code
+      if (overallResult === "pass") {
+        const certNumber = `QC-${new Date().getFullYear()}-${String(Date.now() % 100000).padStart(5, "0")}`;
+        const { data: cert } = await supabase
+          .from("quality_certificates")
+          .insert({
+            company_id: companyId,
+            certificate_number: certNumber,
+            inspection_id: inspection.id,
+            issued_by: user.id,
+          })
+          .select("id")
+          .single();
+
+        if (cert) {
+          await supabase.from("qr_codes").insert({
+            company_id: companyId,
+            entity_type: "quality_certificate",
+            entity_id: cert.id,
+            type: "quality_certificate",
+            status: "active",
+            qr_data: certNumber,
+            label: certNumber,
+            sub_label: `${formData.product_name || "Product"} · ${inspectionNumber}`,
+          });
+        }
+      }
+
       return { id: inspection.id, result: overallResult, number: inspectionNumber };
     },
     onSuccess: (data) => {
