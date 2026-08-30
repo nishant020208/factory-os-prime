@@ -33,6 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
+import { useSupplier } from "@/hooks/use-supplier";
 import { toast } from "sonner";
 import { useState } from "react";
 import {
@@ -78,36 +79,7 @@ function SupplierPosPage() {
   });
   const [dispatching, setDispatching] = useState(false);
 
-  // Resolve own supplier id + name (fail-closed)
-  const { data: mySupplier } = useQuery({
-    queryKey: ["my-supplier", user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      const byUser = await supabase
-        .from("suppliers")
-        .select("id, name")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (byUser.data?.id)
-        return { id: byUser.data.id as string, name: (byUser.data.name as string) ?? "Your company" };
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("email")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (profile?.email) {
-        const { data: sup } = await supabase
-          .from("suppliers")
-          .select("id, name")
-          .eq("contact_email", profile.email)
-          .maybeSingle();
-        return sup?.id
-          ? { id: sup.id as string, name: (sup.name as string) ?? "Your company" }
-          : null;
-      }
-      return null;
-    },
-  });
+  const { mySupplier } = useSupplier();
   const supplierId = mySupplier?.id ?? null;
 
   const { data } = useQuery({
