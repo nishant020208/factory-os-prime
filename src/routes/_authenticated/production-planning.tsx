@@ -8,7 +8,9 @@ import {
   Package,
   ShoppingCart,
   Loader2,
-  Boxes,
+  CreditCard,
+  UserCheck,
+  Banknote,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
@@ -16,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { notifyProcurementTriggered } from "@/lib/notifications";
 import { toast } from "sonner";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/production-planning")({
   head: () => ({
@@ -107,6 +109,39 @@ function ProductionPlanningPage() {
     enabled: !!companyId,
   });
 
+  // Operators for assignment — pull from whitelist (accepted production_operators)
+  const { data: operators } = useQuery({
+    queryKey: ["pp-operators", companyId],
+    queryFn: async () => {
+      // Get whitelisted production operators for this company
+      const { data: wl } = await supabase
+        .from("whitelist")
+        .select("email")
+        .eq("company_id", companyId!)
+        .eq("role", "production_operator")
+        .eq("status", "accepted");
+      if (!wl?.length) return [];
+      const emails = wl.map((w: any) => w.email);
+      // Get profiles for those emails
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .eq("company_id", companyId!)
+        .in("email", emails);
+      return profiles ?? [];
+    },
+    enabled: !!companyId,
+  });
+
+  // Machines for assignment context
+  const { data: machines } = useQuery({
+    queryKey: ["pp-machines", companyId],
+    queryFn: async () =>
+      (await supabase.from("machines").select("id, name, status").eq("company_id", companyId!)).data ??
+      [],
+    enabled: !!companyId,
+  });
+
   // Resolve BOM lines for a product.
   const bomLinesFor = (productId: string | null): BomLine[] => {
     if (!productId) return [];
@@ -158,6 +193,89 @@ function ProductionPlanningPage() {
       };
     });
   }, [orders, boms, materials, products, inventory]);
+
+  // Advance payment request mutation
+  const advancePaymentMutation = useMutation({
+    mutationFn: async ({ order, percentage }: { order: any; percentage: number }) => {
+      if (!companyId) throw new Error("Not authenticated");
+      const totalAmount = Number(order.total_amount ?? 0);
+      const advanceAmount = (totalAmount * percentage) / 100;
+
+      const { error } = await supabase
+        .from("sales_orders")
+        .update({
+          advance_payment_percent: percentage,
+          advance_payment_status: "requested",
+          advance_qr_url: `upi://pay?pa=demo@upi&pn=ABCManufacturing&am=${advanceAmount}`,
+          balance_due: totalAmount - advanceAmount,
+        })
+        .eq("id", order.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pp-orders"] });
+      toast.success("Advance payment request sent to customer");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  // Payment confirmation mutation
+  const confirmPaymentMutation = useMutation({
+    mutationFn: async (order: any) => {
+      if (!companyId) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("sales_orders")
+        .update({
+          advance_payment_status: "confirmed",
+        })
+        .eq("id", order.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pp-orders"] });
+      toast.success("Payment confirmed — operator can be assigned now");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  // Operator assignment mutation
+  const assignOperatorMutation = useMutation({
+    mutationFn: async ({ order, operatorId }: { order: any; operatorId: string }) => {
+      if (!companyId) throw new Error("Not authenticated");
+
+      // Create or update work order with assigned operator
+      const { data: existing } = await supabase
+        .from("work_orders")
+        .select("id")
+        .eq("wo_number", `WO-${order.so_number}`)
+        .eq("company_id", companyId)
+        .single();
+
+      if (existing) {
+        const { error } = await supabase
+          .from("work_orders")
+          .update({ operator_id: operatorId, status: "in_progress", assigned_by: operatorId })
+          .eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("work_orders").insert({
+          company_id: companyId,
+          wo_number: `WO-${order.so_number}`,
+          quantity: order.quantity,
+          status: "in_progress",
+          operator_id: operatorId,
+          assigned_by: operatorId,
+          due_date: order.due_date,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pp-orders"] });
+      toast.success("Operator assigned — work order created");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
 
   const reserveMutation = useMutation({
     mutationFn: async (order: any) => {
@@ -255,110 +373,17 @@ function ProductionPlanningPage() {
       </div>
 
       {(checked ?? []).map((c) => (
-        <Panel
+        <OrderPanel
           key={c.order.id}
-          title={c.order.so_number}
-          right={<StatusBadge status={c.order.status} />}
-          className="mb-4"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-            <div className="text-sm text-muted-foreground">
-              {c.order.customer_name} · {c.order.product_name} × {c.order.quantity} · Due{" "}
-              {c.order.due_date ? new Date(c.order.due_date).toLocaleDateString() : "—"}
-            </div>
-            <div className="flex gap-2">
-              {c.order.status === "approved" && (
-                <>
-                  <Button
-                    size="sm"
-                    className="h-8"
-                    onClick={() => reserveMutation.mutate(c.order)}
-                    disabled={reserveMutation.isPending || !c.allSufficient}
-                    title={
-                      c.allSufficient
-                        ? "Reserve materials and start production"
-                        : "Insufficient stock — trigger procurement first"
-                    }
-                  >
-                    {reserveMutation.isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                    ) : (
-                      <Factory className="h-3.5 w-3.5 mr-1.5" />
-                    )}
-                    Reserve & Start
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 border-amber-500/30 text-amber-400"
-                    onClick={() => procureMutation.mutate(c)}
-                    disabled={procureMutation.isPending || c.allSufficient || c.missing.length === 0}
-                  >
-                    <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
-                    Trigger Procurement
-                  </Button>
-                </>
-              )}
-              {c.order.status === "procurement_pending" && (
-                <span className="text-xs text-amber-400 inline-flex items-center gap-1">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  Awaiting GRN — order resumes automatically once materials are received
-                </span>
-              )}
-              {c.order.status === "material_reserved" && (
-                <span className="text-xs text-success inline-flex items-center gap-1">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Reserved — create Work Orders
-                </span>
-              )}
-              {c.order.status === "in_production" && (
-                <span className="text-xs text-info inline-flex items-center gap-1">
-                  <Factory className="h-3.5 w-3.5" />
-                  In production
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-white/5">
-                  {["Component", "Type", "Per Unit", "Required", "On Hand", "Status"].map((h) => (
-                    <th key={h} className="py-2 px-2 font-medium">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {c.lines.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="py-3 px-2 text-muted-foreground text-xs">
-                      No BOM defined for this product — add one in the BOM tab to run the material check.
-                    </td>
-                  </tr>
-                )}
-                {c.lines.map((l) => (
-                  <tr key={l.line.componentId} className="border-b border-white/5 last:border-0">
-                    <td className="py-2 px-2 font-medium">{l.line.componentName}</td>
-                    <td className="py-2 px-2 text-xs text-muted-foreground uppercase">{l.line.kind}</td>
-                    <td className="py-2 px-2 tabular-nums">
-                      {l.line.perUnit} {l.line.unit}
-                    </td>
-                    <td className="py-2 px-2 tabular-nums">{l.required}</td>
-                    <td className="py-2 px-2 tabular-nums">{l.stock}</td>
-                    <td className="py-2 px-2">
-                      {l.sufficient ? (
-                        <StatusBadge status="sufficient" />
-                      ) : (
-                        <StatusBadge status="insufficient" />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+          c={c}
+          reserveMutation={reserveMutation}
+          procureMutation={procureMutation}
+          advancePaymentMutation={advancePaymentMutation}
+          confirmPaymentMutation={confirmPaymentMutation}
+          assignOperatorMutation={assignOperatorMutation}
+          operators={operators ?? []}
+          machines={machines ?? []}
+        />
       ))}
 
       {checked.length === 0 && (
@@ -368,5 +393,261 @@ function ProductionPlanningPage() {
         />
       )}
     </div>
+  );
+}
+
+function OrderPanel({
+  c,
+  reserveMutation,
+  procureMutation,
+  advancePaymentMutation,
+  confirmPaymentMutation,
+  assignOperatorMutation,
+  operators,
+  machines,
+}: {
+  c: any;
+  reserveMutation: any;
+  procureMutation: any;
+  advancePaymentMutation: any;
+  confirmPaymentMutation: any;
+  assignOperatorMutation: any;
+  operators: any[];
+  machines: any[];
+}) {
+  const [advancePercent, setAdvancePercent] = useState(30);
+  const [selectedOperator, setSelectedOperator] = useState("");
+
+  const paymentStatus = c.order.advance_payment_status;
+  const isPaymentConfirmed = paymentStatus === "confirmed";
+  const isPaymentRequested = paymentStatus === "requested" || paymentStatus === "paid_pending";
+  const canAssignOperator = c.order.status === "in_production" && isPaymentConfirmed;
+
+  return (
+    <Panel
+      title={c.order.so_number}
+      right={<StatusBadge status={c.order.status} />}
+      className="mb-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div className="text-sm text-muted-foreground">
+          {c.order.customer_name} · {c.order.product_name} × {c.order.quantity} · Due{" "}
+          {c.order.due_date ? new Date(c.order.due_date).toLocaleDateString() : "—"}
+        </div>
+        <div className="flex gap-2">
+          {c.order.status === "approved" && (
+            <>
+              <Button
+                size="sm"
+                className="h-8"
+                onClick={() => reserveMutation.mutate(c.order)}
+                disabled={reserveMutation.isPending || !c.allSufficient}
+                title={
+                  c.allSufficient
+                    ? "Reserve materials and start production"
+                    : "Insufficient stock — trigger procurement first"
+                }
+              >
+                {reserveMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <Factory className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Reserve & Start
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 border-amber-500/30 text-amber-400"
+                onClick={() => procureMutation.mutate(c)}
+                disabled={procureMutation.isPending || c.allSufficient || c.missing.length === 0}
+              >
+                <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
+                Trigger Procurement
+              </Button>
+            </>
+          )}
+          {c.order.status === "procurement_pending" && (
+            <span className="text-xs text-amber-400 inline-flex items-center gap-1">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Awaiting GRN — order resumes automatically once materials are received
+            </span>
+          )}
+          {c.order.status === "material_reserved" && (
+            <span className="text-xs text-success inline-flex items-center gap-1">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Reserved — create Work Orders
+            </span>
+          )}
+          {c.order.status === "in_production" && (
+            <span className="text-xs text-info inline-flex items-center gap-1">
+              <Factory className="h-3.5 w-3.5" />
+              In production
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* BOM Table */}
+      <div className="overflow-x-auto mb-3">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-white/5">
+              {["Component", "Type", "Per Unit", "Required", "On Hand", "Status"].map((h) => (
+                <th key={h} className="py-2 px-2 font-medium">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {c.lines.length === 0 && (
+              <tr>
+                <td colSpan={6} className="py-3 px-2 text-muted-foreground text-xs">
+                  No BOM defined for this product — add one in the BOM tab to run the material check.
+                </td>
+              </tr>
+            )}
+            {c.lines.map((l: any) => (
+              <tr key={l.line.componentId} className="border-b border-white/5 last:border-0">
+                <td className="py-2 px-2 font-medium">{l.line.componentName}</td>
+                <td className="py-2 px-2 text-xs text-muted-foreground uppercase">{l.line.kind}</td>
+                <td className="py-2 px-2 tabular-nums">
+                  {l.line.perUnit} {l.line.unit}
+                </td>
+                <td className="py-2 px-2 tabular-nums">{l.required}</td>
+                <td className="py-2 px-2 tabular-nums">{l.stock}</td>
+                <td className="py-2 px-2">
+                  {l.sufficient ? (
+                    <StatusBadge status="sufficient" />
+                  ) : (
+                    <StatusBadge status="insufficient" />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Advance Payment Section — only for in_production orders */}
+      {c.order.status === "in_production" && (
+        <div className="border-t border-white/5 pt-3 mt-3">
+          <div className="flex items-center gap-2 mb-2">
+            <CreditCard className="h-4 w-4 text-blue-400" />
+            <span className="text-sm font-medium">Advance Payment</span>
+            {paymentStatus && (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                isPaymentConfirmed
+                  ? "bg-green-500/20 text-green-400"
+                  : isPaymentRequested
+                  ? "bg-yellow-500/20 text-yellow-400"
+                  : "bg-muted text-muted-foreground"
+              }`}>
+                {isPaymentConfirmed ? "Confirmed" : isPaymentRequested ? "Awaiting Payment" : paymentStatus}
+              </span>
+            )}
+          </div>
+
+          {!paymentStatus && (
+            <div className="flex items-center gap-3">
+              <label className="text-xs text-muted-foreground">Advance %</label>
+              <input
+                type="number"
+                min={10}
+                max={100}
+                value={advancePercent}
+                onChange={(e) => setAdvancePercent(Number(e.target.value))}
+                className="w-16 h-7 px-2 text-sm bg-background border border-white/10 rounded"
+              />
+              <span className="text-xs text-muted-foreground">
+                = ₹{((Number(c.order.total_amount ?? 0) * advancePercent) / 100).toLocaleString("en-IN")}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={() =>
+                  advancePaymentMutation.mutate({ order: c.order, percentage: advancePercent })
+                }
+                disabled={advancePaymentMutation.isPending}
+              >
+                <Banknote className="h-3 w-3 mr-1" />
+                Request Advance
+              </Button>
+            </div>
+          )}
+
+          {isPaymentRequested && (
+            <Button
+              size="sm"
+              className="h-7 text-xs bg-green-600 hover:bg-green-700"
+              onClick={() => confirmPaymentMutation.mutate(c.order)}
+              disabled={confirmPaymentMutation.isPending}
+            >
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Confirm Payment Received
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Operator Assignment Section — only after payment confirmed */}
+      {canAssignOperator && (
+        <div className="border-t border-white/5 pt-3 mt-3">
+          <div className="flex items-center gap-2 mb-2">
+            <UserCheck className="h-4 w-4 text-purple-400" />
+            <span className="text-sm font-medium">Assign Operator</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedOperator}
+              onChange={(e) => setSelectedOperator(e.target.value)}
+              className="h-8 px-2 text-sm bg-background border border-white/10 rounded flex-1 max-w-xs"
+            >
+              <option value="">Select operator…</option>
+              {operators.map((op: any) => (
+                <option key={op.id} value={op.id}>
+                  {op.full_name ?? op.id.slice(0, 8)}
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              className="h-8"
+              disabled={!selectedOperator || assignOperatorMutation.isPending}
+              onClick={() =>
+                assignOperatorMutation.mutate({
+                  order: c.order,
+                  operatorId: selectedOperator,
+                })
+              }
+            >
+              {assignOperatorMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+              ) : (
+                <UserCheck className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Assign
+            </Button>
+          </div>
+          {operators.length === 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              No operators available — add operators in HR first
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Show payment-required notice when in_production but no payment yet */}
+      {c.order.status === "in_production" && !isPaymentConfirmed && (
+        <div className="border-t border-white/5 pt-3 mt-3">
+          <span className="text-xs text-amber-400 inline-flex items-center gap-1">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {paymentStatus
+              ? "Payment pending — operator assignment unlocks after payment confirmation"
+              : "Request advance payment before assigning operators"}
+          </span>
+        </div>
+      )}
+    </Panel>
   );
 }
