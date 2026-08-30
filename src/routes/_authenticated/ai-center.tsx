@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -18,6 +18,45 @@ import { PageHeader, Panel } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+/** Simple markdown-to-HTML renderer for copilot responses */
+function renderMarkdown(text: string): React.ReactNode {
+  // Split by double newlines for paragraphs
+  const paragraphs = text.split(/\n\n+/);
+  return (
+    <>
+      {paragraphs.map((para, i) => {
+        // Check if it's a list (lines starting with • or -)
+        const lines = para.split("\n");
+        const isList = lines.every((l) => /^[•\-]\s/.test(l.trim()));
+        if (isList) {
+          return (
+            <ul key={i} className="list-none space-y-1 my-2">
+              {lines.map((line, j) => (
+                <li key={j} className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">•</span>
+                  <span dangerouslySetInnerHTML={{ __html: formatInline(line.replace(/^[•\-]\s/, "")) }} />
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        // Regular paragraph
+        return (
+          <p key={i} className="my-2" dangerouslySetInnerHTML={{ __html: formatInline(para) }} />
+        );
+      })}
+    </>
+  );
+}
+
+/** Format inline markdown: **bold**, `code`, newlines */
+function formatInline(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/`(.+?)`/g, '<code class="bg-muted px-1 rounded text-xs">$1</code>')
+    .replace(/\n/g, "<br />");
+}
 import { useAuth } from "@/hooks/use-auth";
 import { primaryRole } from "@/lib/route-access";
 import {
@@ -213,8 +252,8 @@ function AICenter() {
                     )}
                     {m.role === "user" ? "You" : `Copilot${m.conf ? ` · ${m.conf}% conf.` : ""}`}
                   </div>
-                  <div className="whitespace-pre-wrap leading-relaxed">
-                    {m.text.replace(/\*\*/g, "")}
+                  <div className="leading-relaxed">
+                    {renderMarkdown(m.text)}
                     {streaming && i === msgs.length - 1 && m.role === "ai" && (
                       <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5" />
                     )}
