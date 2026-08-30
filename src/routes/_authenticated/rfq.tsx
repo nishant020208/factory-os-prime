@@ -136,7 +136,7 @@ function RfqPage() {
     enabled: !!companyId && !isSupplier,
   });
 
-  // Fetch suppliers for Procurement Manager
+  // Fetch suppliers for Procurement Manager — only those with linked user accounts (approved/onboarded)
   const { data: suppliers } = useQuery({
     queryKey: ["rfq-suppliers", companyId],
     queryFn: async () =>
@@ -146,6 +146,7 @@ function RfqPage() {
           .select("id, name")
           .eq("status", "active")
           .eq("company_id", companyId!)
+          .not("user_id", "is", null)  // Only suppliers with linked portal accounts
       ).data ?? [],
     enabled: !!companyId && !isSupplier,
   });
