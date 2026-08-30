@@ -272,6 +272,11 @@ function WorkOrdersPage() {
         <Kpi label="Completed" value={String(completed)} icon={CheckCircle2} tone="success" />
       </div>
 
+      {/* Progress Approval Section */}
+      {isProductionManager && (
+        <ProgressApprovalSection companyId={companyId} workOrders={workOrders ?? []} />
+      )}
+
       <Panel title={`${total} Work Orders`}>
         <div className="overflow-x-auto">
           <Table>
@@ -555,5 +560,90 @@ function WorkOrdersPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function ProgressApprovalSection({ companyId, workOrders }: { companyId: string | null; workOrders: any[] }) {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const pendingApprovals = workOrders.filter((wo: any) => wo.progress_pending);
+
+  const approveMutation = useMutation({
+    mutationFn: async ({ wo, approved }: { wo: any; approved: boolean }) => {
+      if (!companyId || !user) throw new Error("Not authenticated");
+      const patch: any = {
+        progress_pending: false,
+        progress_approved_by: user.id,
+        progress_approved_at: new Date().toISOString(),
+      };
+      if (approved) {
+        // Extract progress from notes ("Progress update: 75% (pending approval)")
+        const match = wo.notes?.match(/Progress update: (\d+)%/);
+        const newProgress = match ? parseInt(match[1]) : wo.progress_percent;
+        patch.progress_percent = newProgress;
+        patch.status = newProgress >= 100 ? "completed" : "in_progress";
+        if (newProgress >= 100 && !wo.end_time) patch.end_time = new Date().toISOString();
+      } else {
+        // Rejected — clear the pending update
+        patch.progress_image_url = null;
+        patch.notes = null;
+      }
+      const { error } = await supabase.from("work_orders").update(patch).eq("id", wo.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["work-orders"] });
+      toast.success("Progress update processed");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  if (!pendingApprovals.length) return null;
+
+  return (
+    <Panel title="Pending Progress Approvals" className="mb-4 border-amber-500/30">
+      <div className="space-y-3">
+        {pendingApprovals.map((wo: any) => (
+          <div key={wo.id} className="flex flex-wrap items-start gap-4 p-3 rounded-lg border border-white/10 bg-white/5">
+            <div className="flex-1 min-w-[200px]">
+              <div className="font-medium text-sm">{wo.wo_number}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {wo.operation ?? "Production"} · Operator: {wo.profiles?.full_name ?? "Unknown"}
+              </div>
+              {wo.notes && (
+                <div className="text-xs text-blue-400 mt-1">{wo.notes}</div>
+              )}
+            </div>
+            {wo.progress_image_url && (
+              <img
+                src={wo.progress_image_url}
+                alt="Work progress"
+                className="h-24 w-24 object-cover rounded-lg border"
+              />
+            )}
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="h-8 bg-green-600 hover:bg-green-700"
+                disabled={approveMutation.isPending}
+                onClick={() => approveMutation.mutate({ wo, approved: true })}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 border-red-500/30 text-red-400"
+                disabled={approveMutation.isPending}
+                onClick={() => approveMutation.mutate({ wo, approved: false })}
+              >
+                Reject
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Panel>
   );
 }
