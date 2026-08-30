@@ -138,7 +138,7 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/procurement": ONLY("company_admin", "procurement_manager", "auditor"),
   "/suppliers": ONLY("company_admin", "procurement_manager", "plant_admin", "auditor"),
   "/purchase-requests": ONLY("company_admin", "procurement_manager", "auditor"),
-  "/rfq": ONLY("company_admin", "procurement_manager", "auditor"),
+  "/rfq": ONLY("company_admin", "procurement_manager", "supplier_portal", "auditor"),
   "/vendor-comparison": ONLY("company_admin", "procurement_manager", "auditor"),
   "/goods-receipt": ONLY("company_admin", "procurement_manager", "warehouse_manager", "auditor"),
 
