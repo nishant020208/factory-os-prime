@@ -7,6 +7,7 @@ import { Kpi, StatusBadge } from "@/components/ui-parts";
 import { useAuth } from "@/hooks/use-auth";
 import { fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/procurement")({
   head: () => ({
@@ -25,6 +26,13 @@ const PO_FORM_FIELDS: FormField[] = [
     type: "text",
     placeholder: "PUR-2026-0004",
     required: true,
+  },
+  {
+    key: "supplier_id",
+    label: "Supplier",
+    type: "select",
+    required: true,
+    options: [], // populated dynamically
   },
   {
     key: "total_amount",
@@ -52,6 +60,31 @@ function ProcurementPage() {
   const queryClient = useQueryClient();
   const { companyId, roles } = useAuth();
   const isAuditor = roles.includes("auditor");
+  const [formFields, setFormFields] = useState<FormField[]>(PO_FORM_FIELDS);
+
+  // Fetch suppliers for the company
+  const { data: suppliers } = useQuery({
+    queryKey: ["suppliers", companyId],
+    queryFn: async () =>
+      (await supabase.from("suppliers").select("id, name").eq("company_id", companyId ?? "").order("name")).data ?? [],
+    enabled: !!companyId,
+  });
+
+  // Update supplier dropdown options when suppliers load
+  useEffect(() => {
+    if (suppliers) {
+      setFormFields((prev) =>
+        prev.map((f) =>
+          f.key === "supplier_id"
+            ? { ...f, options: suppliers.map((s) => ({ value: s.id, label: s.name })) }
+            : f,
+        ),
+      );
+    }
+  }, [suppliers]);
+
+  // Build a supplier id→name lookup for the table
+  const supplierMap = new Map((suppliers ?? []).map((s) => [s.id, s.name]));
 
   const { data } = useQuery({
     queryKey: ["purchase_orders"],
@@ -69,14 +102,17 @@ function ProcurementPage() {
       const { error } = await supabase.from("purchase_orders").insert({
         company_id: companyId!,
         po_number: formData.po_number,
+        supplier_id: formData.supplier_id || null,
         total_amount: parseFloat(formData.total_amount) || 0,
         expected_date: formData.expected_date || null,
         status: formData.status || "draft",
+        created_by: companyId,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-pos"] });
       toast.success("Purchase order created");
     },
     onError: (err: any) => toast.error(err.message),
@@ -88,6 +124,7 @@ function ProcurementPage() {
         .from("purchase_orders")
         .update({
           po_number: d.po_number,
+          supplier_id: d.supplier_id || null,
           total_amount: parseFloat(d.total_amount) || 0,
           expected_date: d.expected_date || null,
           status: d.status || "draft",
@@ -97,6 +134,7 @@ function ProcurementPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
+      queryClient.invalidateQueries({ queryKey: ["supplier-pos"] });
       toast.success("Purchase order updated");
     },
     onError: (err: any) => toast.error(err.message),
@@ -122,7 +160,7 @@ function ProcurementPage() {
       moduleName="procurement"
       rows={data}
       searchKeys={["po_number", "status"]}
-      formFields={isAuditor ? undefined : PO_FORM_FIELDS}
+      formFields={isAuditor ? undefined : formFields}
       onSubmit={isAuditor ? undefined : async (formData, editingRow) => {
         if (editingRow) await updateMutation.mutateAsync({ id: editingRow.id, data: formData });
         else await createMutation.mutateAsync(formData);
@@ -152,6 +190,15 @@ function ProcurementPage() {
           key: "po_number",
           header: "PO #",
           render: (r) => <span className="font-medium">{r.po_number}</span>,
+        },
+        {
+          key: "supplier_id",
+          header: "Supplier",
+          render: (r) => (
+            <span className="text-xs text-muted-foreground">
+              {r.supplier_id ? (supplierMap.get(r.supplier_id) ?? "—") : "—"}
+            </span>
+          ),
         },
         { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
         {
