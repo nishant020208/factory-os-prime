@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { FileText, Send, CheckCircle2, Clock, Loader2, Reply } from "lucide-react";
+import { FileText, Send, CheckCircle2, Clock, Loader2, Reply, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
-import { ModuleStatusBar } from "@/components/module-status";
+import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
+import { useSupplier } from "@/hooks/use-supplier";
 import { toast } from "sonner";
 import { useState } from "react";
 import { safeDate } from "@/lib/utils";
@@ -41,22 +42,30 @@ function RfqPage() {
   const queryClient = useQueryClient();
   const { companyId, user, roles } = useAuth();
   const isSupplier = roles.includes("supplier_portal");
+  const { mySupplier } = useSupplier();
   const [showNew, setShowNew] = useState(false);
+  const [showSendTo, setShowSendTo] = useState<string | null>(null);
+  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [respondTo, setRespondTo] = useState<string | null>(null);
   const [form, setForm] = useState({ material_id: "", quantity: "1", notes: "" });
   const [respForm, setRespForm] = useState({ unit_price: "0", delivery_days: "7", notes: "" });
 
   const { data: rfqs, isLoading } = useQuery({
-    queryKey: ["rfq-list", companyId],
+    queryKey: ["rfq-list", companyId, mySupplier?.id],
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("rfqs")
         .select("*, rfq_responses(*, suppliers(name))")
         .eq("company_id", companyId!)
         .order("created_at", { ascending: false });
+      // Supplier sees only RFQs sent to them
+      if (isSupplier && mySupplier?.id) {
+        query = query.contains("supplier_ids", [mySupplier.id]);
+      }
+      const { data } = await query;
       return data ?? [];
     },
-    enabled: !!companyId,
+    enabled: !!companyId && (!isSupplier || !!mySupplier?.id),
   });
 
   const { data: materials } = useQuery({
@@ -68,13 +77,18 @@ function RfqPage() {
   const { data: suppliers } = useQuery({
     queryKey: ["rfq-suppliers", companyId],
     queryFn: async () =>
-      (await supabase.from("suppliers").select("id, name").eq("status", "active")).data ?? [],
+      (await supabase.from("suppliers").select("id, name").eq("status", "active").eq("company_id", companyId!)).data ?? [],
     enabled: !!companyId && !isSupplier,
   });
 
   const sent = rfqs?.filter((r) => r.status === "sent").length ?? 0;
   const responses = rfqs?.reduce((s, r) => s + ((r as any).rfq_responses?.length ?? 0), 0) ?? 0;
   const closed = rfqs?.filter((r) => r.status === "closed").length ?? 0;
+  const pendingForMe = rfqs?.filter((r) => {
+    if (!isSupplier) return false;
+    const myResp = (r as any).rfq_responses?.find((resp: any) => resp.supplier_id === mySupplier?.id);
+    return !myResp;
+  }).length ?? 0;
 
   const createRfq = useMutation({
     mutationFn: async () => {
@@ -105,16 +119,45 @@ function RfqPage() {
   const sendRfq = useMutation({
     mutationFn: async ({ rfqId, supplierIds }: { rfqId: string; supplierIds: string[] }) => {
       if (!supplierIds.length) throw new Error("Select at least one supplier");
+      // Create rfq_responses rows for each selected supplier
       const { error } = await supabase
         .from("rfq_responses")
-        .insert(supplierIds.map((sid) => ({ rfq_id: rfqId, supplier_id: sid })));
+        .insert(supplierIds.map((sid) => ({ rfq_id: rfqId, supplier_id: sid, status: "pending" })));
       if (error) throw error;
-      const { error: upErr } = await supabase.from("rfqs").update({ status: "sent" }).eq("id", rfqId);
+      // Update RFQ status and store which suppliers it was sent to
+      const { error: upErr } = await supabase
+        .from("rfqs")
+        .update({ status: "sent", supplier_ids: supplierIds })
+        .eq("id", rfqId);
       if (upErr) throw upErr;
+      // Notify each selected supplier
+      for (const sid of supplierIds) {
+        const supplier = (suppliers ?? []).find((s) => s.id === sid);
+        const rfq = (rfqs ?? []).find((r) => r.id === rfqId);
+        if (supplier && rfq) {
+          // Get supplier's user_id for targeted notification
+          const { data: supplierUser } = await supabase
+            .from("suppliers")
+            .select("user_id")
+            .eq("id", sid)
+            .maybeSingle();
+          await supabase.from("notifications").insert({
+            company_id: companyId!,
+            to_user: supplierUser?.user_id ?? null,
+            title: "New RFQ Request",
+            body: `You have received a new RFQ: ${(rfq as any).rfq_number ?? "RFQ"} for ${(rfq as any).title ?? "material"}. Please submit your quote.`,
+            severity: "info",
+            related_entity_type: "rfq",
+            related_entity_id: rfqId,
+          });
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rfq-list"] });
-      toast.success("RFQ sent to suppliers");
+      toast.success("RFQ sent to selected suppliers");
+      setShowSendTo(null);
+      setSelectedSuppliers([]);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -169,22 +212,26 @@ function RfqPage() {
         sub={
           isSupplier
             ? "RFQs addressed to your company — submit your best quote."
-            : "Send RFQs to multiple suppliers, compare quotes and pick the best before committing to a PO."
+            : "Send RFQs to specific suppliers, compare quotes and pick the best before committing to a PO."
         }
         actions={
-          !isSupplier ? (
-            <Button className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={() => setShowNew(true)}>
-              <FileText className="h-4 w-4 mr-1.5" />
-              New RFQ
-            </Button>
-          ) : null
+          <div className="flex items-center gap-2">
+            <ModuleCopilot moduleName="rfq" />
+            {!isSupplier && (
+              <Button className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={() => setShowNew(true)}>
+                <FileText className="h-4 w-4 mr-1.5" />
+                New RFQ
+              </Button>
+            )}
+          </div>
         }
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Kpi label="Total RFQs" value={String(rfqs?.length ?? 0)} icon={FileText} tone="primary" />
         <Kpi label="Sent" value={String(sent)} icon={Send} tone="info" />
         <Kpi label="Supplier Quotes" value={String(responses)} icon={Reply} tone="success" />
+        {isSupplier && <Kpi label="Pending Response" value={String(pendingForMe)} icon={Clock} tone="warning" />}
       </div>
 
       <Dialog open={showNew} onOpenChange={setShowNew}>
@@ -318,12 +365,12 @@ function RfqPage() {
                           size="sm"
                           className="h-7 text-xs"
                           onClick={() => {
-                            const ids = (suppliers ?? []).map((s) => s.id);
-                            sendRfq.mutate({ rfqId: rfq.id, supplierIds: ids });
+                            setShowSendTo(rfq.id);
+                            setSelectedSuppliers([]);
                           }}
                           disabled={sendRfq.isPending}
                         >
-                          <Send className="h-3 w-3 mr-1" /> Send to {suppliers?.length ?? 0} suppliers
+                          <Send className="h-3 w-3 mr-1" /> Send to Suppliers
                         </Button>
                       )}
                       {isSupplier && respList.length === 0 && (
@@ -374,6 +421,87 @@ function RfqPage() {
           </div>
         )}
       </Panel>
+
+      {/* Send to Specific Suppliers Dialog */}
+      <Dialog open={!!showSendTo} onOpenChange={(o) => !o && setShowSendTo(null)}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Send RFQ to Suppliers</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              Select which suppliers should receive this RFQ. They will be notified and can submit quotes.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Select Suppliers *</Label>
+              <div className="max-h-60 overflow-y-auto space-y-2 border border-white/10 rounded-lg p-3">
+                {(suppliers ?? []).map((s) => (
+                  <label
+                    key={s.id}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedSuppliers.includes(s.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedSuppliers((prev) => [...prev, s.id]);
+                        } else {
+                          setSelectedSuppliers((prev) => prev.filter((id) => id !== s.id));
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <span className="text-sm">{s.name}</span>
+                  </label>
+                ))}
+                {(suppliers ?? []).length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-4">
+                    No suppliers found. Add suppliers first.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                onClick={() => {
+                  const allIds = (suppliers ?? []).map((s) => s.id);
+                  setSelectedSuppliers(allIds);
+                }}
+              >
+                Select All
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {selectedSuppliers.length} of {suppliers?.length ?? 0} selected
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSendTo(null)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-[image:var(--gradient-primary)]"
+              onClick={() => {
+                if (showSendTo) {
+                  sendRfq.mutate({ rfqId: showSendTo, supplierIds: selectedSuppliers });
+                }
+              }}
+              disabled={sendRfq.isPending || selectedSuppliers.length === 0}
+            >
+              {sendRfq.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : (
+                <Send className="h-4 w-4 mr-1.5" />
+              )}
+              Send to {selectedSuppliers.length} Supplier{selectedSuppliers.length !== 1 ? "s" : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
