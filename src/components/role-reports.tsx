@@ -1236,6 +1236,96 @@ const procurementBuilders: Builder[] = [
       note: "All purchase orders have been received — no open POs.",
     };
   },
+  // RFQ Summary Report
+  async () => {
+    const rfqs = await fetchAll("rfqs");
+    const responses = await fetchAll("rfq_responses");
+    const rows = rfqs.map((r) => {
+      const rfs = responses.filter((resp) => resp.rfq_id === r.id);
+      const quoted = rfs.filter((resp) => resp.status === "quoted").length;
+      const accepted = rfs.filter((resp) => resp.status === "accepted").length;
+      return {
+        rfq_number: r.rfq_number ?? "—",
+        material: r.title ?? "—",
+        quantity: r.quantity,
+        status: r.status,
+        suppliers_invited: rfs.length,
+        quotes_received: quoted,
+        accepted: accepted,
+        created_at: r.created_at,
+      };
+    });
+    const totalRfqs = rfqs.length;
+    const converted = rfqs.filter((r) => r.status === "converted").length;
+    return {
+      id: "procurement-rfq-summary",
+      module: "procurement",
+      title: "RFQ Summary",
+      sub: "Request for Quotation activity — creation, quotes received, and conversions to PO.",
+      columns: [
+        { key: "rfq_number", label: "RFQ #" },
+        { key: "material", label: "Material" },
+        { key: "quantity", label: "Qty", align: "right" },
+        { key: "status", label: "Status" },
+        { key: "suppliers_invited", label: "Invited", align: "right" },
+        { key: "quotes_received", label: "Quotes", align: "right" },
+        { key: "created_at", label: "Created" },
+      ],
+      rows,
+      fileName: "procurement-rfq-summary",
+      summary: [
+        { label: "Total RFQs", value: num(totalRfqs), tone: "primary" },
+        { label: "Converted to PO", value: num(converted), tone: "success" },
+        { label: "Conversion Rate", value: pct(converted, totalRfqs || 1), tone: "info" },
+      ],
+      note: totalRfqs === 0 ? "No RFQs created yet — RFQs appear here once Procurement sends quote requests to suppliers." : undefined,
+    };
+  },
+  // Supplier Directory Report
+  async () => {
+    const suppliers = await fetchAll("suppliers");
+    const pos = await fetchAll("purchase_orders");
+    const rows = suppliers.map((s) => {
+      const supplierPos = pos.filter((p) => p.supplier_id === s.id);
+      const totalSpend = supplierPos.reduce((sum, p) => sum + Number(p.total_amount ?? 0), 0);
+      const delivered = supplierPos.filter((p) => p.status === "received").length;
+      return {
+        name: s.name,
+        contact_email: s.contact_email ?? "—",
+        contact_phone: s.contact_phone ?? "—",
+        materials_supplied: s.materials_supplied ?? "—",
+        rating: s.rating ?? 0,
+        status: s.status,
+        total_pos: supplierPos.length,
+        total_spend: totalSpend,
+        delivered: delivered,
+      };
+    });
+    return {
+      id: "procurement-supplier-directory",
+      module: "procurement",
+      title: "Supplier Directory",
+      sub: "All suppliers with contact information, materials supplied, and procurement history.",
+      columns: [
+        { key: "name", label: "Supplier" },
+        { key: "contact_email", label: "Email" },
+        { key: "contact_phone", label: "Phone" },
+        { key: "materials_supplied", label: "Materials" },
+        { key: "rating", label: "Rating", align: "right" },
+        { key: "status", label: "Status" },
+        { key: "total_pos", label: "POs", align: "right" },
+        { key: "total_spend", label: "Spend", align: "right" },
+      ],
+      rows,
+      fileName: "procurement-supplier-directory",
+      summary: [
+        { label: "Active Suppliers", value: num(suppliers.filter((s) => s.status === "active").length), tone: "success" },
+        { label: "Total Suppliers", value: num(suppliers.length), tone: "primary" },
+        { label: "Total Spend", value: money(rows.reduce((s, r) => s + r.total_spend, 0)), tone: "info" },
+      ],
+      note: suppliers.length === 0 ? "No suppliers added yet — suppliers appear here once added in the Suppliers tab." : undefined,
+    };
+  },
 ];
 
 /* ------------------------------------------------------------------ */
