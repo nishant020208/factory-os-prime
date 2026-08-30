@@ -347,6 +347,157 @@ function AuditPage() {
   );
 }
 
+// Human-readable labels for common database field names
+const FIELD_LABELS: Record<string, string> = {
+  id: "Record ID",
+  company_id: "Company",
+  user_id: "User",
+  status: "Status",
+  notes: "Notes",
+  issues: "Issues",
+  plant_id: "Plant",
+  created_at: "Created",
+  updated_at: "Updated",
+  report_date: "Report Date",
+  submitted_by: "Submitted By",
+  units_completed: "Units Completed",
+  downtime_minutes: "Downtime (min)",
+  attendance_summary: "Attendance",
+  inspector_id: "Inspector",
+  inspection_number: "Inspection #",
+  inspection_type: "Inspection Type",
+  batch_reference: "Batch Reference",
+  quantity_checked: "Qty Checked",
+  defects_found: "Defects Found",
+  overall_notes: "Overall Notes",
+  result: "Result",
+  full_name: "Full Name",
+  email: "Email",
+  role: "Role",
+  name: "Name",
+  label: "Label",
+  type: "Type",
+  entity_type: "Entity Type",
+  entity_id: "Entity ID",
+  action: "Action",
+  metadata: "Details",
+  old_value: "Old Value",
+  new_value: "New Value",
+  amount: "Amount",
+  total_amount: "Total Amount",
+  po_number: "PO Number",
+  so_number: "SO Number",
+  supplier_id: "Supplier",
+  customer_id: "Customer",
+  order_total: "Order Total",
+  advance_payment_percent: "Advance %",
+  advance_amount: "Advance Amount",
+  balance_due: "Balance Due",
+  carrier: "Carrier",
+  tracking_number: "Tracking #",
+  destination: "Destination",
+  expected_arrival: "Expected Arrival",
+  shipped_date: "Shipped Date",
+  delivered_date: "Delivered Date",
+  paid_date: "Paid Date",
+  invoice_number: "Invoice #",
+  payment_method: "Payment Method",
+  product_name: "Product",
+  product: "Product",
+  quantity: "Quantity",
+  price: "Price",
+  unit_price: "Unit Price",
+  work_order_number: "Work Order #",
+  machine_id: "Machine",
+  priority: "Priority",
+  category: "Category",
+  description: "Description",
+  title: "Title",
+  severity: "Severity",
+  assigned_to: "Assigned To",
+  start_date: "Start Date",
+  end_date: "End Date",
+  due_date: "Due Date",
+  target_date: "Target Date",
+  actual_date: "Actual Date",
+  material: "Material",
+  species: "Species",
+  grade: "Grade",
+  moisture_content: "Moisture %",
+  hardness: "Hardness",
+  dimensions: "Dimensions",
+  weight: "Weight",
+  color: "Color",
+  finish: "Finish",
+  gloss_level: "Gloss Level",
+  certificate_number: "Certificate #",
+  issued_by: "Issued By",
+  qr_data: "QR Data",
+  qr_url: "QR URL",
+  token: "Token",
+  sub_label: "Sub Label",
+  avatar_url: "Avatar URL",
+  phone: "Phone",
+  address: "Address",
+  city: "City",
+  state: "State",
+  country: "Country",
+  zip_code: "ZIP Code",
+  website: "Website",
+  tax_id: "Tax ID",
+  currency: "Currency",
+  timezone: "Timezone",
+  language: "Language",
+  theme: "Theme",
+  is_active: "Active",
+  is_approved: "Approved",
+  approved_by: "Approved By",
+  approved_at: "Approved At",
+  rejection_reason: "Rejection Reason",
+};
+
+function formatFieldValue(key: string, val: unknown): React.ReactNode {
+  if (val === null || val === undefined || val === "") {
+    return <span className="text-muted-foreground/60">empty</span>;
+  }
+  if (typeof val === "boolean") {
+    return val ? "Yes" : "No";
+  }
+  if (typeof val === "number") {
+    return String(val);
+  }
+  if (typeof val === "string") {
+    // Format dates nicely
+    if (/^\d{4}-\d{2}-\d{2}T/.test(val)) {
+      try {
+        return new Date(val).toLocaleString();
+      } catch {
+        return val;
+      }
+    }
+    // Format UUIDs as short IDs
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
+      return val.slice(0, 8) + "…";
+    }
+    return val;
+  }
+  return String(val);
+}
+
+function humanizeDiff(obj: Record<string, unknown>): React.ReactNode[] {
+  const entries = Object.entries(obj).filter(([k]) => k !== "id");
+  if (entries.length === 0) return [];
+  return entries.map(([key, val]) => {
+    const label = FIELD_LABELS[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    return (
+      <div key={key} className="flex items-start gap-2 py-0.5">
+        <span className="text-muted-foreground shrink-0 w-28 truncate font-medium">{label}</span>
+        <span>{formatFieldValue(key, val)}</span>
+      </div>
+    );
+  });
+}
+
 function ChangeCell({ oldV, newV }: { oldV?: unknown; newV?: unknown }) {
   const [open, setOpen] = useState(false);
 
@@ -364,13 +515,22 @@ function ChangeCell({ oldV, newV }: { oldV?: unknown; newV?: unknown }) {
     );
   }
 
-  const format = (v: unknown) => {
+  // Compute changed fields for NEW
+  const changedFields = (oldV && newV && typeof oldV === "object" && typeof newV === "object")
+    ? Object.keys(newV as Record<string, unknown>).filter(
+        (k) => JSON.stringify((oldV as any)[k]) !== JSON.stringify((newV as any)[k])
+      )
+    : [];
+
+  const formatObject = (v: unknown) => {
     if (v === undefined || v === null) return <span className="text-muted-foreground/60">—</span>;
     if (typeof v === "object") {
+      const entries = Object.entries(v as Record<string, unknown>).filter(([k]) => k !== "id");
+      if (entries.length === 0) return <span className="text-muted-foreground/60">empty</span>;
       return (
-        <pre className="whitespace-pre-wrap text-[10px] leading-relaxed max-h-40 overflow-y-auto">
-          {JSON.stringify(v, null, 1)}
-        </pre>
+        <div className="max-h-40 overflow-y-auto space-y-0.5">
+          {humanizeDiff(v as Record<string, unknown>)}
+        </div>
       );
     }
     return <span>{String(v)}</span>;
@@ -381,13 +541,29 @@ function ChangeCell({ oldV, newV }: { oldV?: unknown; newV?: unknown }) {
       {oldV !== undefined && (
         <div className="flex items-start gap-1.5">
           <span className="text-destructive font-medium shrink-0">OLD</span>
-          {format(oldV)}
+          <div className="flex-1">{formatObject(oldV)}</div>
         </div>
       )}
       {newV !== undefined && (
         <div className="flex items-start gap-1.5">
           <span className="text-emerald-400 font-medium shrink-0">NEW</span>
-          {format(newV)}
+          <div className="flex-1">
+            {changedFields.length > 0 ? (
+              <div className="max-h-40 overflow-y-auto space-y-0.5">
+                {changedFields.map((k) => {
+                  const label = FIELD_LABELS[k] ?? k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+                  return (
+                    <div key={k} className="flex items-start gap-2 py-0.5">
+                      <span className="text-muted-foreground shrink-0 w-28 truncate font-medium">{label}</span>
+                      <span className="text-emerald-300">{formatFieldValue(k, (newV as any)[k])}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              formatObject(newV)
+            )}
+          </div>
         </div>
       )}
       <button onClick={() => setOpen(false)} className="text-[10px] text-muted-foreground text-left">
