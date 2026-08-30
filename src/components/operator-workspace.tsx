@@ -40,7 +40,7 @@ export function OperatorWorkOrders() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("work_orders")
-        .select("*")
+        .select("*, machines!work_orders_machine_id_fkey(name, status)")
         .eq("operator_id", user!.id)
         .order("due_date");
       if (error) throw error;
@@ -127,6 +127,17 @@ export function OperatorWorkOrders() {
                   <div className="text-sm text-muted-foreground mt-1">
                     {o.operation ?? "Production"} · Due {o.due_date ?? "Not scheduled"}
                   </div>
+                  {o.machines && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Wrench className="h-3 w-3 text-blue-400" />
+                      <span className="text-xs text-blue-400">
+                        {o.machines.name}
+                        <span className={"ml-1 " + (o.machines.status === "operational" ? "text-green-400" : o.machines.status === "down" ? "text-red-400" : "text-amber-400")}>
+                          ({o.machines.status})
+                        </span>
+                      </span>
+                    </div>
+                  )}
                   <Progress className="mt-3" value={o.progress_percent} />
                   <div className="text-xs text-muted-foreground mt-1">
                     {o.progress_percent}% complete
@@ -209,6 +220,17 @@ function WorkOrderDetail({
           <span className="font-medium">{order.operation ?? "Production task"}</span>
           <StatusBadge status={order.status} />
         </div>
+        {order.machines && (
+          <div className="flex items-center gap-2 mt-1.5">
+            <Wrench className="h-3.5 w-3.5 text-blue-400" />
+            <span className="text-sm text-blue-400">
+              {order.machines.name}
+              <span className={"ml-1 " + (order.machines.status === "operational" ? "text-green-400" : order.machines.status === "down" ? "text-red-400" : "text-amber-400")}>
+                ({order.machines.status})
+              </span>
+            </span>
+          </div>
+        )}
         <p className="text-sm text-muted-foreground mt-1">
           {order.notes || "No additional manager notes."}
         </p>
