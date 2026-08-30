@@ -4617,7 +4617,11 @@ export type Database = {
           operation: string | null
           operator_id: string | null
           production_order_id: string | null
+          progress_approved_at: string | null
+          progress_approved_by: string | null
+          progress_image_url: string | null
           progress_percent: number
+          progress_pending: boolean | null
           quantity: number | null
           start_time: string | null
           status: string
@@ -4640,7 +4644,11 @@ export type Database = {
           operation?: string | null
           operator_id?: string | null
           production_order_id?: string | null
+          progress_approved_at?: string | null
+          progress_approved_by?: string | null
+          progress_image_url?: string | null
           progress_percent?: number
+          progress_pending?: boolean | null
           quantity?: number | null
           start_time?: string | null
           status?: string
@@ -4663,7 +4671,11 @@ export type Database = {
           operation?: string | null
           operator_id?: string | null
           production_order_id?: string | null
+          progress_approved_at?: string | null
+          progress_approved_by?: string | null
+          progress_image_url?: string | null
           progress_percent?: number
+          progress_pending?: boolean | null
           quantity?: number | null
           start_time?: string | null
           status?: string
