@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { useAuth } from "@/hooks/use-auth";
+import { useSupplier } from "@/hooks/use-supplier";
 import { fmtMoney } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/supplier-performance")({
@@ -18,72 +19,46 @@ export const Route = createFileRoute("/_authenticated/supplier-performance")({
 });
 
 function SupplierPerformancePage() {
-  const { user, companyId } = useAuth();
-
-  const { data: mySupplier } = useQuery({
-    queryKey: ["my-supplier", user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      const byUser = await supabase
-        .from("suppliers")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (byUser.data?.id) return byUser.data.id as string;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("email")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (profile?.email) {
-        const { data: sup } = await supabase
-          .from("suppliers")
-          .select("id")
-          .eq("contact_email", profile.email)
-          .maybeSingle();
-        return (sup?.id as string) ?? null;
-      }
-      return null;
-    },
-  });
+  const { companyId } = useAuth();
+  const { mySupplier } = useSupplier();
 
   const { data: pos, isLoading } = useQuery({
-    queryKey: ["supplier-perf-pos", companyId, mySupplier],
+    queryKey: ["supplier-perf-pos", companyId, mySupplier?.id],
     queryFn: async () => {
-      if (!mySupplier) return [];
+      if (!mySupplier?.id) return [];
       const { data } = await supabase
         .from("purchase_orders")
         .select("*")
-        .eq("supplier_id", mySupplier);
+        .eq("supplier_id", mySupplier.id);
       return data ?? [];
     },
-    enabled: !!mySupplier,
+    enabled: !!mySupplier?.id,
   });
 
   const { data: deliveries } = useQuery({
-    queryKey: ["supplier-perf-del", companyId, mySupplier],
+    queryKey: ["supplier-perf-del", companyId, mySupplier?.id],
     queryFn: async () => {
-      if (!mySupplier) return [];
+      if (!mySupplier?.id) return [];
       const { data } = await supabase
         .from("supplier_deliveries")
         .select("*")
-        .eq("supplier_id", mySupplier);
+        .eq("supplier_id", mySupplier.id);
       return data ?? [];
     },
-    enabled: !!mySupplier,
+    enabled: !!mySupplier?.id,
   });
 
   const { data: payments } = useQuery({
-    queryKey: ["supplier-perf-pay", companyId, mySupplier],
+    queryKey: ["supplier-perf-pay", companyId, mySupplier?.id],
     queryFn: async () => {
-      if (!mySupplier) return [];
+      if (!mySupplier?.id) return [];
       const { data } = await supabase
         .from("supplier_payments")
         .select("*")
-        .eq("supplier_id", mySupplier);
+        .eq("supplier_id", mySupplier.id);
       return data ?? [];
     },
-    enabled: !!mySupplier,
+    enabled: !!mySupplier?.id,
   });
 
   const total = pos?.length ?? 0;
