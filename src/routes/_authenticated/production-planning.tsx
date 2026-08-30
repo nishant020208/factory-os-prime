@@ -240,10 +240,10 @@ function ProductionPlanningPage() {
 
   // Operator assignment mutation
   const assignOperatorMutation = useMutation({
-    mutationFn: async ({ order, operatorId }: { order: any; operatorId: string }) => {
+    mutationFn: async ({ order, operatorId, machineId, operation }: { order: any; operatorId: string; machineId?: string | null; operation?: string | null }) => {
       if (!companyId) throw new Error("Not authenticated");
 
-      // Create or update work order with assigned operator
+      // Create or update work order with assigned operator + machine
       const { data: existing } = await supabase
         .from("work_orders")
         .select("id")
@@ -254,7 +254,13 @@ function ProductionPlanningPage() {
       if (existing) {
         const { error } = await supabase
           .from("work_orders")
-          .update({ operator_id: operatorId, status: "in_progress", assigned_by: operatorId })
+          .update({
+            operator_id: operatorId,
+            status: "in_progress",
+            assigned_by: user?.id ?? operatorId,
+            machine_id: machineId || null,
+            operation: operation || null,
+          })
           .eq("id", existing.id);
         if (error) throw error;
       } else {
@@ -264,8 +270,10 @@ function ProductionPlanningPage() {
           quantity: order.quantity,
           status: "in_progress",
           operator_id: operatorId,
-          assigned_by: operatorId,
+          assigned_by: user?.id ?? operatorId,
           due_date: order.due_date,
+          machine_id: machineId || null,
+          operation: operation || null,
         });
         if (error) throw error;
       }
@@ -417,6 +425,8 @@ function OrderPanel({
 }) {
   const [advancePercent, setAdvancePercent] = useState(30);
   const [selectedOperator, setSelectedOperator] = useState("");
+  const [selectedMachine, setSelectedMachine] = useState("");
+  const [operationName, setOperationName] = useState("Carpentry");
 
   const paymentStatus = c.order.advance_payment_status;
   const isPaymentConfirmed = paymentStatus === "confirmed";
@@ -597,11 +607,11 @@ function OrderPanel({
             <UserCheck className="h-4 w-4 text-purple-400" />
             <span className="text-sm font-medium">Assign Operator</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
             <select
               value={selectedOperator}
               onChange={(e) => setSelectedOperator(e.target.value)}
-              className="h-8 px-2 text-sm bg-background border border-white/10 rounded flex-1 max-w-xs"
+              className="h-8 px-2 text-sm bg-background border border-white/10 rounded"
             >
               <option value="">Select operator…</option>
               {operators.map((op: any) => (
@@ -610,6 +620,27 @@ function OrderPanel({
                 </option>
               ))}
             </select>
+            <select
+              value={selectedMachine}
+              onChange={(e) => setSelectedMachine(e.target.value)}
+              className="h-8 px-2 text-sm bg-background border border-white/10 rounded"
+            >
+              <option value="">Select machine…</option>
+              {machines.map((m: any) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} ({m.status})
+                </option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={operationName}
+              onChange={(e) => setOperationName(e.target.value)}
+              placeholder="Operation name"
+              className="h-8 px-2 text-sm bg-background border border-white/10 rounded"
+            />
+          </div>
+          <div className="flex items-center gap-3">
             <Button
               size="sm"
               className="h-8"
@@ -618,6 +649,8 @@ function OrderPanel({
                 assignOperatorMutation.mutate({
                   order: c.order,
                   operatorId: selectedOperator,
+                  machineId: selectedMachine || null,
+                  operation: operationName || null,
                 })
               }
             >
