@@ -454,6 +454,17 @@ const FIELD_LABELS: Record<string, string> = {
   approved_by: "Approved By",
   approved_at: "Approved At",
   rejection_reason: "Rejection Reason",
+  rfq_number: "RFQ #",
+  material_id: "Material",
+  quantity_needed: "Qty Needed",
+  target_delivery_date: "Target Delivery",
+  response_deadline: "Response Deadline",
+  supplier_ids: "Suppliers Invited",
+  quoted_unit_price: "Quoted Price",
+  estimated_delivery_days: "Est. Delivery (days)",
+  minimum_order_quantity: "Min Order Qty",
+  submitted_at: "Submitted At",
+  converted_to_po: "Converted to PO",
 };
 
 function formatFieldValue(key: string, val: unknown): React.ReactNode {
