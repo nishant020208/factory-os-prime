@@ -235,16 +235,16 @@ function CustomerInvoicesPage() {
           </DialogHeader>
           {qrDialog.invoice && (
             <div className="flex flex-col items-center gap-4 py-2">
-              <div className="bg-white rounded-2xl p-3 shadow-lg">
+              <div className="bg-white rounded-2xl p-4 shadow-lg flex items-center justify-center">
                 {qrDialog.generating ? (
                   <div className="w-48 h-48 flex items-center justify-center">
                     <Loader2 className="h-8 w-8 text-primary animate-spin" />
                   </div>
                 ) : qrDialog.scanUrl ? (
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(qrDialog.scanUrl)}`}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(qrDialog.scanUrl)}`}
                     alt="Invoice QR Code"
-                    className="w-48 h-48 rounded-lg"
+                    className="w-48 h-48 rounded-lg object-contain"
                   />
                 ) : (
                   <div className="w-48 h-48 flex items-center justify-center text-xs text-muted-foreground">
@@ -301,7 +301,7 @@ function CustomerInvoicesPage() {
                     size="sm"
                     onClick={() => {
                       const link = document.createElement("a");
-                      link.href = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(qrDialog.scanUrl!)}`;
+                      link.href = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(qrDialog.scanUrl!)}`;
                       link.download = `qr-${qrDialog.invoice!.invoice_number}.png`;
                       link.click();
                       toast.success("QR code downloaded");
