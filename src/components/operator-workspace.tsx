@@ -48,36 +48,39 @@ export function OperatorWorkOrders() {
     },
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ["operator-work-orders", user?.id] });
+  const [uploading, setUploading] = useState(false);
   const update = useMutation({
     mutationFn: async ({
       order,
       progress,
       checklist,
+      imageUrl,
     }: {
       order: WorkOrder;
       progress?: number;
       checklist?: any[];
+      imageUrl?: string | null;
     }) => {
       const nextProgress = progress ?? order.progress_percent;
-      const patch: any = {
-        progress_percent: nextProgress,
-        status: nextProgress >= 100 ? "completed" : nextProgress > 0 ? "in_progress" : order.status,
-      };
-      if (nextProgress >= 100 && !order.end_time) patch.end_time = new Date().toISOString();
+      const patch: any = {};
+      // If progress is changing, require image and set pending approval
+      if (progress !== undefined && progress !== order.progress_percent) {
+        if (!imageUrl && !order.progress_image_url) {
+          throw new Error("Upload a photo of your work before updating progress");
+        }
+        patch.progress_pending = true;
+        patch.progress_image_url = imageUrl ?? order.progress_image_url;
+        // Store the proposed progress but don't confirm it yet
+        patch.notes = `Progress update: ${nextProgress}% (pending approval)`;
+      } else {
+        // Checklist-only update (no progress change) — allow directly
+        if (nextProgress >= 100 && !order.end_time) patch.end_time = new Date().toISOString();
+        patch.progress_percent = nextProgress;
+        patch.status = nextProgress >= 100 ? "completed" : nextProgress > 0 ? "in_progress" : order.status;
+      }
       if (checklist) patch.checklist = checklist;
       const { error } = await supabase.from("work_orders").update(patch).eq("id", order.id);
       if (error) throw error;
-      if (progress !== undefined && companyId && user?.id) {
-        const { error: historyError } = await supabase
-          .from("production_progress")
-          .insert({
-            company_id: companyId,
-            work_order_id: order.id,
-            operator_id: user.id,
-            progress_percent: nextProgress,
-          });
-        if (historyError) throw historyError;
-      }
     },
     onSuccess: () => {
       toast.success("Work order updated");
@@ -176,6 +179,8 @@ function WorkOrderDetail({
   pending: boolean;
 }) {
   const [custom, setCustom] = useState(String(order.progress_percent));
+  const [progressImage, setProgressImage] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const checklist = Array.isArray(order.checklist) ? order.checklist : [];
   const materials = Array.isArray(order.materials) ? order.materials : [];
   // Open issues reported on this work order (visible via reported_by = me).
@@ -279,14 +284,25 @@ function WorkOrderDetail({
       <div>
         <Label>Progress</Label>
         <Progress className="mt-2" value={order.progress_percent} />
+        {order.progress_pending && (
+          <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-sm text-amber-400">
+            <div className="flex items-center gap-1.5 font-medium">
+              <Clock className="h-3.5 w-3.5" />
+              Progress update pending manager approval
+            </div>
+            {order.progress_image_url && (
+              <img src={order.progress_image_url} alt="Work progress" className="mt-2 max-h-32 rounded-lg border" />
+            )}
+          </div>
+        )}
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[25, 50, 75, 100].map((n) => (
             <Button
               key={n}
               variant="outline"
               size="sm"
-              disabled={pending || n < order.progress_percent}
-              onClick={() => save({ order, progress: n })}
+              disabled={pending || n < order.progress_percent || order.progress_pending}
+              onClick={() => save({ order, progress: n, imageUrl: progressImage })}
             >
               {n}%
             </Button>
@@ -300,19 +316,52 @@ function WorkOrderDetail({
             max="100"
             value={custom}
             onChange={(e) => setCustom(e.target.value)}
+            disabled={order.progress_pending}
           />
           <Button
-            disabled={pending}
+            disabled={pending || order.progress_pending}
             onClick={() =>
               save({
                 order,
                 progress: Math.max(order.progress_percent, Math.min(100, Number(custom))),
+                imageUrl: progressImage,
               })
             }
           >
             Update
           </Button>
         </div>
+        {!order.progress_pending && (
+          <div className="mt-2">
+            <Label className="text-xs text-muted-foreground">Upload work photo (required for progress update)</Label>
+            <Input
+              type="file"
+              accept="image/*"
+              className="mt-1"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setUploading(true);
+                try {
+                  const fileName = `progress/${order.id}/${Date.now()}_${file.name}`;
+                  const { data, error } = await supabase.storage
+                    .from("documents")
+                    .upload(fileName, file);
+                  if (error) throw error;
+                  const { data: urlData } = supabase.storage.from("documents").getPublicUrl(data.path);
+                  setProgressImage(urlData.publicUrl);
+                } catch (err: any) {
+                  toast.error("Upload failed: " + err.message);
+                } finally {
+                  setUploading(false);
+                }
+              }}
+            />
+            {progressImage && (
+              <img src={progressImage} alt="Preview" className="mt-2 max-h-24 rounded-lg border" />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
