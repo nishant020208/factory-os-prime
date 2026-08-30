@@ -889,6 +889,7 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
     }
     void recordAccessLog(withEmail, "login", "success");
     toast.success(`Welcome back to FactoryOS`);
+    sessionStorage.setItem("factoryos-navigated", "1");
     navigate({ to: redirect ?? "/dashboard" });
   }
 
@@ -931,6 +932,7 @@ function LoginPanel({ role, redirect }: { role: AppRole; redirect?: string }) {
     }
     void recordAccessLog(email, "signup", "success");
     toast.success("Account created. You're signed in.");
+    sessionStorage.setItem("factoryos-navigated", "1");
     navigate({ to: redirect ?? "/dashboard" });
   }
 
