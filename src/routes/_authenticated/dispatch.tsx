@@ -150,24 +150,41 @@ function DispatchPage() {
         .single();
       if (qrErr) throw qrErr;
 
-      // 3) Reflect in the customer's tracking view
+      // 3) Generate Package QR for the packed goods
+      const pkgNumber = `PKG-${new Date().getFullYear()}-${String(Date.now() % 100000).padStart(5, "0")}`;
+      const { data: pkgQr } = await supabase
+        .from("qr_codes")
+        .insert({
+          company_id: companyId,
+          entity_type: "package",
+          entity_id: ship.id,
+          type: "package",
+          status: "active",
+          qr_data: pkgNumber,
+          label: pkgNumber,
+          sub_label: `${shipmentNumber} · ${form.carrier}`,
+        })
+        .select("token")
+        .single();
+
+      // 4) Reflect in the customer's tracking view
       await supabase
         .from("sales_orders")
         .update({ status: "shipped" })
         .eq("id", form.sales_order_id);
 
-      // 4) Notify Finance + the specific Customer
+      // 5) Notify Finance + the specific Customer
       await notifyDispatchReady(companyId, order?.so_number ?? shipmentNumber, ship.id);
       const customerUser = order?.customers?.user_id ?? null;
       if (customerUser) {
         await notifyShipmentUpdate(companyId, order?.so_number ?? shipmentNumber, customerUser, "dispatch_ready", ship.id);
       }
 
-      return { shipmentNumber, scanUrl: `${window.location.origin}/scan?t=${qr.token}` };
+      return { shipmentNumber, scanUrl: `${window.location.origin}/scan?t=${qr.token}`, pkgScanUrl: pkgQr ? `${window.location.origin}/scan?t=${pkgQr.token}` : null };
     },
     onSuccess: (r) => {
       queryClient.invalidateQueries();
-      toast.success(`Shipment ${r.shipmentNumber} created — QR generated & customer notified`);
+      toast.success(`Shipment ${r.shipmentNumber} created — Shipment & Package QR generated`);
       setShowShip(false);
       setForm({
         sales_order_id: "",
