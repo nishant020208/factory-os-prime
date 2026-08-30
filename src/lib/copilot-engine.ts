@@ -1193,6 +1193,41 @@ export async function answerCopilot(opts: {
     };
   }
 
+  // 3.5. General-knowledge / out-of-scope detection: if the question doesn't
+  //      touch ANY manufacturing domain keyword AND isn't a known social/action
+  //      intent, it's likely a general-knowledge question (sandwich, weather,
+  //      cricket, jokes, etc.). Decline politely with role context.
+  if (intent === "data" || intent === "howto") {
+    const manufacturingTerms = [
+      "order", "production", "inventory", "stock", "warehouse", "machine",
+      "quality", "inspection", "defect", "invoice", "payment", "supplier",
+      "customer", "shipment", "dispatch", "delivery", "employee", "hr",
+      "finance", "budget", "revenue", "purchase", "procurement", "rfq",
+      "work order", "batch", "oee", "throughput", "maintenance", "repair",
+      "product", "sku", "catalog", "bom", "attendance", "payroll",
+      "leave", "training", "yield", "ncr", "capa", "reorder",
+      "approved", "pending", "status", "report", "dashboard",
+      "overview", "summary", "metric", "kpi", "performance",
+      "operations", "plant", "factory", "manufacturing",
+    ];
+    const isManufacturingRelated = manufacturingTerms.some((t) => lower.includes(t));
+    if (!isManufacturingRelated) {
+      const roleName = ROLE_LABELS[role ?? ""] ?? "your role";
+      const allowed = getAllowedLabels(role);
+      return {
+        text: `I'm scoped to **${roleName}** data — I can help with ${allowed.slice(0, 4).join(", ")}${allowed.length > 4 ? " and more" : ""}.
+
+For general questions like this, a general-purpose assistant would be a better fit. I'm built specifically for your FactoryOS manufacturing data.
+
+Try asking me something like:
+• "Give me a company overview"
+• "Show my pending orders"
+• "Any low stock items?"`,
+        conf: 100,
+      };
+    }
+  }
+
   // 3. Entity lookup FIRST — a named code (SO-2026-0001, WO-0042, PO-1234) is
   //    more specific than math or the generic role summary. The regex requires
   //    a code prefix so words like "production" never match.
@@ -1327,6 +1362,38 @@ export async function answerCopilotStream(opts: {
       text: `🚫 **Access Restricted** — you asked about **${domainLabel}**, which is outside your role's scope.`,
       conf: 100,
     };
+  }
+
+  // Out-of-scope detection for streaming variant
+  if (intent === "data" || intent === "howto") {
+    const manufacturingTerms = [
+      "order", "production", "inventory", "stock", "warehouse", "machine",
+      "quality", "inspection", "defect", "invoice", "payment", "supplier",
+      "customer", "shipment", "dispatch", "delivery", "employee", "hr",
+      "finance", "budget", "revenue", "purchase", "procurement", "rfq",
+      "work order", "batch", "oee", "throughput", "maintenance", "repair",
+      "product", "sku", "catalog", "bom", "attendance", "payroll",
+      "leave", "training", "yield", "ncr", "capa", "reorder",
+      "approved", "pending", "status", "report", "dashboard",
+      "overview", "summary", "metric", "kpi", "performance",
+      "operations", "plant", "factory", "manufacturing",
+    ];
+    const isManufacturingRelated = manufacturingTerms.some((t) => lower.includes(t));
+    if (!isManufacturingRelated) {
+      const roleName = ROLE_LABELS[role ?? ""] ?? "your role";
+      const allowed = getAllowedLabels(role);
+      return {
+        text: `I'm scoped to **${roleName}** data — I can help with ${allowed.slice(0, 4).join(", ")}${allowed.length > 4 ? " and more" : ""}.
+
+For general questions like this, a general-purpose assistant would be a better fit. I'm built specifically for your FactoryOS manufacturing data.
+
+Try asking me something like:
+• "Give me a company overview"
+• "Show my pending orders"
+• "Any low stock items?"`,
+        conf: 100,
+      };
+    }
   }
 
   // Try Cerebras streaming
