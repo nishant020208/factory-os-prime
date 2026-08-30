@@ -68,11 +68,17 @@ function PurchaseRequestsPage() {
   const { data: suppliers } = useQuery({
     queryKey: ["pr-suppliers", companyId],
     queryFn: async () =>
-      (await supabase.from("suppliers").select("id, name").eq("status", "active")).data ?? [],
+      (
+        await supabase
+          .from("suppliers")
+          .select("id, name")
+          .eq("status", "active")
+          .not("user_id", "is", null)  // Only suppliers with linked portal accounts
+      ).data ?? [],
     enabled: !!companyId,
   });
 
-  const pending = requisitions?.filter((r) => r.status === "pending" || r.status === "open").length ?? 0;
+  const pending = requisitions?.filter((r) => r.status === "pending").length ?? 0;
   const converted = requisitions?.filter((r) => r.status === "converted").length ?? 0;
 
   const createReq = useMutation({
