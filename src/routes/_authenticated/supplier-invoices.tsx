@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { useSupplier } from "@/hooks/use-supplier";
 import { fmtMoney } from "@/lib/currency";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -49,32 +50,7 @@ function SupplierInvoicesPage() {
     file_url: "",
   });
 
-  const { data: mySupplier } = useQuery({
-    queryKey: ["my-supplier", user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      const byUser = await supabase
-        .from("suppliers")
-        .select("id, name")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (byUser.data?.id) return { id: byUser.data.id as string, name: (byUser.data.name as string) ?? "" };
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("email")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (profile?.email) {
-        const { data: sup } = await supabase
-          .from("suppliers")
-          .select("id, name")
-          .eq("contact_email", profile.email)
-          .maybeSingle();
-        return sup?.id ? { id: sup.id as string, name: (sup.name as string) ?? "" } : null;
-      }
-      return null;
-    },
-  });
+  const { mySupplier } = useSupplier();
 
   const { data: invoices } = useQuery({
     queryKey: ["supplier-invoices", companyId, mySupplier?.id],
