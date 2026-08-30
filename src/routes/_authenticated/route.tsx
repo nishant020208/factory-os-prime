@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
 import { RouteLoading } from "@/components/route-loading";
@@ -20,6 +20,13 @@ export const Route = createFileRoute("/_authenticated")({
   pendingMs: 300,
   pendingMinMs: 0,
   beforeLoad: async ({ location }) => {
+    // Direct URL entry / new tab / refresh must route through landing page first.
+    // The flag is set by in-app navigation (sidebar clicks, login flow) and cleared
+    // on beforeunload so fresh loads always hit the landing page.
+    const hasNavigated = sessionStorage.getItem("factoryos-navigated");
+    if (!hasNavigated) {
+      throw redirect({ to: "/auth", search: { redirect: location.href } });
+    }
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) {
       throw redirect({ to: "/auth", search: { redirect: location.href } });
@@ -123,6 +130,26 @@ function AuthErrorBoundary({ error, reset }: { error: Error; reset: () => void }
 
 function Layout() {
   const { role } = Route.useRouteContext();
+
+  // Clear the navigation flag on page unload so fresh loads (new tab, refresh,
+  // typed URL) always route through the landing page first.
+  useEffect(() => {
+    const unloadHandler = () => sessionStorage.removeItem("factoryos-navigated");
+    window.addEventListener("beforeunload", unloadHandler);
+
+    // Set the flag on any in-app click so sidebar/link navigation works
+    const clickHandler = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement).closest("a, button[data-to], [role='menuitem']");
+      if (target) sessionStorage.setItem("factoryos-navigated", "1");
+    };
+    document.addEventListener("click", clickHandler, true);
+
+    return () => {
+      window.removeEventListener("beforeunload", unloadHandler);
+      document.removeEventListener("click", clickHandler, true);
+    };
+  }, []);
+
   // Root Super Admin is locked to English — language switch cannot affect
   // other companies or the platform console.
   const forceLocale = role === "root_super_admin" ? ("en" as const) : undefined;
