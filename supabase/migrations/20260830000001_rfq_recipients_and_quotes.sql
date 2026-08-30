@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.rfq_recipients (
 
 -- 2. rfq_quotes: stores the actual quote data from suppliers
 CREATE TABLE IF NOT EXISTS public.rfq_quotes (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   rfq_id UUID NOT NULL REFERENCES public.rfqs(id) ON DELETE CASCADE,
   supplier_id UUID NOT NULL REFERENCES public.suppliers(id) ON DELETE CASCADE,
   quoted_unit_price NUMERIC NOT NULL DEFAULT 0,
