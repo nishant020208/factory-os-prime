@@ -3599,8 +3599,12 @@ export type Database = {
       }
       sales_orders: {
         Row: {
+          advance_payment_percent: number | null
+          advance_payment_status: string | null
+          advance_qr_url: string | null
           approved_at: string | null
           approved_by: string | null
+          balance_due: number | null
           company_id: string
           created_at: string
           currency: string | null
@@ -3618,8 +3622,12 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          advance_payment_percent?: number | null
+          advance_payment_status?: string | null
+          advance_qr_url?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          balance_due?: number | null
           company_id: string
           created_at?: string
           currency?: string | null
@@ -3637,8 +3645,12 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          advance_payment_percent?: number | null
+          advance_payment_status?: string | null
+          advance_qr_url?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          balance_due?: number | null
           company_id?: string
           created_at?: string
           currency?: string | null
