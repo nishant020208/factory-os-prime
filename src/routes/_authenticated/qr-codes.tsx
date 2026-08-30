@@ -114,7 +114,7 @@ function QrCodesPage() {
   const getQrImageUrl = (row: any) => {
     const scanUrl = getScanUrl(row);
     if (!scanUrl) return null;
-    return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(scanUrl)}`;
+    return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(scanUrl)}`;
   };
 
   const filtered = (codes ?? []).filter((row: any) => {
@@ -328,9 +328,9 @@ function QrCodesPage() {
             const imgUrl = getQrImageUrl(previewDialog.row);
             return (
               <div className="flex flex-col items-center gap-4 py-2">
-                <div className="bg-white rounded-2xl p-3 shadow-lg">
+                <div className="bg-white rounded-2xl p-4 shadow-lg flex items-center justify-center">
                   {imgUrl ? (
-                    <img src={imgUrl} alt="QR Code" className="w-44 h-44 rounded-lg" />
+                    <img src={imgUrl} alt="QR Code" className="w-44 h-44 rounded-lg object-contain" />
                   ) : (
                     <div className="w-44 h-44 flex items-center justify-center text-xs text-muted-foreground">
                       No token available
