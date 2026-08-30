@@ -13,6 +13,7 @@ import {
   FileText,
   Truck,
   PackageCheck,
+  ArrowDownToLine,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, StatusBadge } from "@/components/ui-parts";
@@ -44,6 +45,7 @@ const TYPE_ICON: Record<string, React.ElementType> = {
   invoice: FileText,
   advance_payment: Clock,
   shipment: Truck,
+  inbound_shipment: ArrowDownToLine,
   package: PackageCheck,
   quality_certificate: ShieldCheck,
   warranty: ShieldCheck,
@@ -53,6 +55,7 @@ const TYPE_LABEL: Record<string, string> = {
   invoice: "Invoice",
   advance_payment: "Advance Payment",
   shipment: "Shipment",
+  inbound_shipment: "Inbound Shipment",
   package: "Package",
   quality_certificate: "Quality Certificate",
   warranty: "Warranty",
