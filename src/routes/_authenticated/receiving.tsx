@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { PackageOpen, CheckCircle2, ScanLine, Loader2, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,11 +54,11 @@ function ReceivingPage() {
         sub="Inbound goods from suppliers — what's on the way and what's been put away. Scan-to-receive lives in Goods Receipt."
         actions={
           <Button asChild variant="outline" className="h-9 text-xs">
-            <a href="/goods-receipt">
+            <Link to="/goods-receipt">
               <ScanLine className="h-3.5 w-3.5 mr-1.5" />
               Open Goods Receipt
               <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-            </a>
+            </Link>
           </Button>
         }
       />
