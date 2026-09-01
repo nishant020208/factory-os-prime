@@ -13,7 +13,11 @@ import {
   ShieldCheck,
   AlertTriangle,
   ArrowDownToLine,
+  Camera,
 } from "lucide-react";
+import { QrCameraScanner } from "@/components/qr-camera-scanner";
+import { useNavigate } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/scan")({
   head: () => ({
@@ -140,9 +144,11 @@ const STATUS_META: Record<
 
 function ScanPage() {
   const { t: token } = useSearch({ from: "/scan" });
+  const navigate = useNavigate();
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -233,6 +239,15 @@ function ScanPage() {
                 <p className="text-sm font-semibold text-white">Lookup failed</p>
                 <p className="text-xs text-white/50 mt-1 leading-relaxed">{error}</p>
               </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2 h-8 text-xs border-white/10 text-white/70 hover:text-white"
+                onClick={() => setScannerOpen(true)}
+              >
+                <Camera className="h-3.5 w-3.5 mr-1.5" />
+                Try Camera Scan
+              </Button>
             </div>
           )}
 
@@ -248,6 +263,15 @@ function ScanPage() {
                   This QR code doesn't exist or has been removed. Please contact the sender.
                 </p>
               </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2 h-8 text-xs border-white/10 text-white/70 hover:text-white"
+                onClick={() => setScannerOpen(true)}
+              >
+                <Camera className="h-3.5 w-3.5 mr-1.5" />
+                Try Camera Scan
+              </Button>
             </div>
           )}
 
@@ -329,6 +353,21 @@ function ScanPage() {
         </div>
       </div>
 
+      {/* Camera scanner button — shown when no token in URL or after errors */}
+      {!token && (
+        <div className="mt-6">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 text-xs border-white/10 text-white/70 hover:text-white"
+            onClick={() => setScannerOpen(true)}
+          >
+            <Camera className="h-4 w-4 mr-2" />
+            Open Camera to Scan QR
+          </Button>
+        </div>
+      )}
+
       {/* Footer */}
       <p className="mt-8 text-xs text-white/20 text-center">
         Powered by{" "}
@@ -340,6 +379,18 @@ function ScanPage() {
         </a>{" "}
         · Secure QR Verification
       </p>
+
+      {/* Camera QR Scanner Dialog */}
+      <QrCameraScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={(decoded) => {
+          setScannerOpen(false);
+          // Navigate to the scan URL with the decoded token
+          navigate({ to: "/scan", search: { t: decoded } });
+        }}
+        title="Scan QR Code"
+      />
     </div>
   );
 }
