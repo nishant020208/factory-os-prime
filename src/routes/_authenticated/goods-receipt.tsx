@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PackageOpen, ScanLine, CheckCircle2, Loader2 } from "lucide-react";
+import { PackageOpen, ScanLine, CheckCircle2, Loader2, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { notifyGRNConfirmed, notifyGRNToSupplier } from "@/lib/notifications";
 import { toast } from "sonner";
 import { useState } from "react";
+import { QrCameraScanner } from "@/components/qr-camera-scanner";
 
 export const Route = createFileRoute("/_authenticated/goods-receipt")({
   head: () => ({
@@ -36,6 +37,8 @@ function GoodsReceiptPage() {
   const isAuditor = roles.includes("auditor");
   const [receivingId, setReceivingId] = useState<string | null>(null);
   const [tokens, setTokens] = useState<Record<string, string>>({});
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerPoId, setScannerPoId] = useState<string | null>(null);
 
   const { data: pos } = useQuery({
     queryKey: ["grn-pos", companyId],
@@ -191,12 +194,26 @@ function GoodsReceiptPage() {
                     </TableCell>
                     <TableCell>
                       {canReceive && !isAuditor ? (
-                        <Input
-                          value={tokens[po.id] ?? ""}
-                          onChange={(e) => setTokens((t) => ({ ...t, [po.id]: e.target.value }))}
-                          placeholder="Scan or paste token (optional)"
-                          className="h-8 text-xs font-mono w-full min-w-[160px]"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            value={tokens[po.id] ?? ""}
+                            onChange={(e) => setTokens((t) => ({ ...t, [po.id]: e.target.value }))}
+                            placeholder="Scan or paste token"
+                            className="h-8 text-xs font-mono flex-1 min-w-[120px]"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 w-8 p-0 flex-shrink-0"
+                            title="Open camera to scan QR code"
+                            onClick={() => {
+                              setScannerPoId(po.id);
+                              setScannerOpen(true);
+                            }}
+                          >
+                            <Camera className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
@@ -245,6 +262,23 @@ function GoodsReceiptPage() {
           </Label>
         </div>
       </Panel>
+
+      {/* Camera QR Scanner */}
+      <QrCameraScanner
+        open={scannerOpen}
+        onClose={() => {
+          setScannerOpen(false);
+          setScannerPoId(null);
+        }}
+        onScan={(decoded) => {
+          if (scannerPoId) {
+            setTokens((t) => ({ ...t, [scannerPoId]: decoded }));
+          }
+          setScannerOpen(false);
+          setScannerPoId(null);
+        }}
+        title="Scan Inbound Shipment QR"
+      />
     </div>
   );
 }
