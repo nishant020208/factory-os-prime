@@ -1,4 +1,4 @@
-# 🏭 Factory OS Prime — AI-Powered Smart Manufacturing Platform
+# 🏭 Factory OS Prime — AI-Powered Smart Manufacturing Platforms
 
 [![React 19](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev/)
 [![TanStack Start](https://img.shields.io/badge/TanStack-Start-FF4154?style=for-the-badge&logo=tanstack&logoColor=white)](https://tanstack.com/)
@@ -27,7 +27,7 @@ Factory OS Prime is architected with modular enterprise micro-modules, allowing 
 | :-------------------------------- | :------------------------------------------------------------------------------------------------------------------------ | :-------------------------------------------------------- |
 | **🏭 Production & Execution**     | Work Order Lifecycle, Bill of Materials (BOM), Capacity Planning, Production Logs, Plant Overview, Shop-floor Dispatching | Work Orders, BOM Items, Stations, Shift Logs              |
 | **📦 Inventory & Warehouse**      | Multi-Warehouse Stock Tracking, Goods Receipts, Stock Movements, Cycle Counting, Transfers, Spare Parts Catalog           | Inventory Items, Batches, Warehouses, Bin Locations       |
-| **🛡️ Quality Assurance (QA/QC)**  | Incoming Inspection, In-Process Quality Checks, Final Inspection, Defect Logging, Non-Conformance Reports (NCR), CAPA     | Inspections, Defects, CAPA Actions, Standards             |
+| **🛡️ Quality Assurance (QA/QC)**  | Incoming Inspection, In-Process Quality Checks, Final Inspection, Defect Logging, Non-Conformance Reports (NCR), CAPAs     | Inspections, Defects, CAPA Actions, Standards             |
 | **🔧 Maintenance & Telemetry**    | Equipment Health Monitoring, Breakdown Management, Scheduled Maintenance Work Orders, Machine History                     | Machines, Telemetry Logs, Spare Parts, Maintenance Orders |
 | **💰 Finance & Accounting**       | General Ledger, AP/AR, Customer & Supplier Invoices, Expense Tracking, Profit & Loss Statements, Budgets                  | Invoices, Expenses, Payments, Budgets, Taxes              |
 | **👥 HR & Workforce Management**  | Employee Directory, Attendance Tracking, Leave Management, Payroll Engine, Recruitment Pipelines, Performance & Training  | Employees, Leaves, Payroll Items, Departments             |
@@ -49,7 +49,7 @@ Factory OS Prime uses a modern, high-performance web architecture combining Serv
 - **Styling & Motion**: Tailwind CSS v4 with modern CSS variables, OKLCH color spaces, glassmorphism, and [Framer Motion](https://www.framer.com/motion/) micro-interactions.
 - **UI Components & Icons**: Radix UI primitives, [Lucide React](https://lucide.dev/) icons, [Recharts](https://recharts.org/) data visualizations, and Sonner notifications.
 - **Data Layer & Realtime Backend**: [Supabase PostgreSQL](https://supabase.com/) with Row-Level Security (RLS), real-time database subscriptions, and secure API gateways.
-- **Form Handling & Validation**: React Hook Form coupled with [Zod](https://zod.dev/) schema enforcement.
+- **Form Handling & Validation**: React Hook Form coupled with [Zod](https://zod.dev/) schema enforcements.
 
 ---
 
