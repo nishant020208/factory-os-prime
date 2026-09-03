@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney } from "@/lib/currency";
 import { notifyGRNConfirmed, notifyGRNToSupplier } from "@/lib/notifications";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -187,7 +188,7 @@ function GoodsReceiptPage() {
                     <TableCell className="font-medium">{po.po_number ?? po.id.slice(0, 8)}</TableCell>
                     <TableCell className="text-xs">{supplier?.name ?? "—"}</TableCell>
                     <TableCell className="font-mono text-xs">
-                      ${Number(po.total_amount ?? 0).toLocaleString()}
+                      {fmtMoney(po.total_amount)}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={po.status} />
