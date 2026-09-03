@@ -14,6 +14,7 @@ const TargetCursor = lazy(() => import('../components/TargetCursor'));
 import appCss from "../styles.css?url";
 import { reportRuntimeError } from "../lib/lovable-error-reporting";
 import { ThemeProvider } from "@/hooks/use-theme";
+import { SoundProvider, GlobalClickSoundLayer } from "@/hooks/use-click-sound";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -285,19 +286,24 @@ function RootComponent() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        {/* Global target cursor — desktop only, returns null on touch/mobile automatically */}
-        <Suspense fallback={null}>
-          <TargetCursor
-            targetSelector='a, button, [role="button"], input, select, label, .cursor-target'
-            spinDuration={2}
-            hideDefaultCursor={true}
-            parallaxOn={true}
-            cursorColor="#ffffff"
-            cursorColorOnTarget="oklch(0.72 0.19 145)"
-          />
-        </Suspense>
-        <Outlet />
-        <Toaster position="top-right" richColors closeButton />
+        <SoundProvider>
+          {/* Global target cursor — desktop only, returns null on touch/mobile automatically */}
+          <Suspense fallback={null}>
+            <TargetCursor
+              targetSelector='a, button, [role="button"], input, select, label, .cursor-target'
+              spinDuration={2}
+              hideDefaultCursor={true}
+              parallaxOn={true}
+              cursorColor="#ffffff"
+              cursorColorOnTarget="oklch(0.72 0.19 145)"
+            />
+          </Suspense>
+          {/* Subtle mechanical click feedback on every button/link (muted state
+              is shared app-wide via SoundProvider/localStorage) */}
+          <GlobalClickSoundLayer />
+          <Outlet />
+          <Toaster position="top-right" richColors closeButton />
+        </SoundProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );
