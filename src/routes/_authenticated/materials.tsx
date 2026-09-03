@@ -218,9 +218,7 @@ function MaterialsPage() {
               <TableRow key={m.id} className="border-white/5">
                 <TableCell className="font-medium">{m.name}</TableCell>
                 <TableCell>{m.unit}</TableCell>
-                <TableCell className="font-mono text-xs">
-                  ${Number(m.unit_cost ?? 0).toFixed(2)}
-                </TableCell>
+                <TableCell className="font-mono text-xs">{fmtMoney(m.unit_cost)}</TableCell>
                 <TableCell>
                   <StatusBadge status={m.is_active ? "active" : "inactive"} />
                 </TableCell>
@@ -306,7 +304,7 @@ function MaterialsPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Unit Cost ($)</Label>
+              <Label className="text-xs text-muted-foreground">Unit Cost</Label>
               <Input
                 type="number"
                 value={form.unit_cost}
