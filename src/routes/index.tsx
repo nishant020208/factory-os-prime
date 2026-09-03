@@ -719,7 +719,13 @@ function FloatingParticles() {
     }> = [];
 
     function resize() {
-      w = window.innerWidth;
+      // Size the canvas to its containing block (the hero section), not the full
+      // viewport: the section is centered and capped at max-w-7xl on wide screens,
+      // and on narrow screens clientWidth excludes the vertical scrollbar. Either
+      // way this keeps the canvas inside the page so it never causes horizontal
+      // overflow or lets the page be dragged left/right.
+      const host = canvas!.parentElement;
+      w = host && host.clientWidth > 0 ? host.clientWidth : document.documentElement.clientWidth;
       h = Math.min(window.innerHeight * 1.1, 700);
       canvas!.width = w * devicePixelRatio;
       canvas!.height = h * devicePixelRatio;
@@ -950,7 +956,7 @@ function Hero() {
       className="relative pt-16 sm:pt-24 pb-16 sm:pb-24 max-w-7xl mx-auto px-4 sm:px-6"
     >
       {/* Furniture factory halftone backdrop (WebGL loupe on desktop) */}
-      <div className="absolute -inset-x-4 sm:-inset-x-6 top-0 bottom-0 -z-0">
+      <div className="absolute inset-0 -z-0">
         <FactoryHalftoneBackdrop />
       </div>
 
@@ -2617,7 +2623,7 @@ function EnterpriseModules() {
   return (
     <section
       id="modules"
-      className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-border"
+      className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 border-t border-border overflow-x-clip"
     >
       <SectionHeader
         eyebrow="Platform"
