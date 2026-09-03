@@ -145,7 +145,7 @@ function SupplierPerformancePage() {
                   <li key={p.id} className="flex items-center justify-between text-xs">
                     <span className="font-medium">{p.po_number}</span>
                     <span className="text-muted-foreground">
-                      ${Number(p.total_amount ?? 0).toLocaleString()} · {p.status}
+                      {fmtMoney(p.total_amount)} · {p.status}
                     </span>
                   </li>
                 ))}
