@@ -537,7 +537,7 @@ function OrdersPage() {
             hideOnMobile: true,
             render: (r: any) => (
               <span className="font-mono text-xs">
-                ${Number(r.total_amount ?? 0).toLocaleString()}
+                {fmtMoney(r.total_amount)}
               </span>
             ),
           },
