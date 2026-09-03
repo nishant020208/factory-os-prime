@@ -323,7 +323,7 @@ function ApprovedOrdersPage() {
                   <option value="">Select material...</option>
                   {(materials ?? []).map((m: any) => (
                     <option key={m.id} value={m.id}>
-                      {m.name} (${Number(m.unit_cost).toFixed(2)}/{m.unit})
+                      {m.name} ({fmtMoney(m.unit_cost)}/{m.unit})
                     </option>
                   ))}
                 </select>
@@ -355,28 +355,20 @@ function ApprovedOrdersPage() {
               <div className="rounded-xl bg-card/60 border border-white/5 p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Order Total</span>
-                  <span className="font-medium">
-                    ${Number(confirmDialog.order.order_total ?? 0).toFixed(2)}
-                  </span>
+                  <span className="font-medium">{fmtMoney(confirmDialog.order.order_total)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Advance ({Number(advancePercent)}%)</span>
                   <span className="font-medium text-primary">
-                    $
-                    {(
-                      (Number(confirmDialog.order.order_total ?? 0) * Number(advancePercent)) /
-                      100
-                    ).toFixed(2)}
+                    {fmtMoney((Number(confirmDialog.order.order_total ?? 0) * Number(advancePercent)) / 100)}
                   </span>
                 </div>
                 <div className="border-t border-white/5 pt-2 flex justify-between text-sm">
                   <span className="font-medium">Balance Due</span>
                   <span className="font-medium">
-                    $
-                    {(
-                      Number(confirmDialog.order.order_total ?? 0) *
-                      (1 - Number(advancePercent) / 100)
-                    ).toFixed(2)}
+                    {fmtMoney(
+                      Number(confirmDialog.order.order_total ?? 0) * (1 - Number(advancePercent) / 100)
+                    )}
                   </span>
                 </div>
               </div>
