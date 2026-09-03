@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney } from "@/lib/currency";
 import { safeDate } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/receiving")({
@@ -102,7 +103,7 @@ function ReceivingPage() {
                         {(po as any).suppliers?.name ?? "—"}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        ${Number(po.total_amount ?? 0).toLocaleString()}
+                        {fmtMoney(po.total_amount)}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {del?.carrier ?? "—"}
