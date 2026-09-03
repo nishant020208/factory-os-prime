@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge } from "@/components/ui-parts";
+import { fmtMoney } from "@/lib/currency";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import {
@@ -287,7 +288,7 @@ function SupplierPosPage() {
                   <TableRow key={po.id} className="border-white/5">
                     <TableCell className="font-medium">{po.po_number ?? po.id.slice(0, 8)}</TableCell>
                     <TableCell className="font-mono text-xs">
-                      ${Number(po.total_amount ?? 0).toLocaleString()}
+                      {fmtMoney(po.total_amount)}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {po.expected_date ? new Date(po.expected_date).toLocaleDateString() : "—"}
