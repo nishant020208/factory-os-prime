@@ -13,6 +13,7 @@ import {
   XCircle,
   KeyRound,
   AlertTriangle,
+  Volume2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Panel, StatusBadge } from "@/components/ui-parts";
@@ -43,6 +44,8 @@ import {
 } from "@/lib/notifications";
 import { applyApprovedProfileChange, profileFieldLabel } from "@/lib/profile-change";
 import { usePreferences, type TimeFormat, type NotificationsPref } from "@/lib/preferences";
+import { useClickSound } from "@/hooks/use-click-sound";
+import { Switch } from "@/components/ui/switch";
 import { AvatarUpload } from "@/components/avatar-upload";
 
 const settingsSearch = z.object({ tab: z.string().optional() });
@@ -272,6 +275,11 @@ function SettingsPage() {
   const { profile, user, roles, companyId } = useAuth();
   const { locale, setLocale, t } = useI18n();
   const { prefs, update: updatePrefs } = usePreferences();
+  const {
+    enabled: clickSoundEnabled,
+    setEnabled: setClickSoundEnabled,
+    play: playClickSound,
+  } = useClickSound();
   // Allow deep-linking to a tab (e.g. /settings?tab=change-requests from nav)
   const search = useSearch({ from: "/_authenticated/settings" });
   const [tab, setTab] = useState<string>(
@@ -960,6 +968,27 @@ function SettingsPage() {
                   Affects navigation, menus and shared UI labels for your account.
                 </div>
               </div>
+            </div>
+            <div className="mt-5 flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-card/50 px-4 py-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
+                  <Label className="text-sm font-medium">Click sounds</Label>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    Subtle mechanical click on buttons and navigation across the app.
+                  </div>
+                </div>
+              </div>
+              <Switch
+                checked={clickSoundEnabled}
+                onCheckedChange={(v) => {
+                  setClickSoundEnabled(v);
+                  // Audible confirmation when switching sound back on (the global
+                  // layer only ticks while enabled, so this click is otherwise silent)
+                  if (v) playClickSound();
+                }}
+                aria-label="Toggle click sounds"
+              />
             </div>
           </Panel>
         </TabsContent>
