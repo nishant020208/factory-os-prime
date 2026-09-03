@@ -162,7 +162,7 @@ function SparePartsPage() {
                         <td className="py-2.5 px-2 font-mono text-xs text-muted-foreground">{p.part_code ?? "—"}</td>
                         <td className="py-2.5 px-2 tabular-nums">{p.quantity}</td>
                         <td className="py-2.5 px-2 tabular-nums text-muted-foreground">{p.reorder_threshold}</td>
-                        <td className="py-2.5 px-2 font-mono text-xs">${Number(p.unit_cost ?? 0).toLocaleString()}</td>
+                        <td className="py-2.5 px-2 font-mono text-xs">{fmtMoney(p.unit_cost)}</td>
                         <td className="py-2.5 px-2">
                           {low ? (
                             <span className="inline-flex items-center gap-1 text-[10px] text-destructive">
@@ -220,7 +220,7 @@ function SparePartsPage() {
                 <Input value={form.part_code} onChange={(e) => setForm((f) => ({ ...f, part_code: e.target.value }))} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Unit Cost ($)</Label>
+                <Label className="text-xs text-muted-foreground">Unit Cost</Label>
                 <Input type="number" value={form.unit_cost} onChange={(e) => setForm((f) => ({ ...f, unit_cost: e.target.value }))} />
               </div>
             </div>
