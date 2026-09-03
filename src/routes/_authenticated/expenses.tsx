@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
-import { fmtMoneyK } from "@/lib/currency";
+import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -165,7 +165,7 @@ function ExpensesPage() {
                       </td>
                       <td className="py-2.5 px-2 text-muted-foreground">{e.description ?? "—"}</td>
                       <td className="py-2.5 px-2 font-mono text-xs">{e.expense_date?.slice(0, 10) ?? "—"}</td>
-                      <td className="py-2.5 px-2 font-mono text-xs">${Number(e.amount ?? 0).toLocaleString()}</td>
+                      <td className="py-2.5 px-2 font-mono text-xs">{fmtMoney(e.amount)}</td>
                       <td className="py-2.5 px-2">
                         <StatusBadge status={e.receipt_url ? "approved" : "pending"} />
                       </td>
@@ -212,7 +212,7 @@ function ExpensesPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Amount ($) *</Label>
+                <Label className="text-xs text-muted-foreground">Amount *</Label>
                 <Input type="number" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
               </div>
               <div className="space-y-1.5">
