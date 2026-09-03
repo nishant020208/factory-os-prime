@@ -157,10 +157,10 @@ function SupplierInvoicesPage() {
                     <TableCell className="font-medium">{inv.invoice_number}</TableCell>
                     <TableCell className="text-xs">{po?.po_number ?? "—"}</TableCell>
                     <TableCell className="text-xs font-mono">
-                      ${Number(inv.gst_amount ?? 0).toLocaleString()}
+                      {fmtMoney(inv.gst_amount)}
                     </TableCell>
                     <TableCell className="text-xs font-mono">
-                      ${Number(inv.total_amount ?? 0).toLocaleString()}
+                      {fmtMoney(inv.total_amount)}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={inv.status} />
@@ -206,7 +206,7 @@ function SupplierInvoicesPage() {
                 <option value="">Select a fulfilled PO…</option>
                 {(fulfilledPos ?? []).map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.po_number} — ${Number(p.total_amount ?? 0).toLocaleString()}
+                    {p.po_number} — {fmtMoney(p.total_amount)}
                   </option>
                 ))}
               </select>
