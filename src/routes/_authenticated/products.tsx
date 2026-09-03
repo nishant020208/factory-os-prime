@@ -49,8 +49,8 @@ const PRODUCT_FORM_FIELDS: FormField[] = [
       { value: "set", label: "Set" },
     ],
   },
-  { key: "unit_cost", label: "Unit Cost ($)", type: "number", placeholder: "42.50" },
-  { key: "unit_price", label: "Unit Price ($)", type: "number", placeholder: "89.00" },
+  { key: "unit_cost", label: "Unit Cost", type: "number", placeholder: "42.50" },
+  { key: "unit_price", label: "Unit Price", type: "number", placeholder: "89.00" },
   { key: "reorder_level", label: "Reorder Level", type: "number", placeholder: "200" },
   {
     key: "status",
