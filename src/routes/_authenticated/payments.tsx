@@ -175,7 +175,7 @@ function FinancePayments() {
                     </TableCell>
                     <TableCell className="text-xs">{p.invoices?.invoice_number ?? "—"}</TableCell>
                     <TableCell className="font-mono text-xs text-success">
-                      +${Number(p.amount ?? 0).toLocaleString()}
+                      +{fmtMoney(p.amount)}
                     </TableCell>
                     <TableCell className="text-xs capitalize">{p.method?.replace(/_/g, " ")}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
@@ -206,7 +206,7 @@ function FinancePayments() {
                 <option value="">Select invoice…</option>
                 {(openInvoices ?? []).map((i: any) => (
                   <option key={i.id} value={i.id}>
-                    {i.invoice_number} — {i.customers?.business_name ?? i.customers?.name ?? "?"} (${Number(i.total_amount ?? 0).toLocaleString()})
+                    {i.invoice_number} — {i.customers?.business_name ?? i.customers?.name ?? "?"} ({fmtMoney(i.total_amount)})
                   </option>
                 ))}
               </select>
@@ -334,7 +334,7 @@ function SupplierPaymentsView() {
                     <TableRow key={p.id} className="border-white/5">
                       <TableCell className="font-medium">{po?.po_number ?? "—"}</TableCell>
                       <TableCell className="font-mono text-xs">
-                        ${Number(p.amount ?? 0).toLocaleString()}
+                        {fmtMoney(p.amount)}
                       </TableCell>
                       <TableCell className="text-xs">{p.method ?? "—"}</TableCell>
                       <TableCell className="text-xs font-mono">{p.transaction_id ?? "—"}</TableCell>
