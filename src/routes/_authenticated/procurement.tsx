@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ResourceView, type FormField } from "@/components/resource-view";
 import { Kpi, StatusBadge } from "@/components/ui-parts";
 import { useAuth } from "@/hooks/use-auth";
-import { fmtMoneyK } from "@/lib/currency";
+import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 
@@ -206,7 +206,7 @@ function ProcurementPage() {
           header: "Amount",
           render: (r) => (
             <span className="font-mono text-xs">
-              ${Number(r.total_amount ?? 0).toLocaleString()}
+              {fmtMoney(r.total_amount)}
             </span>
           ),
         },
