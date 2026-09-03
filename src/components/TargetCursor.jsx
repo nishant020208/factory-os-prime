@@ -61,6 +61,7 @@ const TargetCursor = ({
   const targetCornerPositionsRef = useRef(null);
   const tickerFnRef = useRef(null);
   const activeStrengthRef = useRef(0);
+  const lastMouseRef = useRef({ x: 0, y: 0 });
 
   // Robust mobile/touch detection — never show custom cursor on touch devices
   const isMobile = useMemo(() => {
@@ -174,7 +175,10 @@ const TargetCursor = ({
 
     tickerFnRef.current = tickerFn;
 
-    const moveHandler = e => moveCursor(e.clientX, e.clientY);
+    const moveHandler = e => {
+      lastMouseRef.current = { x: e.clientX, y: e.clientY };
+      moveCursor(e.clientX, e.clientY);
+    };
     window.addEventListener('mousemove', moveHandler);
 
     const scrollHandler = () => {
@@ -209,6 +213,27 @@ const TargetCursor = ({
     window.addEventListener('mousedown', mouseDownHandler);
     window.addEventListener('mouseup', mouseUpHandler);
 
+    // After any click, verify the hovered element is still under the pointer.
+    // Clicks routinely hide or replace the element that was hovered (opening a
+    // dialog, closing a dropdown, navigating to another route), and a removed
+    // element never fires mouseleave — which previously left the targeting
+    // frame frozen on screen while the native cursor stayed hidden.
+    const clickResetHandler = () => {
+      setTimeout(() => {
+        if (!currentLeaveHandler || !activeTarget) return;
+        const el = document.elementFromPoint(
+          lastMouseRef.current.x,
+          lastMouseRef.current.y,
+        );
+        const stillOverTarget =
+          !!el && (el === activeTarget || activeTarget.contains(el));
+        if (!stillOverTarget) {
+          currentLeaveHandler();
+        }
+      }, 0);
+    };
+    window.addEventListener('click', clickResetHandler);
+
     const enterHandler = e => {
       const directTarget = e.target;
       const allTargets = [];
@@ -220,7 +245,18 @@ const TargetCursor = ({
         current = current.parentElement;
       }
       const target = allTargets[0] || null;
-      if (!target || !cursorRef.current || !cornersRef.current) return;
+      if (!target || !cursorRef.current || !cornersRef.current) {
+        // Moving over a non-interactive region while a target frame is still
+        // active means the previously hovered element was removed or covered
+        // without a mouseleave (a click opened a dialog/menu or navigated).
+        // Reset the stale frame so the reticle reverts to the plain cursor
+        // instead of staying frozen in targeting mode with the OS cursor
+        // hidden.
+        if (activeTarget && currentLeaveHandler) {
+          currentLeaveHandler();
+        }
+        return;
+      }
       if (activeTarget === target) return;
       if (activeTarget) {
         cleanupTarget(activeTarget);
@@ -377,6 +413,7 @@ const TargetCursor = ({
       window.removeEventListener('resize', resizeHandler);
       window.removeEventListener('mousedown', mouseDownHandler);
       window.removeEventListener('mouseup', mouseUpHandler);
+      window.removeEventListener('click', clickResetHandler);
 
       if (activeTarget) {
         cleanupTarget(activeTarget);
