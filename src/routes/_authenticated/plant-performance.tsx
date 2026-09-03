@@ -74,7 +74,7 @@ function PlantPerformancePage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("work_orders")
-        .select("*, machines!left(name), profiles!left(full_name)")
+        .select("*, machines!left(name), profiles!work_orders_operator_id_fkey(full_name)")
         .order("created_at", { ascending: false })
         .limit(50);
       return (data ?? []).map((wo: any) => ({
@@ -86,14 +86,17 @@ function PlantPerformancePage() {
     enabled: !!companyId,
   });
 
-  // Staff attendance today — the SAME records Operators/HR write.
+  // Staff attendance today — the SAME records Operators/HR write. No embed:
+  // attendance.employee_id has no FK constraint, so joins fail; names are
+  // mapped client-side from the real employees table.
   const { data: attendance } = useQuery({
     queryKey: ["pm-attendance-today", companyId, today],
     queryFn: async () =>
       (
         await supabase
           .from("attendance")
-          .select("*, employees!left(full_name, department_id, departments!left(name))")
+          .select("*")
+          .eq("company_id", companyId!)
           .eq("date", today)
       ).data ?? [],
     enabled: !!companyId,
@@ -215,6 +218,16 @@ function PlantPerformancePage() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  const employeeById = new Map((employees ?? []).map((e: any) => [e.id, e]));
+  const deptById = new Map((departments ?? []).map((d: any) => [d.id, d.name]));
+  const attendanceRows = (attendance ?? []).map((a: any) => {
+    const emp = employeeById.get(a.employee_id);
+    return {
+      ...a,
+      employee_name: emp?.full_name ?? "—",
+      department_name: emp ? (deptById.get(emp.department_id) ?? "—") : "—",
+    };
+  });
   const present = (attendance ?? []).filter((a: any) => a.status === "present").length;
   const absent = (attendance ?? []).filter((a: any) => a.status === "absent").length;
   const late = (attendance ?? []).filter((a: any) => a.status === "late").length;
@@ -297,10 +310,10 @@ function PlantPerformancePage() {
                 </tr>
               </thead>
               <tbody>
-                {(attendance ?? []).map((a: any) => (
+                {attendanceRows.map((a: any) => (
                   <tr key={a.id} className="border-b border-white/5 last:border-0">
-                    <td className="py-2 px-2 font-medium">{a.employees?.full_name ?? "—"}</td>
-                    <td className="py-2 px-2">{a.employees?.departments?.name ?? "—"}</td>
+                    <td className="py-2 px-2 font-medium">{a.employee_name}</td>
+                    <td className="py-2 px-2">{a.department_name}</td>
                     <td className="py-2 px-2">{a.check_in ? new Date(a.check_in).toLocaleTimeString() : "—"}</td>
                     <td className="py-2 px-2">{a.check_out ? new Date(a.check_out).toLocaleTimeString() : "—"}</td>
                     <td className="py-2 px-2"><StatusBadge status={a.status ?? "—"} /></td>
@@ -364,9 +377,7 @@ function PlantPerformancePage() {
                 const headcount = (employees ?? []).filter(
                   (e: any) => e.department_id === d.id,
                 ).length;
-                const deptToday = (attendance ?? []).filter(
-                  (a: any) => a.employees?.departments?.name === d.name,
-                );
+                const deptToday = attendanceRows.filter((a: any) => a.department_name === d.name);
                 return (
                   <div key={d.id} className="flex items-center justify-between py-3">
                     <div className="flex items-center gap-2">
