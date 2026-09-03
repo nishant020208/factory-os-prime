@@ -98,7 +98,7 @@ function PlantOverviewPage() {
       (
         await supabase
           .from("attendance")
-          .select("*, employees!left(full_name, department_id, departments!left(name))")
+          .select("*")
           .eq("company_id", companyId!)
           .eq("date", today)
       ).data ?? [],
