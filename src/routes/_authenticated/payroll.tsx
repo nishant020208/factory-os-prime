@@ -39,7 +39,7 @@ function PayrollPage() {
       (
         await supabase
           .from("payroll")
-          .select("*, profiles!left(full_name, email)")
+          .select("*")
           .eq("company_id", companyId!)
           .order("period", { ascending: false })
           .limit(300)
@@ -189,11 +189,17 @@ function PayrollPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // payroll.employee_id has no FK constraint, so names are mapped client-side
+  // from employees (with profiles as fallback for UI-generated rows).
+  const payrollNameById = new Map<string, any>([
+    ...(profiles ?? []).map((p: any): [string, any] => [p.id, p]),
+    ...(employees ?? []).map((e: any): [string, any] => [e.id, e]),
+  ]);
   const payrollRecords = (payrollRows ?? [])
     .slice(0, 100)
     .map((r: any) => ({
       id: r.id,
-      name: r.profiles?.full_name ?? "Employee",
+      name: payrollNameById.get(r.employee_id)?.full_name ?? "Employee",
       period: r.period ?? "",
       base: Number(r.gross_amount ?? 0),
       deductions: Number(r.deductions ?? 0),
