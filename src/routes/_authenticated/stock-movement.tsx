@@ -59,7 +59,7 @@ function StockMovementPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("stock_transfers")
-        .select("*, products(sku, name), materials(name), warehouses!stock_transfers_from_warehouse_id_fkey(name), warehouses!stock_transfers_to_warehouse_id_fkey(name)")
+        .select("*, products(sku, name), materials(name), from_wh:warehouses!stock_transfers_from_warehouse_id_fkey(name), to_wh:warehouses!stock_transfers_to_warehouse_id_fkey(name)")
         .order("created_at", { ascending: false })
         .limit(100);
       return data ?? [];
@@ -86,8 +86,8 @@ function StockMovementPage() {
       ref: "TRF",
       sku: t.products?.sku ?? t.materials?.name ?? t.product_id?.slice(0, 8) ?? "—",
       product: t.products?.name ?? t.materials?.name ?? "—",
-      from: t.warehouses?.[0]?.name ?? "—",
-      to: t.warehouses?.[1]?.name ?? "—",
+      from: t.from_wh?.name ?? "—",
+      to: t.to_wh?.name ?? "—",
       delta: Number(t.quantity ?? 0),
       reason: t.status ?? "transfer",
       actor: "transfer",
