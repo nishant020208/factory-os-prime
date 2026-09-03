@@ -18,6 +18,7 @@ import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
+import { fmtMoney } from "@/lib/currency";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 
@@ -256,7 +257,7 @@ function ShipmentsPage() {
                 <div className="flex items-center gap-3 text-right shrink-0">
                   {order.total_amount > 0 && (
                     <span className="font-mono text-sm font-semibold">
-                      ${Number(order.total_amount).toLocaleString()}
+                      {fmtMoney(order.total_amount)}
                     </span>
                   )}
                   <StatusBadge status={order.status} />
