@@ -31,7 +31,7 @@ const BOM_FORM_FIELDS: FormField[] = [
   { key: "components", label: "Components", type: "number", placeholder: "4", required: true },
   {
     key: "total_cost",
-    label: "Total Cost ($)",
+    label: "Total Cost",
     type: "number",
     placeholder: "142.50",
     required: true,
@@ -143,13 +143,13 @@ function BomPage() {
         {
           key: "unit_cost",
           header: "Unit Cost",
-          render: (r) => <span className="font-mono text-xs">${r.unit_cost.toFixed(2)}</span>,
+          render: (r) => <span className="font-mono text-xs">{fmtMoney(r.unit_cost)}</span>,
         },
         {
           key: "total_cost",
           header: "Rollup",
           render: (r) => (
-            <span className="font-mono text-xs font-medium">${r.total_cost.toFixed(2)}</span>
+            <span className="font-mono text-xs font-medium">{fmtMoney(r.total_cost)}</span>
           ),
         },
         { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
