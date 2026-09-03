@@ -13,7 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { useAuth } from "@/hooks/use-auth";
-import { fmtMoneyK } from "@/lib/currency";
+import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 
 export const Route = createFileRoute("/_authenticated/finance")({
   head: () => ({
@@ -226,7 +226,7 @@ function FinancePage() {
                     </div>
                   </div>
                   <div className="font-mono text-xs text-success">
-                    +${Number(p.amount ?? 0).toLocaleString()}
+                    +{fmtMoney(p.amount)}
                   </div>
                 </div>
               ))}
@@ -257,8 +257,8 @@ function FinancePage() {
                       <td className="py-2.5 px-2 font-mono text-xs">{i.invoice_number}</td>
                       <td className="py-2.5 px-2">{i.suppliers?.name ?? "—"}</td>
                       <td className="py-2.5 px-2 font-mono text-xs">{i.po_id?.slice(0, 8) ?? "—"}</td>
-                      <td className="py-2.5 px-2 font-mono text-xs">${Number(i.gst_amount ?? 0).toLocaleString()}</td>
-                      <td className="py-2.5 px-2 font-mono text-xs">${Number(i.total_amount ?? 0).toLocaleString()}</td>
+                      <td className="py-2.5 px-2 font-mono text-xs">{fmtMoney(i.gst_amount)}</td>
+                      <td className="py-2.5 px-2 font-mono text-xs">{fmtMoney(i.total_amount)}</td>
                       <td className="py-2.5 px-2">
                         <StatusBadge status={i.status} />
                       </td>
