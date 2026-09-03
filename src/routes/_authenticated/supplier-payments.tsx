@@ -144,7 +144,7 @@ function SupplierPaymentsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs">
-                      ${Number(i.total_amount ?? 0).toLocaleString()}
+                      {fmtMoney(i.total_amount)}
                     </span>
                     {!isAuditor && (
                       <Button
@@ -188,7 +188,7 @@ function SupplierPaymentsPage() {
                     <tr key={p.id} className="border-b border-white/5">
                       <td className="py-2.5 px-2 font-medium">{p.suppliers?.name ?? "—"}</td>
                       <td className="py-2.5 px-2 text-xs">{p.supplier_invoices?.invoice_number ?? "—"}</td>
-                      <td className="py-2.5 px-2 font-mono text-xs">${Number(p.amount ?? 0).toLocaleString()}</td>
+                      <td className="py-2.5 px-2 font-mono text-xs">{fmtMoney(p.amount)}</td>
                       <td className="py-2.5 px-2 font-mono text-xs">{p.transaction_id ?? "—"}</td>
                       <td className="py-2.5 px-2 text-xs text-muted-foreground">
                         {p.paid_at ? new Date(p.paid_at).toLocaleDateString() : "—"}
@@ -211,7 +211,7 @@ function SupplierPaymentsPage() {
             <div className="space-y-3 py-2">
               <div className="text-sm">
                 <span className="font-medium">{selected.invoice_number}</span> —{" "}
-                {selected.suppliers?.name} · ${Number(selected.total_amount ?? 0).toLocaleString()}
+                {selected.suppliers?.name} · {fmtMoney(selected.total_amount)}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Amount</Label>
