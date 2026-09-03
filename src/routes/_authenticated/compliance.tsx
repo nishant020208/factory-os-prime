@@ -214,7 +214,7 @@ function CompliancePage() {
                 return [
                   String(r.invoice_number ?? "—"),
                   String(r.customer_id ?? "—").slice(0, 8),
-                  <span key="a" className="tabular-nums">${Number(r.total_amount ?? 0).toLocaleString()}</span>,
+                  <span key="a" className="tabular-nums">{fmtMoney(r.total_amount)}</span>,
                   overdue ? <span key="s" className="text-destructive text-xs font-medium">OVERDUE</span> : <StatusBadge key="s" status={String(r.status ?? "")} />,
                   r.issue_date ? safeDate(String(r.issue_date), true) : "—",
                   r.due_date ? safeDate(String(r.due_date), true) : "—",
