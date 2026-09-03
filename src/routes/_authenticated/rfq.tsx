@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
+import { fmtMoney } from "@/lib/currency";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -779,7 +780,7 @@ function RfqPage() {
                               )}
                             </TableCell>
                             <TableCell className="font-mono text-sm">
-                              ${Number(quote.unit_price).toLocaleString()}
+                              {fmtMoney(quote.unit_price)}
                             </TableCell>
                             <TableCell>{quote.delivery_days ?? "—"} days</TableCell>
                             <TableCell className="text-muted-foreground text-xs max-w-[200px] truncate">
@@ -843,7 +844,7 @@ function RfqPage() {
                           <div>
                             <span className="text-muted-foreground text-xs">Price:</span>
                             <div className="font-mono font-medium">
-                              ${Number(quote.unit_price).toLocaleString()}
+                              {fmtMoney(quote.unit_price)}
                             </div>
                           </div>
                           <div>
@@ -1092,7 +1093,7 @@ function RfqPage() {
                           </div>
                           {r.status === "quoted" && (
                             <div className="text-muted-foreground mt-1">
-                              ${Number(r.unit_price).toLocaleString()} / unit · {r.delivery_days ?? "—"} days
+                              {fmtMoney(r.unit_price)} / unit · {r.delivery_days ?? "—"} days
                             </div>
                           )}
                         </div>
