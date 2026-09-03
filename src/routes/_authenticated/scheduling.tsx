@@ -51,7 +51,8 @@ function SchedulingPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("shift_schedules")
-        .select("*, departments!left(name), profiles!left(full_name)")
+        .select("*, departments!left(name)")
+        .eq("company_id", companyId!)
         .order("shift_date", { ascending: false })
         .limit(60);
       return (data ?? []).map((s: any) => ({
