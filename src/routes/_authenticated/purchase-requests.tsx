@@ -242,7 +242,7 @@ function PurchaseRequestsPage() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Total Amount ($)</Label>
+              <Label className="text-xs text-muted-foreground">Total Amount</Label>
               <Input
                 type="number"
                 value={poForm.total_amount}
