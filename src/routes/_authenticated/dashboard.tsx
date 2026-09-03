@@ -737,7 +737,7 @@ function PendingApprovalsPanel() {
               <span className="text-muted-foreground">{o.customers?.name ?? "—"}</span>
             </div>
             <span className="text-xs text-muted-foreground">
-              ${Number(o.total_amount ?? 0).toLocaleString()}
+              {fmtMoney(o.total_amount)}
             </span>
           </div>
         ))}
@@ -1406,7 +1406,7 @@ function ProcurementDashboard() {
                   <div>
                     <div className="font-medium">{p.po_number ?? p.id.slice(0, 8)}</div>
                     <div className="text-[11px] text-muted-foreground">
-                      Total ${Number(p.total_amount ?? 0).toLocaleString()}
+                      Total {fmtMoney(p.total_amount)}
                     </div>
                   </div>
                   <StatusBadge status={p.status} />
@@ -2145,7 +2145,7 @@ function SupplierDashboard() {
                 >
                   <span className="font-medium">{p.po_number ?? p.id.slice(0, 8)}</span>
                   <span className="flex items-center gap-2 text-muted-foreground">
-                    ${Number(p.total_amount ?? 0).toLocaleString()}
+                    {fmtMoney(p.total_amount)}
                     <StatusBadge status={p.status} />
                   </span>
                 </button>
