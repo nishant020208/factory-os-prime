@@ -19,7 +19,7 @@ import { Kpi, StatusBadge, PageHeader, Panel } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { fmtMoneyK } from "@/lib/currency";
+import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { notifyInvoiceGenerated, notifyPaymentStatusChanged } from "@/lib/notifications";
 import { getCustomerUserId } from "@/lib/customer-lookup";
 import { toast } from "sonner";
@@ -362,11 +362,11 @@ function InvoicesPage() {
                 <div className="flex items-center gap-3 sm:gap-4">
                   <div className="text-right">
                     <div className="font-mono font-semibold text-sm">
-                      ${Number(inv.total_amount ?? 0).toLocaleString()}
+                      {fmtMoney(inv.total_amount)}
                     </div>
                     {inv.tax_amount > 0 && (
                       <div className="text-[10px] text-muted-foreground">
-                        +${Number(inv.tax_amount).toLocaleString()} tax
+                        +{fmtMoney(inv.tax_amount)} tax
                       </div>
                     )}
                   </div>
@@ -415,7 +415,7 @@ function InvoicesPage() {
                 <div>
                   <div className="font-medium">{o.order_number}</div>
                   <div className="text-[11px] text-muted-foreground">
-                    {o.customers?.business_name ?? o.customers?.name ?? "—"} · Balance ${Number(o.balance_due ?? 0).toLocaleString()}
+                    {o.customers?.business_name ?? o.customers?.name ?? "—"} · Balance {fmtMoney(o.balance_due)}
                   </div>
                 </div>
                 <Button
@@ -507,9 +507,7 @@ function InvoicesPage() {
             key: "total_amount",
             header: "Amount",
             render: (r: any) => (
-              <span className="font-mono text-xs">
-                ${Number(r.total_amount ?? 0).toLocaleString()}
-              </span>
+              <span className="font-mono text-xs">{fmtMoney(r.total_amount)}</span>
             ),
           },
           {
@@ -588,9 +586,7 @@ function InvoicesPage() {
               <div className="rounded-xl bg-card/60 border border-white/5 p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Balance Due (real)</span>
-                  <span className="font-medium">
-                    ${Number(genDialog.order.balance_due ?? 0).toLocaleString()}
-                  </span>
+                  <span className="font-medium">{fmtMoney(genDialog.order.balance_due)}</span>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">GST %</Label>
@@ -610,7 +606,7 @@ function InvoicesPage() {
                 </div>
                 <div className="border-t border-white/5 pt-2 flex justify-between">
                   <span className="font-medium">Total (excl. GST)</span>
-                  <span className="font-medium">${Number(genDialog.order.balance_due ?? 0).toLocaleString()}</span>
+                  <span className="font-medium">{fmtMoney(genDialog.order.balance_due)}</span>
                 </div>
               </div>
               <p className="text-[10px] text-muted-foreground">
