@@ -88,7 +88,7 @@ function WorkOrdersPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("work_orders")
-        .select("*, machines!left(name, status), profiles!left(full_name)")
+        .select("*, machines!left(name, status), profiles!work_orders_operator_id_fkey(full_name)")
         .order("created_at", { ascending: false });
       return (data ?? []).map((wo: any) => ({
         ...wo,
