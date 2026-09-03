@@ -36,7 +36,7 @@ const PO_FORM_FIELDS: FormField[] = [
   },
   {
     key: "total_amount",
-    label: "Total Amount ($)",
+    label: "Total Amount",
     type: "number",
     placeholder: "25000",
     required: true,
