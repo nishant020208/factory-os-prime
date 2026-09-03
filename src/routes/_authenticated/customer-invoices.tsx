@@ -18,7 +18,7 @@ import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
-import { fmtMoneyK } from "@/lib/currency";
+import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -195,11 +195,11 @@ function CustomerInvoicesPage() {
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="text-right">
                   <div className="font-mono font-semibold text-sm">
-                    ${Number(inv.total_amount ?? 0).toLocaleString()}
+                    {fmtMoney(inv.total_amount)}
                   </div>
                   {inv.tax_amount > 0 && (
                     <div className="text-[10px] text-muted-foreground">
-                      +${Number(inv.tax_amount).toLocaleString()} tax
+                      +{fmtMoney(inv.tax_amount)} tax
                     </div>
                   )}
                 </div>
