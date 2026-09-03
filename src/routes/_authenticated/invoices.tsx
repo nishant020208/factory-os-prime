@@ -51,12 +51,12 @@ const INVOICE_FORM_FIELDS: FormField[] = [
   },
   {
     key: "total_amount",
-    label: "Total Amount ($)",
+    label: "Total Amount",
     type: "number",
     placeholder: "5000.00",
     required: true,
   },
-  { key: "tax_amount", label: "Tax Amount ($)", type: "number", placeholder: "900.00" },
+  { key: "tax_amount", label: "Tax Amount", type: "number", placeholder: "900.00" },
   { key: "due_date", label: "Due Date", type: "date" },
   {
     key: "status",
