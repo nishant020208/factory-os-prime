@@ -3853,6 +3853,7 @@ export type Database = {
           from_warehouse_id: string | null
           id: string
           material_id: string | null
+          notes: string | null
           product_id: string | null
           quantity: number
           status: string
@@ -3865,6 +3866,7 @@ export type Database = {
           from_warehouse_id?: string | null
           id?: string
           material_id?: string | null
+          notes?: string | null
           product_id?: string | null
           quantity?: number
           status?: string
@@ -3877,6 +3879,7 @@ export type Database = {
           from_warehouse_id?: string | null
           id?: string
           material_id?: string | null
+          notes?: string | null
           product_id?: string | null
           quantity?: number
           status?: string
@@ -4812,6 +4815,17 @@ export type Database = {
           _to_status: string
         }
         Returns: undefined
+      }
+      transfer_stock: {
+        Args: {
+          p_company_id: string
+          p_from_warehouse_id: string
+          p_product_id: string
+          p_quantity: number
+          p_notes?: string
+          p_to_warehouse_id: string
+        }
+        Returns: Json
       }
     }
     Enums: {
