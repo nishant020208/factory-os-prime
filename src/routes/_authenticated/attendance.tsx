@@ -116,15 +116,29 @@ function AttendancePage() {
     enabled: !!companyId,
   });
 
+  const { data: employees } = useQuery({
+    queryKey: ["att-employees", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("employees")
+          .select("id, full_name, job_title")
+          .eq("company_id", companyId!)
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+
   // REAL attendance records — same table Production Operators write to via
-  // their own check-in/check-out (verified in the Operator build).
+  // their own check-in/check-out (verified in the Operator build). No embed:
+  // attendance.employee_id has no FK constraint, so names are mapped
+  // client-side from employees (with profiles as fallback for UI-recorded rows).
   const { data: attendanceRecords } = useQuery({
     queryKey: ["att-records", companyId],
     queryFn: async () => {
       if (!companyId) return [];
       const { data } = await supabase
         .from("attendance")
-        .select("*, profiles!left(full_name, job_title)")
+        .select("*")
         .eq("company_id", companyId)
         .order("date", { ascending: false })
         .limit(300);
@@ -134,10 +148,14 @@ function AttendancePage() {
   });
 
   const today = new Date().toISOString().split("T")[0];
+  const attendanceNameById = new Map<string, any>([
+    ...(profiles ?? []).map((p: any): [string, any] => [p.id, p]),
+    ...(employees ?? []).map((e: any): [string, any] => [e.id, e]),
+  ]);
   const records = (attendanceRecords ?? []).map((r: any) => ({
     id: r.id,
-    name: r.profiles?.full_name ?? "Unknown",
-    job_title: r.profiles?.job_title ?? "—",
+    name: attendanceNameById.get(r.employee_id)?.full_name ?? "Unknown",
+    job_title: attendanceNameById.get(r.employee_id)?.job_title ?? "—",
     date: r.date ?? "",
     check_in: r.check_in
       ? new Date(r.check_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
