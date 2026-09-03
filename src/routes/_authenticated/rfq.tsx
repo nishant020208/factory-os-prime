@@ -642,7 +642,7 @@ function RfqPage() {
               Provide your best pricing and delivery estimate for this RFQ.
             </p>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Quoted Unit Price ($) *</Label>
+              <Label className="text-xs text-muted-foreground">Quoted Unit Price *</Label>
               <Input
                 type="number"
                 value={respForm.unit_price}
@@ -941,7 +941,7 @@ function RfqPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Total Amount ($)</Label>
+              <Label className="text-xs text-muted-foreground">Total Amount</Label>
               <Input
                 type="number"
                 value={poForm.total_amount}
