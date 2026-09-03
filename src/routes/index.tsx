@@ -51,6 +51,8 @@ import {
   Building2,
   Server,
   KeyRound,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import {
   LineChart as RechartLine,
@@ -64,6 +66,7 @@ import {
 } from "recharts";
 import { ROLES } from "@/lib/roles";
 import { useTheme, type ThemeMode } from "@/hooks/use-theme";
+import { useClickSound } from "@/hooks/use-click-sound";
 import { supabase } from "@/integrations/supabase/client";
 import { FactoryHalftoneBackdrop } from "@/components/factory-halftone-backdrop";
 import BorderGlow from "@/components/BorderGlow";
@@ -3405,6 +3408,11 @@ function TopNav() {
   const [mobile, setMobile] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const {
+    enabled: soundEnabled,
+    setEnabled: setSoundEnabled,
+    play: playClick,
+  } = useClickSound();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -3524,6 +3532,25 @@ function TopNav() {
             </AnimatePresence>
           </div>
 
+          {/* Click-sound mute toggle (preference persists in localStorage) */}
+          <button
+            onClick={() => {
+              const next = !soundEnabled;
+              setSoundEnabled(next);
+              // Audible confirmation when switching sound back on
+              if (next) playClick();
+            }}
+            className="grid place-items-center h-8 w-8 rounded-md hover:bg-muted/60 text-muted-foreground transition-colors"
+            aria-label={soundEnabled ? "Mute click sounds" : "Enable click sounds"}
+            aria-pressed={soundEnabled}
+            title={soundEnabled ? "Click sounds on — mute" : "Click sounds off — enable"}
+          >
+            {soundEnabled ? (
+              <Volume2 className="h-4 w-4" />
+            ) : (
+              <VolumeX className="h-4 w-4" />
+            )}
+          </button>
           <Link
             to="/auth"
             className="hidden sm:inline-flex items-center h-8 px-3 rounded-md text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all"
