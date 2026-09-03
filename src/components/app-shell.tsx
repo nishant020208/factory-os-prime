@@ -13,8 +13,11 @@ import {
   Factory,
   BrainCircuit,
   Palette,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useTheme, type ThemeMode } from "@/hooks/use-theme";
+import { useClickSound } from "@/hooks/use-click-sound";
 import { toast } from "sonner";
 import { recordAccessLog } from "@/lib/access-log";
 import {
@@ -372,6 +375,11 @@ function TopBar() {
   const router = useRouter();
   const { profile, roles, companyId } = useAuth();
   const { theme, setTheme } = useTheme();
+  const {
+    enabled: soundEnabled,
+    setEnabled: setSoundEnabled,
+    play: playClick,
+  } = useClickSound();
   const { t } = useI18n();
   const { unreadCount } = useNotifications();
   // Register TanStack Router navigate handler for in-app navigation (no full page reloads)
@@ -519,6 +527,28 @@ function TopBar() {
               )}
             </AnimatePresence>
           </div>
+          {/* Click-sound mute toggle (preference persists in localStorage) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            aria-label={soundEnabled ? "Mute click sounds" : "Enable click sounds"}
+            aria-pressed={soundEnabled}
+            title={soundEnabled ? "Click sounds on — mute" : "Click sounds off — enable"}
+            onClick={() => {
+              const next = !soundEnabled;
+              setSoundEnabled(next);
+              // Give instant feedback when switching sound back on (the global
+              // layer only ticks while enabled, so this click is otherwise silent)
+              if (next) playClick();
+            }}
+          >
+            {soundEnabled ? (
+              <Volume2 className="h-4 w-4" />
+            ) : (
+              <VolumeX className="h-4 w-4" />
+            )}
+          </Button>
           <Button
             variant="ghost"
             size="icon"
