@@ -191,6 +191,7 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/documents": ONLY("customer_portal", "supplier_portal", "auditor", "company_admin"),
 
   "/supplier-pos": ONLY("supplier_portal", "company_admin", "auditor"),
+  "/my-catalog": ONLY("supplier_portal", "company_admin", "auditor"),
   "/deliveries": ONLY("supplier_portal", "company_admin", "auditor"),
   "/supplier-invoices": ONLY("supplier_portal", "company_admin", "auditor"),
   "/payments": ONLY("supplier_portal", "company_admin", "finance_manager", "auditor"),
