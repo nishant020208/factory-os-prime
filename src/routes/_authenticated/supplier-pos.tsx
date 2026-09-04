@@ -89,7 +89,7 @@ function SupplierPosPage() {
       if (!supplierId) return [];
       const { data } = await supabase
         .from("purchase_orders")
-        .select("*")
+        .select("*, purchase_order_items(id, quantity, unit_price, materials(name, unit))")
         .eq("supplier_id", supplierId)
         .order("created_at", { ascending: false });
       return data ?? [];
@@ -270,14 +270,16 @@ function SupplierPosPage() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-white/5">
-                {["PO #", "Amount", "Expected", "Status", "Actions"].map((h) => (
-                  <TableHead
-                    key={h}
-                    className="text-[11px] uppercase tracking-wider text-muted-foreground"
-                  >
-                    {h}
-                  </TableHead>
-                ))}
+                {["PO #", "Materials Ordered", "Amount", "Expected", "Status", "Actions"].map(
+                  (h) => (
+                    <TableHead
+                      key={h}
+                      className="text-[11px] uppercase tracking-wider text-muted-foreground"
+                    >
+                      {h}
+                    </TableHead>
+                  ),
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -287,6 +289,36 @@ function SupplierPosPage() {
                 return (
                   <TableRow key={po.id} className="border-white/5">
                     <TableCell className="font-medium">{po.po_number ?? po.id.slice(0, 8)}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const items: any[] = (po as any).purchase_order_items ?? [];
+                        if (items.length === 0)
+                          return <span className="text-xs text-muted-foreground">—</span>;
+                        return (
+                          <div className="space-y-0.5 max-w-[240px]">
+                            {items.map((it: any) => {
+                              const m: any = Array.isArray(it.materials)
+                                ? it.materials[0]
+                                : it.materials;
+                              return (
+                                <div key={it.id} className="text-xs truncate">
+                                  <span className="font-medium">
+                                    {m?.name ?? "Material"}
+                                  </span>{" "}
+                                  ×{it.quantity}
+                                  {it.unit_price ? (
+                                    <span className="text-muted-foreground">
+                                      {" "}
+                                      @ {fmtMoney(it.unit_price)}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell className="font-mono text-xs">
                       {fmtMoney(po.total_amount)}
                     </TableCell>
@@ -374,10 +406,9 @@ function SupplierPosPage() {
                     </TableCell>
                   </TableRow>
                 );
-              })}
-              {(data ?? []).length === 0 && (
+              })}              {(data ?? []).length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-12">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
                     No purchase orders yet. When the buyer sends you a PO, it will appear here.
                   </TableCell>
                 </TableRow>
