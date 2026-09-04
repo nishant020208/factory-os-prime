@@ -11,7 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { PageHeader, Kpi, Panel, StatusBadge } from "@/components/ui-parts";
+import { PageHeader, Kpi, Panel, StatusBadge, MaterialsCell } from "@/components/ui-parts";
 import { fmtMoney } from "@/lib/currency";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
@@ -290,34 +290,7 @@ function SupplierPosPage() {
                   <TableRow key={po.id} className="border-white/5">
                     <TableCell className="font-medium">{po.po_number ?? po.id.slice(0, 8)}</TableCell>
                     <TableCell>
-                      {(() => {
-                        const items: any[] = (po as any).purchase_order_items ?? [];
-                        if (items.length === 0)
-                          return <span className="text-xs text-muted-foreground">—</span>;
-                        return (
-                          <div className="space-y-0.5 max-w-[240px]">
-                            {items.map((it: any) => {
-                              const m: any = Array.isArray(it.materials)
-                                ? it.materials[0]
-                                : it.materials;
-                              return (
-                                <div key={it.id} className="text-xs truncate">
-                                  <span className="font-medium">
-                                    {m?.name ?? "Material"}
-                                  </span>{" "}
-                                  ×{it.quantity}
-                                  {it.unit_price ? (
-                                    <span className="text-muted-foreground">
-                                      {" "}
-                                      @ {fmtMoney(it.unit_price)}
-                                    </span>
-                                  ) : null}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
+                      <MaterialsCell items={(po as any).purchase_order_items} />
                     </TableCell>
                     <TableCell className="font-mono text-xs">
                       {fmtMoney(po.total_amount)}
