@@ -332,6 +332,7 @@ function CAPAPage() {
               <Label className="text-xs text-muted-foreground">Due Date</Label>
               <Input
                 type="date"
+                min={new Date().toISOString().split("T")[0]}
                 value={capaForm.due_date}
                 onChange={(e) => setCapaForm((f) => ({ ...f, due_date: e.target.value }))}
               />
