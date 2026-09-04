@@ -351,21 +351,30 @@ function RfqPage() {
     mutationFn: async () => {
       if (!convertToPo || !companyId) throw new Error("Invalid conversion data");
 
-      // 1. Create the Purchase Order
-      const { data: newPo, error: poError } = await supabase
-        .from("purchase_orders")
-        .insert({
-          company_id: companyId,
-          po_number: poForm.po_number || `PO-${Date.now().toString().slice(-6)}`,
-          supplier_id: convertToPo.supplierId,
-          total_amount: Number(poForm.total_amount) || convertToPo.unitPrice,
-          expected_date: poForm.expected_date || null,
-          status: "pending",
-          created_by: companyId,
-        })
-        .select("id, po_number")
-        .single();
+      // 1. Create the Purchase Order atomically through the shared RPC: the
+      // material line (this RFQ's material at the winning quote's unit price)
+      // is written together with the PO, and the order always starts "sent".
+      const rfqRow = (rfqs ?? []).find((r) => r.id === convertToPo.rfqId);
+      const { data: poRes, error: poError } = await supabase.rpc(
+        "create_purchase_order_with_items",
+        {
+          p_company_id: companyId,
+          p_po_number: poForm.po_number || `PO-${Date.now().toString().slice(-6)}`,
+          p_supplier_id: convertToPo.supplierId,
+          p_expected_date: poForm.expected_date || "",
+          p_items: [
+            {
+              material_id: rfqRow?.material_id ?? null,
+              quantity: Number(rfqRow?.quantity ?? 1),
+              unit_price: convertToPo.unitPrice,
+            },
+          ],
+        },
+      );
       if (poError) throw poError;
+      const poResult = poRes as any;
+      if (!poResult?.ok) throw new Error(poResult?.error ?? "Failed to create the purchase order");
+      const newPo = { id: poResult.po_id, po_number: poResult.po_number };
 
       // 2. Update RFQ status to converted
       const { error: rfqError } = await supabase
