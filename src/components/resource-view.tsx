@@ -59,7 +59,17 @@ export interface FormField {
   required?: boolean;
   options?: { value: string; label: string }[];
   defaultValue?: string;
+  /**
+   * Value is DERIVED from the current form data instead of being typed by the
+   * user (e.g. a PO total computed from a supplier's quoted RFQ price).
+   * Computed fields render read-only and are filled automatically on submit
+   * for NEW records. Past dates on every date input are blocked via min=today.
+   */
+  computed?: (fd: Record<string, string>) => string;
 }
+
+// Earliest selectable date: today (previous dates are blocked everywhere).
+const TODAY_ISO = new Date().toISOString().split("T")[0];
 
 export interface ResourceViewProps<T extends Record<string, any>> {
   eyebrow: string;
@@ -182,14 +192,23 @@ export function ResourceView<T extends Record<string, any>>({
     setSelectedRow(row);
     setShowDeleteDialog(true);
   };
+
   const handleFormSubmit = async () => {
-    if (formFields?.some((f) => f.required && !formData[f.key])) {
+    // Auto-fill computed fields (e.g. totals derived from a linked quote) for
+    // NEW records — they are never typed by the user.
+    const payload = { ...formData };
+    if (!selectedRow && formFields) {
+      for (const f of formFields) {
+        if (f.computed) payload[f.key] = String(f.computed(payload) ?? "");
+      }
+    }
+    if (formFields?.some((f) => f.required && !payload[f.key])) {
       toast.error("Please fill all required fields");
       return;
     }
     try {
       if (onSubmit) {
-        await onSubmit(formData, selectedRow ?? undefined);
+        await onSubmit(payload, selectedRow ?? undefined);
         // Parent handles its own toast via onSuccess/onError
       } else {
         toast.success(selectedRow ? "Record updated" : "Record created");
@@ -530,12 +549,27 @@ export function ResourceView<T extends Record<string, any>>({
                     placeholder={field.placeholder}
                     className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[80px]"
                   />
+                ) : field.computed ? (
+                  <div className="space-y-1">
+                    <Input
+                      type="number"
+                      value={selectedRow ? String(formData[field.key] ?? "") : String(field.computed(formData) ?? "")}
+                      onChange={() => {}}
+                      placeholder={field.placeholder ?? "Auto-calculated"}
+                      disabled
+                      className="h-9 font-mono"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Auto-calculated from linked data — not manually entered
+                    </p>
+                  </div>
                 ) : (
                   <Input
                     type={field.type}
                     value={formData[field.key] ?? ""}
                     onChange={(e) => setFormData((d) => ({ ...d, [field.key]: e.target.value }))}
                     placeholder={field.placeholder}
+                    min={field.type === "date" ? TODAY_ISO : undefined}
                     className="h-9"
                   />
                 )}
