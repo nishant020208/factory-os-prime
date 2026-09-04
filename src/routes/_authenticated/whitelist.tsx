@@ -73,6 +73,28 @@ function WhitelistPage() {
         .data ?? [],
   });
 
+  // Emails that have already created an account (logged in at least once).
+  // Any whitelist row whose email has a real profile is shown as ACTIVE, not
+  // the raw seed "pending" — a live account is proof positive the invite was
+  // used, even if the seed never flipped to accepted.
+  const { data: profiles } = useQuery({
+    queryKey: ["whitelist-active-users", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("profiles")
+          .select("email")
+          .eq("company_id", companyId!)
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+  const activeEmails = useMemo(
+    () => new Set((profiles ?? []).map((p) => p.email?.toLowerCase()).filter(Boolean)),
+    [profiles],
+  );
+  const displayStatus = (w: any) =>
+    activeEmails.has(String(w.email).toLowerCase()) ? "active" : (w.status ?? "pending");
+
   const { data: plants } = useQuery({
     queryKey: ["whitelist-plants", companyId],
     queryFn: async () =>
@@ -128,8 +150,9 @@ function WhitelistPage() {
     ? ROLES.filter((r) => PLANT_LEVEL_ROLES.includes(r.id))
     : ROLES.filter((r) => r.id !== "root_super_admin");
 
-  const pending = visibleRows.filter((w) => w.status === "pending").length;
-  const accepted = visibleRows.filter((w) => w.status === "accepted").length;
+  const pending = visibleRows.filter((w) => displayStatus(w) === "pending").length;
+  const accepted = visibleRows.filter((w) => displayStatus(w) === "accepted").length;
+  const active = visibleRows.filter((w) => displayStatus(w) === "active").length;
 
   return (
     <div className="max-w-[1600px] mx-auto">
@@ -239,6 +262,7 @@ function WhitelistPage() {
         />
         <Kpi label="Pending" value={String(pending)} icon={FileCheck2} tone="warning" />
         <Kpi label="Accepted" value={String(accepted)} icon={FileCheck2} tone="success" />
+        <Kpi label="Active" value={String(active)} icon={FileCheck2} tone="success" />
         <Kpi
           label="Revoked"
           value={String(visibleRows.filter((w) => w.status === "revoked").length)}
@@ -292,7 +316,7 @@ function WhitelistPage() {
                     {plantName(w.plant_id)}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={w.status} />
+                    <StatusBadge status={displayStatus(w)} />
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {safeDate(w.created_at)}
