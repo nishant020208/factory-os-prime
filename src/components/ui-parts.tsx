@@ -110,6 +110,7 @@ export function StatusBadge({ status }: { status: string | null | undefined }) {
     completed: "bg-success/15 text-success border-success/30",
     approved: "bg-success/15 text-success border-success/30",
     received: "bg-success/15 text-success border-success/30",
+    sent: "bg-info/15 text-info border-info/30",
     in_progress: "bg-info/15 text-info border-info/30",
     running: "bg-info/15 text-info border-info/30",
     planned: "bg-muted text-muted-foreground border-white/10",
