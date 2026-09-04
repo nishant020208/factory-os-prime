@@ -224,6 +224,7 @@ function RootComponent() {
     //    table or RLS error never triggers the error boundary.
     const TABLES = [
       "notifications",
+      "whitelist",
       "production_orders",
       "machines",
       "inventory",
