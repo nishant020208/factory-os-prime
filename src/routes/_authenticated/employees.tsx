@@ -28,6 +28,20 @@ export const Route = createFileRoute("/_authenticated/employees")({
   component: EmployeesPage,
 });
 
+// Whitelisted plant roles that count as "invited team members" (external
+// portal and company-level roles are excluded from the employee roster).
+const TEAM_ROLES = new Set([
+  "plant_admin",
+  "plant_manager",
+  "production_manager",
+  "warehouse_manager",
+  "procurement_manager",
+  "quality_inspector",
+  "maintenance_engineer",
+  "hr_manager",
+  "production_operator",
+]);
+
 const EMPTY_FORM = {
   full_name: "",
   email: "",
@@ -79,11 +93,41 @@ function EmployeesPage() {
     enabled: !!companyId,
   });
 
+  // Whitelist invites (RLS-scoped: Plant Admin sees their own plant's rows).
+  // Live-refreshes through the global realtime channel on the whitelist table.
+  const { data: invites } = useQuery({
+    queryKey: ["whitelist", companyId],
+    queryFn: async () =>
+      (await supabase.from("whitelist").select("*").order("created_at", { ascending: false })).data ?? [],
+    enabled: !!companyId,
+  });
+
   const linkedEmails = new Set((profiles ?? []).map((p: any) => p.email?.toLowerCase()));
+  const employeeEmails = new Set((employees ?? []).map((e: any) => e.email?.toLowerCase()));
   const rows = (employees ?? []).map((e: any) => ({
     ...e,
     linked: linkedEmails.has((e.email ?? "").toLowerCase()),
   }));
+
+  // Whitelisted team members who don't have an employee record yet — shown so
+  // an invite is never invisible inside the plant roster.
+  const inviteRows = (invites ?? [])
+    .filter(
+      (w: any) =>
+        TEAM_ROLES.has(w.role) &&
+        !employeeEmails.has(String(w.email ?? "").toLowerCase()),
+    )
+    .map((w: any) => ({
+      id: `invite-${w.id}`,
+      email: w.email,
+      full_name: (profiles ?? []).find(
+        (p: any) => p.email?.toLowerCase() === String(w.email ?? "").toLowerCase(),
+      )?.full_name,
+      job_title: w.role.replace(/_/g, " "),
+      status: linkedEmails.has(String(w.email ?? "").toLowerCase()) ? "active" : "pending",
+      plant_id: w.plant_id,
+      created_at: w.created_at,
+    }));
 
   const deptName = (id: string | null) =>
     (departments ?? []).find((d: any) => d.id === id)?.name ?? (id ? id : "—");
@@ -254,6 +298,57 @@ function EmployeesPage() {
           )}
         </Panel>
       </div>
+
+      {inviteRows.length > 0 && (
+        <div className="mt-4">
+          <Panel
+            title={`${inviteRows.length} invited team member${inviteRows.length === 1 ? "" : "s"} (whitelisted)`}
+            right={
+              <span className="text-[11px] text-muted-foreground">
+                Whitelisted, awaiting onboarding
+              </span>
+            }
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/5">
+                    {["Member", "Role", "Status", "Invited"].map((h) => (
+                      <th
+                        key={h}
+                        className="text-left text-[11px] uppercase tracking-wider text-muted-foreground py-2 px-2"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {inviteRows.map((r: any) => (
+                    <tr key={r.id} className="border-b border-white/5 hover:bg-white/[0.02]">
+                      <td className="py-2.5 px-2">
+                        <div className="font-medium capitalize">
+                          {r.full_name ?? r.email ?? "—"}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">{r.email ?? "—"}</div>
+                      </td>
+                      <td className="py-2.5 px-2 text-muted-foreground capitalize">
+                        {r.job_title}
+                      </td>
+                      <td className="py-2.5 px-2">
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="py-2.5 px-2 text-xs text-muted-foreground">
+                        {r.created_at ? new Date(r.created_at).toLocaleDateString() : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        </div>
+      )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="sm:max-w-[480px]">
