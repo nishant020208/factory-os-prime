@@ -296,6 +296,7 @@ function DispatchPage() {
               <Label className="text-xs text-muted-foreground">Expected Arrival</Label>
               <Input
                 type="date"
+                min={new Date().toISOString().split("T")[0]}
                 value={form.expected_arrival}
                 onChange={(e) => setForm((f) => ({ ...f, expected_arrival: e.target.value }))}
               />
