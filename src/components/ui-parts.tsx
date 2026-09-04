@@ -4,6 +4,8 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { fmtMoney } from "@/lib/currency";
+import { resolveRelation } from "@/lib/utils";
 
 export function PageHeader({
   eyebrow,
@@ -148,6 +150,37 @@ export function EmptyState({
       <div className="text-lg font-medium">{title}</div>
       {sub && <div className="text-sm text-muted-foreground mt-1">{sub}</div>}
       {action && <div className="mt-4">{action}</div>}
+    </div>
+  );
+}
+
+type OrderedLine = {
+  id: string;
+  quantity: number | string;
+  unit_price?: number | null;
+  materials?: { name?: string | null } | { name?: string | null }[] | null;
+};
+
+/**
+ * The "Teak Wood ×3 @ ₹850" stack shown under Materials Ordered on purchase
+ * order tables. Renders an em-dash for legacy POs that predate line rows.
+ */
+export function MaterialsCell({ items }: { items?: OrderedLine[] | null }) {
+  const lines = items ?? [];
+  if (lines.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <div className="space-y-0.5 max-w-[240px]">
+      {lines.map((it) => {
+        const m = resolveRelation(it.materials);
+        return (
+          <div key={it.id} className="text-xs truncate">
+            <span className="font-medium">{m?.name ?? "Material"}</span> ×{it.quantity}
+            {it.unit_price ? (
+              <span className="text-muted-foreground"> @ {fmtMoney(it.unit_price)}</span>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
