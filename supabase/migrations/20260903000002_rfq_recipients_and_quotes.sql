@@ -43,6 +43,7 @@ ALTER TABLE public.rfq_quotes ENABLE ROW LEVEL SECURITY;
 
 -- 5. RLS Policies for rfq_recipients
 -- Procurement Manager can see all recipients for their company's RFQs
+DROP POLICY IF EXISTS "rfq_recipients_procurement_select" ON public.rfq_recipients;
 CREATE POLICY "rfq_recipients_procurement_select" ON public.rfq_recipients
   FOR SELECT
   TO authenticated
@@ -60,6 +61,7 @@ CREATE POLICY "rfq_recipients_procurement_select" ON public.rfq_recipients
   );
 
 -- Supplier can only see their own recipient record
+DROP POLICY IF EXISTS "rfq_recipients_supplier_select" ON public.rfq_recipients;
 CREATE POLICY "rfq_recipients_supplier_select" ON public.rfq_recipients
   FOR SELECT
   TO authenticated
@@ -71,6 +73,7 @@ CREATE POLICY "rfq_recipients_supplier_select" ON public.rfq_recipients
   );
 
 -- Procurement Manager can insert recipients for their company's RFQs
+DROP POLICY IF EXISTS "rfq_recipients_procurement_insert" ON public.rfq_recipients;
 CREATE POLICY "rfq_recipients_procurement_insert" ON public.rfq_recipients
   FOR INSERT
   TO authenticated
@@ -88,6 +91,7 @@ CREATE POLICY "rfq_recipients_procurement_insert" ON public.rfq_recipients
   );
 
 -- Supplier can update their own recipient status (e.g., mark as viewed)
+DROP POLICY IF EXISTS "rfq_recipients_supplier_update" ON public.rfq_recipients;
 CREATE POLICY "rfq_recipients_supplier_update" ON public.rfq_recipients
   FOR UPDATE
   TO authenticated
@@ -100,6 +104,7 @@ CREATE POLICY "rfq_recipients_supplier_update" ON public.rfq_recipients
 
 -- 6. RLS Policies for rfq_quotes
 -- Procurement Manager can see all quotes for their company's RFQs
+DROP POLICY IF EXISTS "rfq_quotes_procurement_select" ON public.rfq_quotes;
 CREATE POLICY "rfq_quotes_procurement_select" ON public.rfq_quotes
   FOR SELECT
   TO authenticated
@@ -117,6 +122,7 @@ CREATE POLICY "rfq_quotes_procurement_select" ON public.rfq_quotes
   );
 
 -- Supplier can only see their OWN quote (critical for competitive confidentiality)
+DROP POLICY IF EXISTS "rfq_quotes_supplier_select" ON public.rfq_quotes;
 CREATE POLICY "rfq_quotes_supplier_select" ON public.rfq_quotes
   FOR SELECT
   TO authenticated
@@ -128,6 +134,7 @@ CREATE POLICY "rfq_quotes_supplier_select" ON public.rfq_quotes
   );
 
 -- Supplier can only insert THEIR OWN quote
+DROP POLICY IF EXISTS "rfq_quotes_supplier_insert" ON public.rfq_quotes;
 CREATE POLICY "rfq_quotes_supplier_insert" ON public.rfq_quotes
   FOR INSERT
   TO authenticated
@@ -139,6 +146,7 @@ CREATE POLICY "rfq_quotes_supplier_insert" ON public.rfq_quotes
   );
 
 -- Supplier can only update THEIR OWN quote
+DROP POLICY IF EXISTS "rfq_quotes_supplier_update" ON public.rfq_quotes;
 CREATE POLICY "rfq_quotes_supplier_update" ON public.rfq_quotes
   FOR UPDATE
   TO authenticated
