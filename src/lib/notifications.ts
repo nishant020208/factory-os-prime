@@ -13,7 +13,7 @@
  * If a role isn't listed as a receiver for a trigger, it must not receive it.
  */
 import { supabase } from "@/integrations/supabase/client";
-import { getRoleUserId } from "@/lib/customer-lookup";
+import { getRoleUserId, getRoleUserIdByPlant } from "@/lib/customer-lookup";
 import { fmtMoney } from "@/lib/currency";
 
 export type NotificationSeverity = "info" | "warning" | "success" | "error";
@@ -431,6 +431,7 @@ export async function notifyOrderApproved(
   orderNumber: string,
   customerUserId: string,
   orderId: string,
+  plantId?: string | null,
 ) {
   // Customer (targeted by to_user only)
   await fireNotification(
@@ -443,11 +444,16 @@ export async function notifyOrderApproved(
     "sales_orders",
     orderId,
   );
-  // Production Manager (role-wide)
+  // Production Manager — prefer the order's own plant's Production Manager
+  // (to_user targeting); fall back to role-wide when none can be resolved.
+  const pmUserId = plantId
+    ? await getRoleUserIdByPlant(companyId, "production_manager", plantId)
+    : null;
+  const [pmRole, pmUser] = resolveTarget("production_manager", pmUserId);
   await fireNotification(
     companyId,
-    "production_manager",
-    null,
+    pmRole,
+    pmUser,
     "📋 New Order to Plan",
     `Order ${orderNumber} has been approved. Create a production order.`,
     "info",
