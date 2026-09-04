@@ -323,6 +323,7 @@ function LeavesPage() {
                 <Label className="text-xs text-muted-foreground">Start Date *</Label>
                 <Input
                   type="date"
+                  min={new Date().toISOString().split("T")[0]}
                   value={form.start_date}
                   onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
                 />
@@ -331,6 +332,7 @@ function LeavesPage() {
                 <Label className="text-xs text-muted-foreground">End Date *</Label>
                 <Input
                   type="date"
+                  min={new Date().toISOString().split("T")[0]}
                   value={form.end_date}
                   onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
                 />
