@@ -9,11 +9,9 @@ import {
   Pencil,
   Trash2,
   Search as SearchIcon,
-  Package,
-  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { PageHeader, Kpi, Panel, StatusBadge } from "@/components/ui-parts";
+import { PageHeader, Kpi, Panel, StatusBadge, MaterialsCell } from "@/components/ui-parts";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -40,10 +38,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { NewPoDialog } from "@/components/new-po-dialog";
+import { PO_STATUS_OPTIONS } from "@/lib/po";
 import { useAuth } from "@/hooks/use-auth";
 import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 export const Route = createFileRoute("/_authenticated/procurement")({
   head: () => ({
@@ -55,35 +55,7 @@ export const Route = createFileRoute("/_authenticated/procurement")({
   component: ProcurementPage,
 });
 
-const PO_STATUS_OPTIONS = [
-  { value: "draft", label: "Draft" },
-  { value: "sent", label: "Sent to Supplier" },
-  { value: "pending", label: "Pending" },
-  { value: "approved", label: "Approved" },
-  { value: "accepted", label: "Accepted" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "received", label: "Received" },
-];
-
 const TODAY_ISO = new Date().toISOString().split("T")[0];
-
-interface LineItem {
-  material_id: string;
-  material_name: string;
-  unit: string;
-  quantity: string;
-  unit_price: number;
-}
-
-function nextPoNumber(rows: any[]): string {
-  let max = 0;
-  for (const r of rows ?? []) {
-    const m = /PUR-\d{4}-(\d+)/.exec(String(r.po_number ?? ""));
-    if (m) max = Math.max(max, parseInt(m[1], 10));
-  }
-  const year = new Date().getFullYear();
-  return `PUR-${year}-${String(max + 1).padStart(4, "0")}`;
-}
 
 function ProcurementPage() {
   const queryClient = useQueryClient();
@@ -93,10 +65,6 @@ function ProcurementPage() {
   const [q, setQ] = useState("");
   const [newOpen, setNewOpen] = useState(false);
   const [editRow, setEditRow] = useState<any | null>(null);
-  const [poNumber, setPoNumber] = useState("");
-  const [supplierId, setSupplierId] = useState("");
-  const [expectedDate, setExpectedDate] = useState("");
-  const [lines, setLines] = useState<LineItem[]>([]);
   const [editStatus, setEditStatus] = useState("sent");
   const [editDate, setEditDate] = useState("");
 
@@ -105,21 +73,6 @@ function ProcurementPage() {
     queryFn: async () =>
       (await supabase.from("suppliers").select("id, name").eq("company_id", companyId ?? "").order("name"))
         .data ?? [],
-    enabled: !!companyId,
-  });
-
-  // The supplier's catalog (materials + prices). Ops roles read the whole
-  // company catalog; only the selected supplier's rows are offered as lines.
-  const { data: catalog } = useQuery({
-    queryKey: ["supplier-materials-catalog", companyId],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("supplier_materials")
-          .select("id, supplier_id, material_id, unit_price, status, materials(name, unit)")
-          .eq("status", "active")
-          .order("created_at", { ascending: false })
-      ).data ?? [],
     enabled: !!companyId,
   });
 
@@ -135,22 +88,6 @@ function ProcurementPage() {
   });
 
   const supplierMap = new Map((suppliers ?? []).map((s: any) => [s.id, s.name]));
-
-  const catalogForSupplier = useMemo(
-    () =>
-      (catalog ?? [])
-        .filter((c: any) => c.supplier_id === supplierId)
-        .map((c: any) => {
-          const m: any = Array.isArray(c.materials) ? c.materials[0] : c.materials;
-          return {
-            material_id: c.material_id,
-            name: m?.name ?? "—",
-            unit: m?.unit ?? "",
-            unit_price: Number(c.unit_price ?? 0),
-          };
-        }),
-    [catalog, supplierId],
-  );
 
   const rows = (data ?? []).map((po: any) => ({
     ...po,
@@ -168,66 +105,6 @@ function ProcurementPage() {
   const totalValue = rows.reduce((s: number, p: any) => s + Number(p.total_amount ?? 0), 0);
   const sentCount = rows.filter((p: any) => p.status === "sent").length;
   const receivedCount = rows.filter((p: any) => p.status === "received").length;
-
-  const lineTotal = (l: LineItem) => (parseFloat(l.quantity) || 0) * l.unit_price;
-  const grandTotal = lines.reduce((s, l) => s + lineTotal(l), 0);
-
-  const addLine = (materialId: string) => {
-    const entry = catalogForSupplier.find((c) => c.material_id === materialId);
-    if (!entry) return;
-    if (lines.some((l) => l.material_id === materialId)) {
-      toast.error("That material is already on this order — adjust its quantity instead");
-      return;
-    }
-    setLines((ls) => [
-      ...ls,
-      {
-        material_id: entry.material_id,
-        material_name: entry.name,
-        unit: entry.unit,
-        quantity: "1",
-        unit_price: entry.unit_price,
-      },
-    ]);
-  };
-
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      if (!supplierId) throw new Error("Select a supplier first");
-      if (lines.length === 0) throw new Error("Add at least one material line to the order");
-      for (const l of lines) {
-        if (!(parseFloat(l.quantity) > 0)) throw new Error("Every line needs a quantity above zero");
-      }
-      const { data: res, error } = await supabase.rpc("create_purchase_order_with_items", {
-        p_company_id: companyId!,
-        p_po_number: poNumber.trim(),
-        p_supplier_id: supplierId,
-        p_expected_date: expectedDate,
-        p_items: lines.map((l) => ({
-          material_id: l.material_id,
-          quantity: parseFloat(l.quantity),
-          unit_price: l.unit_price,
-        })),
-      });
-      if (error) throw error;
-      const r = res as any;
-      if (!r?.ok) throw new Error(r?.error ?? "Failed to create the purchase order");
-      return r;
-    },
-    onSuccess: (r: any) => {
-      queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
-      queryClient.invalidateQueries({ queryKey: ["supplier-pos"] });
-      toast.success(
-        `Purchase order ${r.po_number ?? ""} created — sent to supplier, total ${fmtMoney(r.total)}`,
-      );
-      setNewOpen(false);
-      setLines([]);
-      setSupplierId("");
-      setExpectedDate("");
-      setPoNumber("");
-    },
-    onError: (err: any) => toast.error(err.message),
-  });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
@@ -258,37 +135,10 @@ function ProcurementPage() {
     onError: (err: any) => toast.error(err.message),
   });
 
-  const openNew = () => {
-    setPoNumber(nextPoNumber(rows));
-    setSupplierId("");
-    setExpectedDate("");
-    setLines([]);
-    setNewOpen(true);
-  };
   const openEdit = (po: any) => {
     setEditRow(po);
     setEditStatus(po.status || "sent");
     setEditDate(po.expected_date ? String(po.expected_date).slice(0, 10) : "");
-  };
-
-  const materialsCell = (po: any) => {
-    const items = po.purchase_order_items ?? [];
-    if (!items.length) return <span className="text-xs text-muted-foreground">—</span>;
-    return (
-      <div className="space-y-0.5 max-w-[240px]">
-        {items.map((it: any) => {
-          const m: any = Array.isArray(it.materials) ? it.materials[0] : it.materials;
-          return (
-            <div key={it.id} className="text-xs truncate">
-              <span className="font-medium">{m?.name ?? "Material"}</span> ×{it.quantity}
-              {it.unit_price ? (
-                <span className="text-muted-foreground"> @ {fmtMoney(it.unit_price)}</span>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-    );
   };
 
   return (
@@ -299,7 +149,7 @@ function ProcurementPage() {
         sub="Every PO from request to receipt — materials auto-priced from the supplier's catalog, never typed."
         actions={
           !isAuditor ? (
-            <Button onClick={openNew} className="bg-[image:var(--gradient-primary)] shadow-glow">
+            <Button onClick={() => setNewOpen(true)} className="bg-[image:var(--gradient-primary)] shadow-glow">
               <Plus className="h-4 w-4 mr-1.5" />
               New Purchase Order
             </Button>
@@ -349,7 +199,9 @@ function ProcurementPage() {
               <TableRow key={po.id} className="border-white/5">
                 <TableCell className="font-medium">{po.po_number}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{po.supplier_name}</TableCell>
-                <TableCell>{materialsCell(po)}</TableCell>
+                <TableCell>
+                  <MaterialsCell items={po.purchase_order_items} />
+                </TableCell>
                 <TableCell>
                   <StatusBadge status={po.status} />
                 </TableCell>
@@ -397,155 +249,7 @@ function ProcurementPage() {
       </Panel>
 
       {/* New Purchase Order — multi-material builder */}
-      <Dialog open={newOpen} onOpenChange={(o) => !o && setNewOpen(false)}>
-        <DialogContent className="sm:max-w-[640px] max-h-[88vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>New Purchase Order</DialogTitle>
-            <DialogDescription>
-              Add the materials to order — unit prices come from the supplier's catalog and the
-              total is calculated automatically. The order is sent to the supplier.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">PO Number *</Label>
-                <Input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Supplier *</Label>
-                <Select
-                  value={supplierId}
-                  onValueChange={(v) => {
-                    setSupplierId(v);
-                    setLines([]);
-                  }}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select supplier" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(suppliers ?? []).map((s: any) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Expected Date</Label>
-              <Input
-                type="date"
-                value={expectedDate}
-                min={TODAY_ISO}
-                onChange={(e) => setExpectedDate(e.target.value)}
-                className="h-9"
-              />
-            </div>
-
-            {/* Material lines */}
-            <div className="rounded-xl border border-white/10 p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs text-muted-foreground">Materials Ordered *</Label>
-                {supplierId ? (
-                  <div className="flex items-center gap-1.5">
-                    <Select
-                      value=""
-                      onValueChange={(v) => v && addLine(v)}
-                    >
-                      <SelectTrigger className="h-8 w-56">
-                        <SelectValue placeholder="+ Add material from catalog" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {catalogForSupplier.map((c) => (
-                          <SelectItem key={c.material_id} value={c.material_id}>
-                            {c.name} — {fmtMoney(c.unit_price)}
-                            {c.unit ? ` / ${c.unit}` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : null}
-              </div>
-
-              {supplierId && catalogForSupplier.length === 0 && (
-                <p className="text-xs text-amber-400/90">
-                  This supplier has no priced materials in their catalog yet. Ask them to add
-                  materials in their portal (My Catalog), or pick a different supplier.
-                </p>
-              )}
-
-              {lines.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-2">
-                  {supplierId
-                    ? "Use “+ Add material from catalog” to build the order."
-                    : "Select a supplier to see the materials they supply."}
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {lines.map((l, i) => (
-                    <div
-                      key={`${l.material_id}-${i}`}
-                      className="grid grid-cols-[1fr_90px_110px_30px] gap-2 items-center"
-                    >
-                      <div className="text-sm truncate" title={`${l.material_name} (${l.unit})`}>
-                        <span className="font-medium">{l.material_name}</span>
-                        <span className="text-muted-foreground text-xs"> ({l.unit})</span>
-                      </div>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={l.quantity}
-                        onChange={(e) =>
-                          setLines((ls) =>
-                            ls.map((x, xi) => (xi === i ? { ...x, quantity: e.target.value } : x)),
-                          )
-                        }
-                        className="h-8"
-                      />
-                      <div className="text-right font-mono text-xs self-center">
-                        {fmtMoney(lineTotal(l))}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive"
-                        onClick={() => setLines((ls) => ls.filter((_, xi) => xi !== i))}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                  <div className="pt-2 border-t border-white/10 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1.5">
-                      <Package className="h-3.5 w-3.5" /> Prices from supplier catalog — not
-                      manually entered
-                    </span>
-                    <span className="font-semibold tabular-nums">
-                      Total: {fmtMoney(grandTotal)}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              className="bg-[image:var(--gradient-primary)]"
-              disabled={!supplierId || lines.length === 0 || createMutation.isPending}
-              onClick={() => createMutation.mutate()}
-            >
-              {createMutation.isPending ? "Creating…" : "Send to Supplier"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NewPoDialog open={newOpen} onOpenChange={setNewOpen} companyId={companyId} />
 
       {/* Edit status / expected date */}
       <Dialog open={!!editRow} onOpenChange={(o) => !o && setEditRow(null)}>
