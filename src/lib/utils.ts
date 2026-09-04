@@ -5,6 +5,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * PostgREST returns a `to-one` embedded relation either as a single object or
+ * as a one-element array depending on the query shape. Pages that render the
+ * joined row should not each re-implement that normalization.
+ */
+export function resolveRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return (value[0] as T) ?? null;
+  return value ?? null;
+}
+
 export type AppTimeFormat = "12h" | "24h" | "auto";
 
 /**
