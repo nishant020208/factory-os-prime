@@ -33,6 +33,9 @@ import { fmtMoney } from "@/lib/currency";
 
 type Row = Record<string, unknown> & { id: string; company_id?: string };
 
+// Past dates are blocked on every date entry field: only today/forward.
+const TODAY_ISO = new Date().toISOString().split("T")[0];
+
 function fmt(kind: ColumnDef["kind"], v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
   if (kind === "currency") return fmtMoney(Number(v));
@@ -685,6 +688,13 @@ function FieldControl({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={field.placeholder}
+        min={
+          field.type === "date"
+            ? TODAY_ISO
+            : field.type === "datetime"
+              ? `${TODAY_ISO}T00:00`
+              : undefined
+        }
         className="h-9"
       />
     </div>
