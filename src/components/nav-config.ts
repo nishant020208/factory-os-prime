@@ -183,6 +183,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
         { to: "/notifications", label: "Notifications", icon: Bell, badge: "!" },
         { to: "/plant-overview", label: "Plant Overview", icon: Factory },
         { to: "/orders", label: "Order Approvals", icon: ShoppingCart, badge: "!" },
+        { to: "/customer-requests", label: "Customers", icon: UserPlus, badge: "!" },
         { to: "/departments", label: "Departments", icon: TreePine },
         { to: "/employees", label: "Employees", icon: Users },
         { to: "/whitelist", label: "Whitelist", icon: UserPlus },
