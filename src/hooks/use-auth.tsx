@@ -10,6 +10,7 @@ export interface AuthState {
   loading: boolean;
   roles: AppRole[];
   companyId: string | null;
+  plantId: string | null;
   isMainAdmin: boolean;
   profile: {
     full_name: string | null;
@@ -26,6 +27,7 @@ const EMPTY_AUTH: AuthState = {
   loading: true,
   roles: [],
   companyId: null,
+  plantId: null,
   isMainAdmin: false,
   profile: null,
 };
@@ -40,16 +42,29 @@ async function fetchAuthState(): Promise<AuthState> {
 
   try {
     const [rolesRes, profileRes] = await Promise.all([
-      supabase.from("user_roles").select("role,company_id").eq("user_id", session.user.id),
+      supabase
+        .from("user_roles")
+        .select("role,company_id,plant_id")
+        .eq("user_id", session.user.id),
       supabase
         .from("profiles")
-        .select("full_name,email,avatar_url,company_id,is_main_admin,phone,job_title")
+        .select("full_name,email,avatar_url,company_id,plant_id,is_main_admin,phone,job_title")
         .eq("id", session.user.id)
         .maybeSingle(),
     ]);
 
     const rolesData = rolesRes.data ?? [];
     const profile = profileRes.data;
+
+    // A user's plant: from their profile, else their plant-level user_roles row.
+    // Company-level roles (finance/auditor) intentionally keep plantId null so
+    // they remain cross-plant.
+    const plantId =
+      profile?.plant_id ??
+      (rolesData as Array<{ role?: string; plant_id?: string | null }>).find(
+        (r) => r.plant_id && r.role !== "finance_manager" && r.role !== "auditor",
+      )?.plant_id ??
+      null;
 
     return {
       session,
@@ -60,6 +75,7 @@ async function fetchAuthState(): Promise<AuthState> {
         profile?.company_id ??
         (rolesData as Array<{ company_id?: string }>)?.[0]?.company_id ??
         null,
+      plantId,
       isMainAdmin: profile?.is_main_admin === true,
       profile: profile
         ? {
@@ -85,6 +101,7 @@ async function fetchAuthState(): Promise<AuthState> {
       loading: false,
       roles: [],
       companyId: null,
+      plantId: null,
       isMainAdmin: false,
       profile: {
         full_name: null,
