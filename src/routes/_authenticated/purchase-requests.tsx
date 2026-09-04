@@ -104,7 +104,13 @@ function PurchaseRequestsPage() {
 
   const autoTotal = (supplierId: string, materialId?: string | null) => {
     const q = findQuote(supplierId, materialId);
-    return q ? Number(q.unit_price) * Number(q.rfqs?.quantity ?? 0) : null;
+    if (!q) return null;
+    // The line ordered against this requisition carries the requisition's own
+    // quantity at the quoted per-unit price (falling back to the RFQ qty).
+    const req = (requisitions ?? []).find((r) => r.id === showConvert) as any;
+    const qty =
+      Number(req?.quantity) > 0 ? Number(req.quantity) : Number(q.rfqs?.quantity ?? 0);
+    return Number(q.unit_price) * qty;
   };
 
   const pending = requisitions?.filter((r) => r.status === "pending").length ?? 0;
@@ -143,33 +149,50 @@ function PurchaseRequestsPage() {
       const req = (requisitions ?? []).find((r) => r.id === showConvert) as any;
       // Price is never manual: it must come from the supplier's open quote
       // for this material.
-      const amount = autoTotal(poForm.supplier_id, req?.material_id);
-      if (amount === null) {
+      const quote = findQuote(poForm.supplier_id, req?.material_id);
+      if (!quote) {
         throw new Error(
           `No open quote from this supplier for ${req?.materials?.name ?? "this material"} — run an RFQ and get a quote first`,
         );
       }
-      const { data: po, error: poErr } = await supabase
-        .from("purchase_orders")
-        .insert({
-          company_id: companyId!,
-          po_number: `PO-${new Date().getFullYear()}-${String(Date.now() % 100000).padStart(5, "0")}`,
-          supplier_id: poForm.supplier_id,
-          requisition_id: showConvert,
-          status: "sent",
-          total_amount: amount,
-          expected_date: poForm.expected_date || null,
-          created_by: user!.id,
-        })
-        .select("id")
-        .single();
+      const qty =
+        Number(req?.quantity) > 0 ? Number(req.quantity) : Number(quote.rfqs?.quantity ?? 0);
+      const amount = Number(quote.unit_price) * qty;
+      // Create the PO atomically through the shared RPC — the material line
+      // (requisitioned material at the quoted unit price) is written together
+      // with the PO, which always starts "sent".
+      const { data: poRes, error: poErr } = await supabase.rpc(
+        "create_purchase_order_with_items",
+        {
+          p_company_id: companyId!,
+          p_po_number: `PO-${new Date().getFullYear()}-${String(Date.now() % 100000).padStart(5, "0")}`,
+          p_supplier_id: poForm.supplier_id,
+          p_expected_date: poForm.expected_date || "",
+          p_items: [
+            {
+              material_id: req?.material_id ?? null,
+              quantity: qty,
+              unit_price: Number(quote.unit_price),
+            },
+          ],
+        },
+      );
       if (poErr) throw poErr;
+      const poResult = poRes as any;
+      if (!poResult?.ok)
+        throw new Error(poResult?.error ?? "Failed to create the purchase order");
+      // Keep the requisition → PO link so the originating request stays traceable.
+      const { error: linkErr } = await supabase
+        .from("purchase_orders")
+        .update({ requisition_id: showConvert, created_by: user!.id })
+        .eq("id", poResult.po_id);
+      if (linkErr) throw linkErr;
       const { error: upErr } = await supabase
         .from("purchase_requisitions")
         .update({ status: "converted" })
         .eq("id", showConvert);
       if (upErr) throw upErr;
-      return { poId: po.id, number: req?.pr_number ?? "PR" };
+      return { poId: poResult.po_id, number: req?.pr_number ?? "PR" };
     },
     onSuccess: (r) => {
       queryClient.invalidateQueries();
