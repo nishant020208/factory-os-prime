@@ -241,6 +241,7 @@ function SchedulingPage() {
               <Label className="text-xs">Date</Label>
               <Input
                 type="date"
+                min={new Date().toISOString().split("T")[0]}
                 value={form.shift_date}
                 onChange={(e) => setForm((f) => ({ ...f, shift_date: e.target.value }))}
               />
