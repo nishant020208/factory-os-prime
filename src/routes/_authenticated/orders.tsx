@@ -121,7 +121,7 @@ function getOrderFormFields(customers: any[], products: any[], isCustomer: boole
 
 function OrdersPage() {
   const queryClient = useQueryClient();
-  const { companyId, user, roles } = useAuth();
+  const { companyId, user, roles, plantId } = useAuth();
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; orderId: string }>({
     open: false,
     orderId: "",
@@ -159,6 +159,7 @@ function OrdersPage() {
   const isCompanyAdmin = roles.includes("company_admin");
   const isCustomer = roles.includes("customer_portal");
   const isProductionManager = roles.includes("production_manager");
+  const isPlantAdmin = roles.includes("plant_admin");
 
   // Resolve customer_id for portal users (they should only see their own orders)
   const { data: myCustomerId } = useQuery({
@@ -206,6 +207,10 @@ function OrdersPage() {
       // DATA ISOLATION: Customer portal users only see their own orders
       if (isCustomer && myCustomerId) {
         query = query.eq("customer_id", myCustomerId);
+      }
+      // PLANT ISOLATION: Plant Admin sees only orders assigned to their plant
+      if (isPlantAdmin && plantId) {
+        query = query.eq("plant_id", plantId);
       }
 
       const { data } = await query.order("created_at", { ascending: false });
@@ -289,6 +294,13 @@ function OrdersPage() {
       const soNumber = formData.so_number?.trim() || `SO-${Date.now().toString().slice(-6)}`;
 
       // Customers submit with pending_approval and no priority/due_date (admin sets those)
+      // The order inherits the plant the customer is assigned to, so the right
+      // Plant Admin sees and approves it.
+      const { data: custRow } = await supabase
+        .from("customers")
+        .select("plant_id")
+        .eq("id", customerId)
+        .maybeSingle();
       const { data: inserted, error } = await supabase
         .from("sales_orders")
         .insert({
@@ -303,6 +315,7 @@ function OrdersPage() {
           due_date: isCustomer ? null : (formData.due_date || null),
           progress: 0,
           notes: formData.notes || null,
+          plant_id: custRow?.plant_id ?? null,
         })
         .select("id")
         .single();
@@ -368,9 +381,16 @@ function OrdersPage() {
       // Update status + record history
       await approveCustomerOrder(orderId, companyId, user.id, order.customer_id);
 
-      // Notify Customer + Production Manager
+      // Notify Customer + Production Manager (targeted to the order's plant's
+      // Production Manager when one exists).
       const customerUserId = await getCustomerUserId(order.customer_id);
-      await notifyOrderApproved(companyId, order.so_number, customerUserId ?? "", orderId);
+      await notifyOrderApproved(
+        companyId,
+        order.so_number,
+        customerUserId ?? "",
+        orderId,
+        order.plant_id ?? null,
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders-sales"] });
@@ -552,7 +572,8 @@ function OrdersPage() {
             render: (r: any) => (
               <div className="flex items-center gap-2">
                 <StatusBadge status={r.status} />
-                {r.status === "pending_approval" && (isCompanyAdmin || isProductionManager) && (
+                {r.status === "pending_approval" &&
+                  (isCompanyAdmin || isProductionManager || isPlantAdmin) && (
                   <div className="flex gap-1">
                     <Button
                       size="sm"
