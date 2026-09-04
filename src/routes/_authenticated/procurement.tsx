@@ -7,7 +7,7 @@ import { Kpi, StatusBadge } from "@/components/ui-parts";
 import { useAuth } from "@/hooks/use-auth";
 import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 
 export const Route = createFileRoute("/_authenticated/procurement")({
   head: () => ({
@@ -19,7 +19,10 @@ export const Route = createFileRoute("/_authenticated/procurement")({
   component: ProcurementPage,
 });
 
-const PO_FORM_FIELDS: FormField[] = [
+// The PO total is NEVER typed — it is auto-calculated from the selected
+// supplier's quoted RFQ price (unit price × RFQ quantity), exactly like the
+// RFQ → Convert-to-PO flow. PO fields below stay supplier/date/status only.
+const PO_BASE_FIELDS: FormField[] = [
   {
     key: "po_number",
     label: "PO Number",
@@ -32,21 +35,14 @@ const PO_FORM_FIELDS: FormField[] = [
     label: "Supplier",
     type: "select",
     required: true,
-    options: [], // populated dynamically
-  },
-  {
-    key: "total_amount",
-    label: "Total Amount",
-    type: "number",
-    placeholder: "25000",
-    required: true,
+    options: [], // populated dynamically from the suppliers query
   },
   { key: "expected_date", label: "Expected Date", type: "date" },
   {
     key: "status",
     label: "Status",
     type: "select",
-    defaultValue: "draft",
+    defaultValue: "pending",
     options: [
       { value: "draft", label: "Draft" },
       { value: "pending", label: "Pending" },
@@ -60,7 +56,6 @@ function ProcurementPage() {
   const queryClient = useQueryClient();
   const { companyId, roles } = useAuth();
   const isAuditor = roles.includes("auditor");
-  const [formFields, setFormFields] = useState<FormField[]>(PO_FORM_FIELDS);
 
   // Fetch suppliers for the company
   const { data: suppliers } = useQuery({
@@ -70,18 +65,57 @@ function ProcurementPage() {
     enabled: !!companyId,
   });
 
-  // Update supplier dropdown options when suppliers load
-  useEffect(() => {
-    if (suppliers) {
-      setFormFields((prev) =>
-        prev.map((f) =>
-          f.key === "supplier_id"
-            ? { ...f, options: suppliers.map((s) => ({ value: s.id, label: s.name })) }
-            : f,
-        ),
-      );
+  // Open RFQ quotes (status=quoted on a sent RFQ) — the ONLY allowed source of
+  // a PO's price. Keyed by supplier so the form can auto-derive the total.
+  const { data: openQuotes } = useQuery({
+    queryKey: ["open-rfq-quotes", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("rfq_responses")
+          .select("id, supplier_id, unit_price, created_at, rfqs!inner(id, rfq_number, title, quantity, status)")
+          .eq("status", "quoted")
+          .eq("rfqs.status", "sent")
+          .order("created_at", { ascending: false })
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+
+  const quoteBySupplier = useMemo(() => {
+    const m = new Map<string, any[]>();
+    for (const q of openQuotes ?? []) {
+      const arr = m.get(q.supplier_id) ?? [];
+      arr.push(q);
+      m.set(q.supplier_id, arr);
     }
-  }, [suppliers]);
+    return m;
+  }, [openQuotes]);
+
+  // Supplier options + the auto-calculated Total Amount field (read-only).
+  const formFields: FormField[] | undefined = useMemo(() => {
+    if (!suppliers) return PO_BASE_FIELDS;
+    const withSupplier = PO_BASE_FIELDS.map((f) =>
+      f.key === "supplier_id"
+        ? { ...f, options: suppliers.map((s) => ({ value: s.id, label: s.name })) }
+        : f,
+    );
+    return [
+      ...withSupplier,
+      {
+        key: "total_amount",
+        label: "Total Amount",
+        type: "number",
+        placeholder: "Waiting for a quoted RFQ…",
+        computed: (fd) => {
+          const sid = fd.supplier_id;
+          if (!sid) return "";
+          const q = (quoteBySupplier.get(sid) ?? [])[0];
+          if (!q) return "";
+          return String(Number(q.unit_price) * Number(q.rfqs?.quantity ?? 0));
+        },
+      },
+    ];
+  }, [suppliers, quoteBySupplier]);
 
   // Build a supplier id→name lookup for the table
   const supplierMap = new Map((suppliers ?? []).map((s) => [s.id, s.name]));
@@ -99,11 +133,19 @@ function ProcurementPage() {
 
   const createMutation = useMutation({
     mutationFn: async (formData: Record<string, string>) => {
+      // Price is never manual: derive it from the supplier's open quote.
+      const q = (quoteBySupplier.get(formData.supplier_id) ?? [])[0];
+      if (!formData.supplier_id || !q) {
+        throw new Error(
+          "No open quote from this supplier to auto-price the PO. Send an RFQ and get their quote first.",
+        );
+      }
+      const amount = Number(q.unit_price) * Number(q.rfqs?.quantity ?? 0);
       const { error } = await supabase.from("purchase_orders").insert({
         company_id: companyId!,
         po_number: formData.po_number,
         supplier_id: formData.supplier_id || null,
-        total_amount: parseFloat(formData.total_amount) || 0,
+        total_amount: amount,
         expected_date: formData.expected_date || null,
         status: formData.status || "draft",
         created_by: companyId,
@@ -113,7 +155,8 @@ function ProcurementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-pos"] });
-      toast.success("Purchase order created");
+      queryClient.invalidateQueries({ queryKey: ["open-rfq-quotes"] });
+      toast.success("Purchase order created with the supplier's quoted price");
     },
     onError: (err: any) => toast.error(err.message),
   });
