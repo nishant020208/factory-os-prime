@@ -551,10 +551,16 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
     setBusy(true);
     try {
       // Location → coordinates (city dictionary first, Nominatim fallback),
-      // so the company's admin can auto-assign this customer to their
-      // nearest plant when the request is approved.
+      // so the nearest plant is resolved at submission time (anon-safe RPC)
+      // and stored on the request. The right Plant Admin then sees this
+      // request in their Customer tab.
       const geoQuery = [form.address, form.city].filter(Boolean).join(", ");
       const coords = geoQuery ? await geocodeAddress(geoQuery) : null;
+      const { data: nearestPlantId } = await supabase.rpc("find_nearest_plant", {
+        p_company_id: form.company_id,
+        p_lat: (coords?.lat ?? null) as number | null,
+        p_lng: (coords?.lng ?? null) as number | null,
+      } as never);
 
       // No .select() here on purpose: anonymous visitors may submit a request
       // but must never be able to read customer_requests back.
@@ -569,6 +575,7 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
         city: form.city || null,
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
+        plant_id: nearestPlantId ?? null,
         status: "pending",
       });
       if (error) throw error;
