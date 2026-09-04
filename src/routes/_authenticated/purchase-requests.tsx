@@ -25,7 +25,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { notifyInsufficientStock } from "@/lib/notifications";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { safeDate } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/purchase-requests")({
@@ -78,6 +78,35 @@ function PurchaseRequestsPage() {
     enabled: !!companyId,
   });
 
+  // Open supplier quotes (quoted RFQ responses on a sent RFQ). A PO price may
+  // only come from one of these — never typed by hand.
+  const { data: openQuotes } = useQuery({
+    queryKey: ["pr-open-quotes", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("rfq_responses")
+          .select(
+            "id, supplier_id, unit_price, created_at, rfqs!inner(id, rfq_number, title, quantity, material_id, status)",
+          )
+          .eq("status", "quoted")
+          .eq("rfqs.status", "sent")
+          .order("created_at", { ascending: false })
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+
+  // Quote matching a supplier + material (a requisition is material-specific).
+  const findQuote = (supplierId: string, materialId?: string | null) =>
+    (openQuotes ?? []).find(
+      (q) => q.supplier_id === supplierId && (!materialId || q.rfqs?.material_id === materialId),
+    );
+
+  const autoTotal = (supplierId: string, materialId?: string | null) => {
+    const q = findQuote(supplierId, materialId);
+    return q ? Number(q.unit_price) * Number(q.rfqs?.quantity ?? 0) : null;
+  };
+
   const pending = requisitions?.filter((r) => r.status === "pending").length ?? 0;
   const converted = requisitions?.filter((r) => r.status === "converted").length ?? 0;
 
@@ -112,6 +141,14 @@ function PurchaseRequestsPage() {
       if (!showConvert) throw new Error("Missing requisition");
       if (!poForm.supplier_id) throw new Error("Select a supplier");
       const req = (requisitions ?? []).find((r) => r.id === showConvert) as any;
+      // Price is never manual: it must come from the supplier's open quote
+      // for this material.
+      const amount = autoTotal(poForm.supplier_id, req?.material_id);
+      if (amount === null) {
+        throw new Error(
+          `No open quote from this supplier for ${req?.materials?.name ?? "this material"} — run an RFQ and get a quote first`,
+        );
+      }
       const { data: po, error: poErr } = await supabase
         .from("purchase_orders")
         .insert({
@@ -120,7 +157,7 @@ function PurchaseRequestsPage() {
           supplier_id: poForm.supplier_id,
           requisition_id: showConvert,
           status: "sent",
-          total_amount: Number(poForm.total_amount) || 0,
+          total_amount: amount,
           expected_date: poForm.expected_date || null,
           created_by: user!.id,
         })
@@ -245,9 +282,14 @@ function PurchaseRequestsPage() {
               <Label className="text-xs text-muted-foreground">Total Amount</Label>
               <Input
                 type="number"
-                value={poForm.total_amount}
-                onChange={(e) => setPoForm((f) => ({ ...f, total_amount: e.target.value }))}
+                value={String(autoTotal(poForm.supplier_id, (requisitions ?? []).find((r) => r.id === showConvert)?.material_id) ?? "")}
+                placeholder="No open quote yet — run an RFQ first"
+                disabled
+                className="h-9 font-mono"
               />
+              <p className="text-[10px] text-muted-foreground">
+                Auto-calculated from the supplier's quote (unit price × quantity) — never typed
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Expected Delivery</Label>
@@ -255,6 +297,7 @@ function PurchaseRequestsPage() {
                 type="date"
                 value={poForm.expected_date}
                 onChange={(e) => setPoForm((f) => ({ ...f, expected_date: e.target.value }))}
+                min={new Date().toISOString().split("T")[0]}
               />
             </div>
           </div>
