@@ -720,12 +720,15 @@ export type Database = {
         Row: {
           address: string | null
           business_name: string
+          city: string | null
           company_id: string
           contact_person: string
           created_at: string | null
           email: string
           gst_number: string | null
           id: string
+          latitude: number | null
+          longitude: number | null
           phone: string | null
           rejection_reason: string | null
           reviewed_at: string | null
@@ -735,12 +738,15 @@ export type Database = {
         Insert: {
           address?: string | null
           business_name: string
+          city?: string | null
           company_id: string
           contact_person: string
           created_at?: string | null
           email: string
           gst_number?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           phone?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
@@ -750,12 +756,15 @@ export type Database = {
         Update: {
           address?: string | null
           business_name?: string
+          city?: string | null
           company_id?: string
           contact_person?: string
           created_at?: string | null
           email?: string
           gst_number?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           phone?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
@@ -790,8 +799,11 @@ export type Database = {
           gst_number: string | null
           id: string
           is_active: boolean | null
+          latitude: number | null
+          longitude: number | null
           name: string
           phone: string | null
+          plant_id: string | null
           segment: string | null
           shipping_address: string | null
           status: string
@@ -814,8 +826,11 @@ export type Database = {
           gst_number?: string | null
           id?: string
           is_active?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
           name: string
           phone?: string | null
+          plant_id?: string | null
           segment?: string | null
           shipping_address?: string | null
           status?: string
@@ -838,8 +853,11 @@ export type Database = {
           gst_number?: string | null
           id?: string
           is_active?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
           name?: string
           phone?: string | null
+          plant_id?: string | null
           segment?: string | null
           shipping_address?: string | null
           status?: string
@@ -851,6 +869,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
             referencedColumns: ["id"]
           },
         ]
@@ -2511,6 +2536,8 @@ export type Database = {
           country: string | null
           created_at: string
           id: string
+          latitude: number | null
+          longitude: number | null
           name: string
           status: string
           updated_at: string
@@ -2523,6 +2550,8 @@ export type Database = {
           country?: string | null
           created_at?: string
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           name: string
           status?: string
           updated_at?: string
@@ -2535,6 +2564,8 @@ export type Database = {
           country?: string | null
           created_at?: string
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           name?: string
           status?: string
           updated_at?: string
@@ -3110,6 +3141,13 @@ export type Database = {
             foreignKeyName: "purchase_orders_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "rfq_quote_comparison"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
@@ -3441,6 +3479,133 @@ export type Database = {
           },
         ]
       }
+      rfq_quotes: {
+        Row: {
+          created_at: string | null
+          currency: string | null
+          estimated_delivery_days: number | null
+          id: string
+          minimum_order_quantity: number | null
+          notes: string | null
+          quoted_unit_price: number
+          rfq_id: string
+          submitted_at: string | null
+          supplier_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string | null
+          estimated_delivery_days?: number | null
+          id?: string
+          minimum_order_quantity?: number | null
+          notes?: string | null
+          quoted_unit_price?: number
+          rfq_id: string
+          submitted_at?: string | null
+          supplier_id: string
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string | null
+          estimated_delivery_days?: number | null
+          id?: string
+          minimum_order_quantity?: number | null
+          notes?: string | null
+          quoted_unit_price?: number
+          rfq_id?: string
+          submitted_at?: string | null
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfq_quotes_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_quote_comparison"
+            referencedColumns: ["rfq_id"]
+          },
+          {
+            foreignKeyName: "rfq_quotes_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfqs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_quotes_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_quote_comparison"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "rfq_quotes_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfq_recipients: {
+        Row: {
+          created_at: string | null
+          id: string
+          responded_at: string | null
+          rfq_id: string
+          sent_at: string | null
+          status: string
+          supplier_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          responded_at?: string | null
+          rfq_id: string
+          sent_at?: string | null
+          status?: string
+          supplier_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          responded_at?: string | null
+          rfq_id?: string
+          sent_at?: string | null
+          status?: string
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfq_recipients_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_quote_comparison"
+            referencedColumns: ["rfq_id"]
+          },
+          {
+            foreignKeyName: "rfq_recipients_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfqs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_recipients_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_quote_comparison"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "rfq_recipients_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rfq_responses: {
         Row: {
           created_at: string
@@ -3477,8 +3642,22 @@ export type Database = {
             foreignKeyName: "rfq_responses_rfq_id_fkey"
             columns: ["rfq_id"]
             isOneToOne: false
+            referencedRelation: "rfq_quote_comparison"
+            referencedColumns: ["rfq_id"]
+          },
+          {
+            foreignKeyName: "rfq_responses_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
             referencedRelation: "rfqs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_responses_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_quote_comparison"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "rfq_responses_supplier_id_fkey"
@@ -3502,6 +3681,7 @@ export type Database = {
           rfq_number: string | null
           status: string
           supplier_ids: string[] | null
+          target_delivery_date: string | null
           title: string
         }
         Insert: {
@@ -3516,6 +3696,7 @@ export type Database = {
           rfq_number?: string | null
           status?: string
           supplier_ids?: string[] | null
+          target_delivery_date?: string | null
           title: string
         }
         Update: {
@@ -3530,6 +3711,7 @@ export type Database = {
           rfq_number?: string | null
           status?: string
           supplier_ids?: string[] | null
+          target_delivery_date?: string | null
           title?: string
         }
         Relationships: [
@@ -3613,6 +3795,7 @@ export type Database = {
           id: string
           notes: string | null
           order_date: string
+          plant_id: string | null
           priority: string | null
           progress: number | null
           rejection_reason: string | null
@@ -3636,6 +3819,7 @@ export type Database = {
           id?: string
           notes?: string | null
           order_date?: string
+          plant_id?: string | null
           priority?: string | null
           progress?: number | null
           rejection_reason?: string | null
@@ -3659,6 +3843,7 @@ export type Database = {
           id?: string
           notes?: string | null
           order_date?: string
+          plant_id?: string | null
           priority?: string | null
           progress?: number | null
           rejection_reason?: string | null
@@ -3673,6 +3858,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_orders_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
             referencedColumns: ["id"]
           },
         ]
@@ -3982,6 +4174,13 @@ export type Database = {
             foreignKeyName: "supplier_deliveries_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "rfq_quote_comparison"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "supplier_deliveries_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
@@ -4043,6 +4242,13 @@ export type Database = {
             foreignKeyName: "supplier_invoices_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
+            referencedRelation: "rfq_quote_comparison"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "supplier_invoices_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
             referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
@@ -4093,6 +4299,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_messages_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_quote_comparison"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "supplier_messages_supplier_id_fkey"
@@ -4167,6 +4380,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_quote_comparison"
+            referencedColumns: ["supplier_id"]
           },
           {
             foreignKeyName: "supplier_payments_supplier_id_fkey"
@@ -4623,8 +4843,8 @@ export type Database = {
           progress_approved_at: string | null
           progress_approved_by: string | null
           progress_image_url: string | null
-          progress_percent: number
           progress_pending: boolean | null
+          progress_percent: number
           quantity: number | null
           start_time: string | null
           status: string
@@ -4650,8 +4870,8 @@ export type Database = {
           progress_approved_at?: string | null
           progress_approved_by?: string | null
           progress_image_url?: string | null
-          progress_percent?: number
           progress_pending?: boolean | null
+          progress_percent?: number
           quantity?: number | null
           start_time?: string | null
           status?: string
@@ -4677,8 +4897,8 @@ export type Database = {
           progress_approved_at?: string | null
           progress_approved_by?: string | null
           progress_image_url?: string | null
-          progress_percent?: number
           progress_pending?: boolean | null
+          progress_percent?: number
           quantity?: number | null
           start_time?: string | null
           status?: string
@@ -4724,7 +4944,25 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      rfq_quote_comparison: {
+        Row: {
+          currency: string | null
+          estimated_delivery_days: number | null
+          material_name: string | null
+          minimum_order_quantity: number | null
+          quantity: number | null
+          quote_notes: string | null
+          quoted_unit_price: number | null
+          recipient_status: string | null
+          rfq_id: string | null
+          rfq_number: string | null
+          rfq_status: string | null
+          submitted_at: string | null
+          supplier_id: string | null
+          supplier_name: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       create_order_notification: {
@@ -4755,6 +4993,7 @@ export type Database = {
       current_company_id: { Args: never; Returns: string }
       current_supplier_company: { Args: never; Returns: string }
       current_supplier_id: { Args: never; Returns: string }
+      current_user_plant_id: { Args: never; Returns: string }
       get_active_companies: { Args: never; Returns: Json }
       get_platform_stats: { Args: never; Returns: Json }
       get_root_user_id: { Args: never; Returns: string }
@@ -4773,6 +5012,7 @@ export type Database = {
       is_hr_manager: { Args: never; Returns: boolean }
       is_main_admin: { Args: never; Returns: boolean }
       is_maintenance_engineer: { Args: never; Returns: boolean }
+      is_plant_admin: { Args: never; Returns: boolean }
       is_plant_manager: { Args: never; Returns: boolean }
       is_production_manager: { Args: never; Returns: boolean }
       is_production_operator: { Args: never; Returns: boolean }
@@ -4820,9 +5060,9 @@ export type Database = {
         Args: {
           p_company_id: string
           p_from_warehouse_id: string
+          p_notes?: string
           p_product_id: string
           p_quantity: number
-          p_notes?: string
           p_to_warehouse_id: string
         }
         Returns: Json
@@ -4861,12 +5101,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4890,11 +5130,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4915,11 +5155,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4940,11 +5180,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4957,11 +5197,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
