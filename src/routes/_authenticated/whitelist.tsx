@@ -58,6 +58,9 @@ const PLANT_LEVEL_ROLES: AppRole[] = [
   "production_operator",
 ];
 
+/** Roles a Plant Admin may invite. Supplier Portal accounts serve their plant. */
+const PLANT_ADMIN_ROLES: AppRole[] = [...PLANT_LEVEL_ROLES, "supplier_portal"];
+
 function WhitelistPage() {
   const qc = useQueryClient();
   const { companyId, roles, plantId } = useAuth();
@@ -112,7 +115,7 @@ function WhitelistPage() {
   const [roleFilter, setRoleFilter] = useState<string>("all");
 
   const roleNeedsPlant = useMemo(
-    () => !isRoot && PLANT_LEVEL_ROLES.includes(role as AppRole),
+    () => !isRoot && PLANT_ADMIN_ROLES.includes(role as AppRole),
     [role, isRoot],
   );
 
@@ -147,7 +150,7 @@ function WhitelistPage() {
   }, [data, isPlantAdmin, plantId, roleFilter]);
 
   const inviteRoles = isPlantAdmin
-    ? ROLES.filter((r) => PLANT_LEVEL_ROLES.includes(r.id))
+    ? ROLES.filter((r) => PLANT_ADMIN_ROLES.includes(r.id))
     : ROLES.filter((r) => r.id !== "root_super_admin");
 
   const pending = visibleRows.filter((w) => displayStatus(w) === "pending").length;
@@ -162,7 +165,7 @@ function WhitelistPage() {
         title="Whitelist"
         sub={
           isPlantAdmin
-            ? "Invite plant-level roles for your plant. Each invite is plant-scoped."
+            ? "Invite plant-level roles and supplier portals for your plant. Each invite is plant-scoped."
             : "Only whitelisted emails may register. Assign a role, company and plant per invitation."
         }
         actions={
