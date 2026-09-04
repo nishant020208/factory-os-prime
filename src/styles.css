@@ -170,6 +170,22 @@
   --border-gradient: linear-gradient(135deg, oklch(1 0 0 / 8%), oklch(1 0 0 / 3%));
 }
 
+/* Native form controls (select dropdowns, date pickers, scrollbars)
+   follow the active theme so popups and their text stay readable in
+   both dark and light mode — e.g. a <select> popup renders dark with
+   light text instead of a bright system popup on a dark screen.      */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+[data-theme="light"],
+.light {
+  color-scheme: light;
+}
+[data-theme="aesthetic"] {
+  color-scheme: light;
+}
+
 /* ============================================================ */
 /*  THEME — LIGHT  (data-theme="light")                         */
 /* ============================================================ */
