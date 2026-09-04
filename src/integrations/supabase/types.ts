@@ -730,6 +730,7 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           phone: string | null
+          plant_id: string | null
           rejection_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
@@ -748,6 +749,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           phone?: string | null
+          plant_id?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -766,6 +768,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           phone?: string | null
+          plant_id?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -777,6 +780,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_requests_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
             referencedColumns: ["id"]
           },
         ]
@@ -4994,6 +5004,10 @@ export type Database = {
       current_supplier_company: { Args: never; Returns: string }
       current_supplier_id: { Args: never; Returns: string }
       current_user_plant_id: { Args: never; Returns: string }
+      find_nearest_plant: {
+        Args: { p_company_id: string; p_lat: number; p_lng: number }
+        Returns: string
+      }
       get_active_companies: { Args: never; Returns: Json }
       get_platform_stats: { Args: never; Returns: Json }
       get_root_user_id: { Args: never; Returns: string }
