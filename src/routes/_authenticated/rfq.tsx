@@ -938,6 +938,7 @@ function RfqPage() {
                 type="date"
                 value={poForm.expected_date}
                 onChange={(e) => setPoForm((f) => ({ ...f, expected_date: e.target.value }))}
+                min={new Date().toISOString().split("T")[0]}
               />
             </div>
             <div className="space-y-1.5">
@@ -945,8 +946,12 @@ function RfqPage() {
               <Input
                 type="number"
                 value={poForm.total_amount}
-                onChange={(e) => setPoForm((f) => ({ ...f, total_amount: e.target.value }))}
+                disabled
+                className="h-9 font-mono"
               />
+              <p className="text-[10px] text-muted-foreground">
+                Auto-calculated from the supplier's quote — {fmtMoney(Number(poForm.total_amount))}
+              </p>
             </div>
           </div>
           <DialogFooter>
