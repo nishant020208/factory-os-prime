@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { safeDate } from "@/lib/utils";
-import { FileCheck2, Plus, Loader2 } from "lucide-react";
+import { FileCheck2, Plus, Loader2, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Panel, StatusBadge, Kpi } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
@@ -46,10 +46,25 @@ export const Route = createFileRoute("/_authenticated/whitelist")({
   component: WhitelistPage,
 });
 
+/** Plant-level roles a Plant Admin may invite — never company-level roles. */
+const PLANT_LEVEL_ROLES: AppRole[] = [
+  "plant_manager",
+  "production_manager",
+  "warehouse_manager",
+  "procurement_manager",
+  "quality_inspector",
+  "maintenance_engineer",
+  "hr_manager",
+  "production_operator",
+];
+
 function WhitelistPage() {
   const qc = useQueryClient();
-  const { companyId, roles } = useAuth();
-  const canInvite = roles.includes("root_super_admin") || roles.includes("company_admin");
+  const { companyId, roles, plantId } = useAuth();
+  const isRoot = roles.includes("root_super_admin");
+  const isCompanyAdmin = roles.includes("company_admin");
+  const isPlantAdmin = roles.includes("plant_admin");
+  const canInvite = isRoot || isCompanyAdmin || isPlantAdmin;
 
   const { data } = useQuery({
     queryKey: ["whitelist"],
@@ -58,15 +73,37 @@ function WhitelistPage() {
         .data ?? [],
   });
 
+  const { data: plants } = useQuery({
+    queryKey: ["whitelist-plants", companyId],
+    queryFn: async () =>
+      (await supabase.from("plants").select("id, name, code").eq("company_id", companyId!))
+        .data ?? [],
+    enabled: !!companyId,
+  });
+  const plantName = (id: string | null) =>
+    id ? (plants?.find((p) => p.id === id)?.name ?? id) : "—";
+
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<AppRole>("production_operator");
+  const [invitePlant, setInvitePlant] = useState<string>(plantId ?? "none");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+
+  const roleNeedsPlant = useMemo(
+    () => !isRoot && PLANT_LEVEL_ROLES.includes(role as AppRole),
+    [role, isRoot],
+  );
 
   const invite = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
-        .from("whitelist")
-        .insert({ email, role, company_id: companyId, status: "pending" });
+      const plant = roleNeedsPlant && invitePlant !== "none" ? invitePlant : null;
+      const { error } = await supabase.from("whitelist").insert({
+        email,
+        role,
+        company_id: companyId,
+        plant_id: plant,
+        status: "pending",
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -78,8 +115,21 @@ function WhitelistPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const pending = data?.filter((w) => w.status === "pending").length ?? 0;
-  const accepted = data?.filter((w) => w.status === "accepted").length ?? 0;
+  // Plant Admin's view is already RLS-scoped to their plant; filter in the
+  // UI as well so the list is unambiguous.
+  const visibleRows = useMemo(() => {
+    let rows = data ?? [];
+    if (isPlantAdmin && plantId) rows = rows.filter((w) => w.plant_id === plantId);
+    if (roleFilter !== "all") rows = rows.filter((w) => w.role === roleFilter);
+    return rows;
+  }, [data, isPlantAdmin, plantId, roleFilter]);
+
+  const inviteRoles = isPlantAdmin
+    ? ROLES.filter((r) => PLANT_LEVEL_ROLES.includes(r.id))
+    : ROLES.filter((r) => r.id !== "root_super_admin");
+
+  const pending = visibleRows.filter((w) => w.status === "pending").length;
+  const accepted = visibleRows.filter((w) => w.status === "accepted").length;
 
   return (
     <div className="max-w-[1600px] mx-auto">
@@ -87,7 +137,11 @@ function WhitelistPage() {
       <PageHeader
         eyebrow="Access Control"
         title="Whitelist"
-        sub="Only whitelisted emails may register. Assign a role, company and plant per invitation."
+        sub={
+          isPlantAdmin
+            ? "Invite plant-level roles for your plant. Each invite is plant-scoped."
+            : "Only whitelisted emails may register. Assign a role, company and plant per invitation."
+        }
         actions={
           <>
             {canInvite && (
@@ -100,7 +154,9 @@ function WhitelistPage() {
                 </DialogTrigger>
                 <DialogContent className="glass-strong border-white/10">
                   <DialogHeader>
-                    <DialogTitle>Invite user</DialogTitle>
+                    <DialogTitle>
+                      {isPlantAdmin ? "Invite to your plant" : "Invite user"}
+                    </DialogTitle>
                   </DialogHeader>
                   <div className="space-y-3">
                     <div className="space-y-1.5">
@@ -118,7 +174,7 @@ function WhitelistPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {ROLES.filter((r) => r.id !== "root_super_admin").map((r) => (
+                          {inviteRoles.map((r) => (
                             <SelectItem key={r.id} value={r.id}>
                               {r.label}
                             </SelectItem>
@@ -126,6 +182,33 @@ function WhitelistPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {roleNeedsPlant && (
+                      <div className="space-y-1.5">
+                        <Label>Plant</Label>
+                        {isPlantAdmin ? (
+                          <div className="rounded-md border border-input bg-background/40 px-3 py-2 text-sm">
+                            {plantName(plantId)} (your plant)
+                          </div>
+                        ) : (
+                          <Select
+                            value={invitePlant}
+                            onValueChange={setInvitePlant}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No plant (company-level)</SelectItem>
+                              {(plants ?? []).map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.name} ({p.code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <DialogFooter>
                     <Button
@@ -150,7 +233,7 @@ function WhitelistPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Kpi
           label="Total invites"
-          value={String(data?.length ?? 0)}
+          value={String(visibleRows.length)}
           icon={FileCheck2}
           tone="primary"
         />
@@ -158,17 +241,37 @@ function WhitelistPage() {
         <Kpi label="Accepted" value={String(accepted)} icon={FileCheck2} tone="success" />
         <Kpi
           label="Revoked"
-          value={String(data?.filter((w) => w.status === "revoked").length ?? 0)}
+          value={String(visibleRows.filter((w) => w.status === "revoked").length)}
           icon={FileCheck2}
           tone="destructive"
         />
       </div>
       <div className="mt-4">
-        <Panel title={`${data?.length ?? 0} invitations`}>
+        <Panel
+          title={`${visibleRows.length} invitations`}
+          right={
+            <div className="flex items-center gap-2">
+              <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-48 h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All roles</SelectItem>
+                  {inviteRoles.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          }
+        >
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-white/5">
-                {["Email", "Role", "Status", "Invited"].map((h) => (
+                {["Email", "Role", "Plant", "Status", "Invited"].map((h) => (
                   <TableHead
                     key={h}
                     className="text-[11px] uppercase tracking-wider text-muted-foreground"
@@ -179,11 +282,14 @@ function WhitelistPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(data ?? []).map((w) => (
+              {visibleRows.map((w) => (
                 <TableRow key={w.id} className="border-white/5">
                   <TableCell className="font-medium">{w.email}</TableCell>
                   <TableCell className="capitalize text-muted-foreground">
                     {w.role.replace(/_/g, " ")}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {plantName(w.plant_id)}
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={w.status} />
