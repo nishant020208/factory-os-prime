@@ -18,6 +18,7 @@ import {
   Eye,
   EyeOff,
   Store,
+  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +28,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ROLES, ROLE_MAP, type AppRole } from "@/lib/roles";
 import { notifyCompanyRegistrationRequest, notifyCustomerAccessRequest } from "@/lib/notifications";
 import { recordAccessLog } from "@/lib/access-log";
+import { geocodeAddress } from "@/lib/plant-location";
 
 const searchSchema = z.object({
   role: z.string().optional(),
@@ -505,6 +507,7 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
     phone: "",
     gst_number: "",
     address: "",
+    city: "",
   });
   const [busy, setBusy] = useState(false);
 
@@ -547,6 +550,12 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
     }
     setBusy(true);
     try {
+      // Location → coordinates (city dictionary first, Nominatim fallback),
+      // so the company's admin can auto-assign this customer to their
+      // nearest plant when the request is approved.
+      const geoQuery = [form.address, form.city].filter(Boolean).join(", ");
+      const coords = geoQuery ? await geocodeAddress(geoQuery) : null;
+
       // No .select() here on purpose: anonymous visitors may submit a request
       // but must never be able to read customer_requests back.
       const { error } = await supabase.from("customer_requests").insert({
@@ -557,6 +566,9 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
         phone: form.phone || null,
         gst_number: form.gst_number || null,
         address: form.address || null,
+        city: form.city || null,
+        latitude: coords?.lat ?? null,
+        longitude: coords?.lng ?? null,
         status: "pending",
       });
       if (error) throw error;
@@ -650,10 +662,19 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
           />
           <FloatingLabelField
             icon={Building2}
-            label="Billing Address"
+            label="Shop / Business Address"
             value={form.address}
             onChange={(v) => setForm((f) => ({ ...f, address: v }))}
           />
+          <FloatingLabelField
+            icon={MapPin}
+            label="City / Location *"
+            value={form.city}
+            onChange={(v) => setForm((f) => ({ ...f, city: v }))}
+          />
+          <p className="text-xs text-muted-foreground">
+            Your nearest plant is chosen automatically from this location.
+          </p>
 
           <RippleButton
             type="submit"
@@ -663,6 +684,7 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
               !form.business_name ||
               !form.contact_person ||
               !form.email ||
+              !form.city ||
               (form.phone.length > 0 && form.phone.length !== 10)
             }
             className="w-full h-11 rounded-lg bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-600 text-white font-medium shadow-glow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
