@@ -479,6 +479,7 @@ function SupplierPosPage() {
                 <Label className="text-xs text-muted-foreground">Dispatch Date *</Label>
                 <Input
                   type="date"
+                  min={new Date().toISOString().split("T")[0]}
                   value={dispatchForm.dispatch_date}
                   onChange={(e) =>
                     setDispatchForm((f) => ({ ...f, dispatch_date: e.target.value }))
@@ -490,6 +491,7 @@ function SupplierPosPage() {
                 <Label className="text-xs text-muted-foreground">Expected Arrival</Label>
                 <Input
                   type="date"
+                  min={new Date().toISOString().split("T")[0]}
                   value={dispatchForm.expected_arrival}
                   onChange={(e) =>
                     setDispatchForm((f) => ({ ...f, expected_arrival: e.target.value }))
