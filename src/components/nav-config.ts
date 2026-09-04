@@ -409,6 +409,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
         { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { to: "/notifications", label: "Notifications", icon: Bell, badge: "!" },
         { to: "/supplier-pos", label: "Purchase Orders", icon: ShoppingCart },
+        { to: "/my-catalog", label: "My Catalog", icon: Package },
         { to: "/rfq", label: "RFQ Requests", icon: FileSearch, badge: "New" },
         { to: "/deliveries", label: "Deliveries", icon: TruckIcon },
         { to: "/supplier-invoices", label: "Invoices", icon: Receipt },
