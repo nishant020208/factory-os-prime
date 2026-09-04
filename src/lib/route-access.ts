@@ -55,7 +55,7 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
 
   // NEW: Materials (Company Admin + Production Manager read; Auditor read-only)
   "/materials": ONLY("company_admin", "production_manager", "auditor"),
-  "/customer-requests": ONLY("company_admin"),
+  "/customer-requests": ONLY("company_admin", "plant_admin"),
   "/approved-orders": ONLY("production_manager", "company_admin"),
 
   "/dashboard": ALL_COMPANY,
