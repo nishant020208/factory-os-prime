@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useState } from "react";
+import { nearestPlantForLocation } from "@/lib/plant-location";
 
 export const Route = createFileRoute("/_authenticated/customer-requests")({
   head: () => ({
@@ -74,6 +75,15 @@ function CustomerRequestsPage() {
         .eq("id", requestId);
       if (updateError) throw updateError;
 
+      // Auto-assign the customer to their nearest plant based on the
+      // geocoded location captured at registration (city dictionary +
+      // Nominatim fallback). Falls back to the company's primary plant.
+      const nearest = await nearestPlantForLocation(
+        companyId,
+        request.latitude ?? null,
+        request.longitude ?? null,
+      );
+
       // Create customer account. `name` is NOT NULL in the customers schema,
       // so we mirror business_name into it (this is the field every customers
       // list/table renders). email is set on both `email` and `contact_email`
@@ -88,6 +98,9 @@ function CustomerRequestsPage() {
         phone: request.phone || null,
         gst_number: request.gst_number || null,
         billing_address: request.address || null,
+        latitude: request.latitude ?? null,
+        longitude: request.longitude ?? null,
+        plant_id: nearest?.id ?? null,
         is_active: true,
       });
       if (custError) throw custError;
