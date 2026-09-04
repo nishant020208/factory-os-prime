@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { safeDate } from "@/lib/utils";
 import { FileCheck2, Plus, Loader2 } from "lucide-react";
@@ -53,6 +53,19 @@ function WhitelistPage() {
       ).data ?? [],
   });
 
+  // Emails that have already created an account (logged in). Whitelist rows
+  // whose email has a real profile show as ACTIVE instead of raw "pending".
+  const { data: profiles } = useQuery({
+    queryKey: ["platform-whitelist-active"],
+    queryFn: async () => (await supabase.from("profiles").select("email")).data ?? [],
+  });
+  const activeEmails = useMemo(
+    () => new Set((profiles ?? []).map((p) => p.email?.toLowerCase()).filter(Boolean)),
+    [profiles],
+  );
+  const displayStatus = (w: any) =>
+    activeEmails.has(String(w.email).toLowerCase()) ? "active" : (w.status ?? "pending");
+
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -103,8 +116,9 @@ function WhitelistPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const pending = data?.filter((w) => w.status === "pending").length ?? 0;
-  const accepted = data?.filter((w) => w.status === "accepted").length ?? 0;
+  const pending = data?.filter((w) => displayStatus(w) === "pending").length ?? 0;
+  const accepted = data?.filter((w) => displayStatus(w) === "accepted").length ?? 0;
+  const active = data?.filter((w) => displayStatus(w) === "active").length ?? 0;
 
   return (
     <div className="max-w-[1600px] mx-auto">
@@ -232,6 +246,7 @@ function WhitelistPage() {
         <Kpi label="Total" value={String(data?.length ?? 0)} icon={FileCheck2} tone="primary" />
         <Kpi label="Pending" value={String(pending)} icon={FileCheck2} tone="warning" />
         <Kpi label="Accepted" value={String(accepted)} icon={FileCheck2} tone="success" />
+        <Kpi label="Active" value={String(active)} icon={FileCheck2} tone="success" />
         <Kpi
           label="Revoked"
           value={String(data?.filter((w) => w.status === "revoked").length ?? 0)}
@@ -262,7 +277,7 @@ function WhitelistPage() {
                     {w.company_id?.slice(0, 8) ?? "—"}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={w.status} />
+                    <StatusBadge status={displayStatus(w)} />
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {safeDate(w.created_at)}
