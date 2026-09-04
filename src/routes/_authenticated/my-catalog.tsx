@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
 import { fmtMoney } from "@/lib/currency";
-import { safeDate } from "@/lib/utils";
+import { resolveRelation, safeDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -57,15 +57,6 @@ interface CatalogRow {
   created_at?: string | null;
   updated_at?: string | null;
   materials?: { name: string; unit: string } | { name: string; unit: string }[] | null;
-}
-
-function materialName(row: CatalogRow): string {
-  const m: any = Array.isArray(row.materials) ? row.materials[0] : row.materials;
-  return m?.name ?? "—";
-}
-function materialUnit(row: CatalogRow): string {
-  const m: any = Array.isArray(row.materials) ? row.materials[0] : row.materials;
-  return m?.unit ?? "";
 }
 
 function MyCatalogPage() {
@@ -250,8 +241,12 @@ function MyCatalogPage() {
             <TableBody>
               {rows.map((r) => (
                 <TableRow key={r.id} className="border-white/5">
-                  <TableCell className="font-medium">{materialName(r)}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{materialUnit(r)}</TableCell>
+                  <TableCell className="font-medium">
+                    {resolveRelation(r.materials)?.name ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {resolveRelation(r.materials)?.unit ?? ""}
+                  </TableCell>
                   <TableCell className="font-mono text-xs">{fmtMoney(r.unit_price)}</TableCell>
                   <TableCell>
                     <StatusBadge status={r.status} />
@@ -274,7 +269,11 @@ function MyCatalogPage() {
                         size="icon"
                         className="h-7 w-7 text-destructive"
                         onClick={() => {
-                          if (confirm(`Remove ${materialName(r)} from your catalog?`))
+                          if (
+                            confirm(
+                              `Remove ${resolveRelation(r.materials)?.name ?? "—"} from your catalog?`,
+                            )
+                          )
                             deleteMutation.mutate(r.id);
                         }}
                       >
