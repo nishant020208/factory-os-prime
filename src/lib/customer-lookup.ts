@@ -66,3 +66,29 @@ export async function getRoleUserId(
     return null;
   }
 }
+
+/**
+ * Resolve a specific user id holding a role within a company AND a specific
+ * plant — used so an order approved by Plant Admin notifies the Production
+ * Manager of that same plant (to_user targeting, never a role broadcast).
+ */
+export async function getRoleUserIdByPlant(
+  companyId: string | null,
+  role: string,
+  plantId: string,
+): Promise<string | null> {
+  if (!companyId) return null;
+  try {
+    const { data } = await supabase
+      .from("user_roles")
+      .select("user_id")
+      .eq("company_id", companyId)
+      .eq("role", role as never)
+      .eq("plant_id", plantId)
+      .limit(1)
+      .maybeSingle();
+    return data?.user_id ?? null;
+  } catch {
+    return null;
+  }
+}
