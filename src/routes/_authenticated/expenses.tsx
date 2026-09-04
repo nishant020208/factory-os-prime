@@ -217,7 +217,7 @@ function ExpensesPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Date</Label>
-                <Input type="date" value={form.expense_date} onChange={(e) => setForm((f) => ({ ...f, expense_date: e.target.value }))} />
+                <Input type="date" min={new Date().toISOString().split("T")[0]} value={form.expense_date} onChange={(e) => setForm((f) => ({ ...f, expense_date: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1.5">
