@@ -4264,6 +4264,68 @@ export type Database = {
           },
         ]
       }
+      supplier_materials: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          material_id: string
+          status: string
+          supplier_id: string
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          material_id: string
+          status?: string
+          supplier_id: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          material_id?: string
+          status?: string
+          supplier_id?: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_materials_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_materials_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_materials_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_quote_comparison"
+            referencedColumns: ["supplier_id"]
+          },
+          {
+            foreignKeyName: "supplier_materials_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_messages: {
         Row: {
           company_id: string
@@ -4987,6 +5049,16 @@ export type Database = {
           _user_id: string
         }
         Returns: undefined
+      }
+      create_purchase_order_with_items: {
+        Args: {
+          p_company_id: string
+          p_expected_date: string
+          p_items: Json
+          p_po_number: string
+          p_supplier_id: string
+        }
+        Returns: Json
       }
       create_targeted_notification: {
         Args: {
