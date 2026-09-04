@@ -258,7 +258,7 @@ function SchedulesPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Next Due *</Label>
-                <Input type="date" value={form.next_due} onChange={(e) => setForm((f) => ({ ...f, next_due: e.target.value }))} />
+                <Input type="date" min={new Date().toISOString().split("T")[0]} value={form.next_due} onChange={(e) => setForm((f) => ({ ...f, next_due: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1.5">
