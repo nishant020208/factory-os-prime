@@ -28,14 +28,16 @@ function renderMarkdown(text: string): React.ReactNode {
       {paragraphs.map((para, i) => {
         // Check if it's a list (lines starting with • or -)
         const lines = para.split("\n");
-        const isList = lines.every((l) => /^[•\-]\s/.test(l.trim()));
+        const isList = lines.every((l) => /^[•-]\s/.test(l.trim()));
         if (isList) {
           return (
             <ul key={i} className="list-none space-y-1 my-2">
               {lines.map((line, j) => (
                 <li key={j} className="flex items-start gap-2">
                   <span className="text-primary mt-0.5">•</span>
-                  <span dangerouslySetInnerHTML={{ __html: formatInline(line.replace(/^[•\-]\s/, "")) }} />
+                  <span
+                    dangerouslySetInnerHTML={{ __html: formatInline(line.replace(/^[•-]\s/, "")) }}
+                  />
                 </li>
               ))}
             </ul>
@@ -71,7 +73,7 @@ import { hasCerebrasKey, checkCerebrasHealth } from "@/lib/cerebras";
 import { hasGroqKey, checkGroqHealth } from "@/lib/groq";
 
 const copilotPlaceholder: Record<string, string> = {
-  root_super_admin: 'Ask about companies, registrations, platform health…',
+  root_super_admin: "Ask about companies, registrations, platform health…",
   company_admin: 'Ask Copilot — "show production", "approve orders", "staff count"…',
   plant_manager: 'Ask Copilot — "production schedule", "machine status", "daily report"…',
   plant_admin: 'Ask Copilot — "plant overview", "departments", "machines"…',
@@ -122,8 +124,14 @@ function AICenter() {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [streaming, setStreaming] = useState(false);
-  const [groqStatus, setGroqStatus] = useState<{ connected: boolean; message: string }>({ connected: false, message: "Checking..." });
-  const [cerebrasStatus, setCerebrasStatus] = useState<{ connected: boolean; message: string }>({ connected: false, message: "Checking..." });
+  const [groqStatus, setGroqStatus] = useState<{ connected: boolean; message: string }>({
+    connected: false,
+    message: "Checking...",
+  });
+  const [cerebrasStatus, setCerebrasStatus] = useState<{ connected: boolean; message: string }>({
+    connected: false,
+    message: "Checking...",
+  });
   const groqReady = groqStatus.connected;
   const cerebrasReady = cerebrasStatus.connected;
 
@@ -147,7 +155,9 @@ function AICenter() {
   const [msgs, setMsgs] = useState<{ role: "user" | "ai"; text: string; conf?: number }[]>([
     {
       role: "ai",
-      text: greetingMap[role ?? ""] ?? `Hi, I'm your FactoryOS Copilot — powered by Groq AI. I'm scoped to **${role?.replace(/_/g, " ")}** data. I can help you with: **${allowedLabels}**.`,
+      text:
+        greetingMap[role ?? ""] ??
+        `Hi, I'm your FactoryOS Copilot — powered by Groq AI. I'm scoped to **${role?.replace(/_/g, " ")}** data. I can help you with: **${allowedLabels}**.`,
       conf: 100,
     },
   ]);
@@ -177,7 +187,10 @@ function AICenter() {
           setMsgs((m) => {
             const updated = [...m];
             if (updated[placeholderIdx]) {
-              updated[placeholderIdx] = { ...updated[placeholderIdx], text: updated[placeholderIdx].text + chunk };
+              updated[placeholderIdx] = {
+                ...updated[placeholderIdx],
+                text: updated[placeholderIdx].text + chunk,
+              };
             }
             return updated;
           });
@@ -228,13 +241,23 @@ function AICenter() {
           title="Copilot"
           right={
             <div className="flex items-center gap-3">
-              <span className={`text-[10px] flex items-center gap-1 ${groqReady ? 'text-green-400' : 'text-yellow-400'}`} title={groqStatus.message}>
-                <span className={`h-1.5 w-1.5 rounded-full ${groqReady ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
-                {groqReady ? 'Groq Connected' : `Groq: ${groqStatus.message}`}
+              <span
+                className={`text-[10px] flex items-center gap-1 ${groqReady ? "text-green-400" : "text-yellow-400"}`}
+                title={groqStatus.message}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${groqReady ? "bg-green-400 animate-pulse" : "bg-yellow-400"}`}
+                />
+                {groqReady ? "Groq Connected" : `Groq: ${groqStatus.message}`}
               </span>
-              <span className={`text-[10px] flex items-center gap-1 ${cerebrasReady ? 'text-green-400' : 'text-yellow-400'}`} title={cerebrasStatus.message}>
-                <span className={`h-1.5 w-1.5 rounded-full ${cerebrasReady ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
-                {cerebrasReady ? 'Cerebras Connected' : `Cerebras: ${cerebrasStatus.message}`}
+              <span
+                className={`text-[10px] flex items-center gap-1 ${cerebrasReady ? "text-green-400" : "text-yellow-400"}`}
+                title={cerebrasStatus.message}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${cerebrasReady ? "bg-green-400 animate-pulse" : "bg-yellow-400"}`}
+                />
+                {cerebrasReady ? "Cerebras Connected" : `Cerebras: ${cerebrasStatus.message}`}
               </span>
               {streaming && (
                 <span className="text-[10px] text-primary flex items-center gap-1 animate-pulse">
