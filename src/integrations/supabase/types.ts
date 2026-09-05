@@ -3680,6 +3680,7 @@ export type Database = {
       }
       rfqs: {
         Row: {
+          auto_generated: boolean
           company_id: string
           created_at: string
           created_by: string | null
@@ -3689,12 +3690,14 @@ export type Database = {
           quantity: number
           response_deadline: string | null
           rfq_number: string | null
+          source_order_id: string | null
           status: string
           supplier_ids: string[] | null
           target_delivery_date: string | null
           title: string
         }
         Insert: {
+          auto_generated?: boolean
           company_id: string
           created_at?: string
           created_by?: string | null
@@ -3704,12 +3707,14 @@ export type Database = {
           quantity?: number
           response_deadline?: string | null
           rfq_number?: string | null
+          source_order_id?: string | null
           status?: string
           supplier_ids?: string[] | null
           target_delivery_date?: string | null
           title: string
         }
         Update: {
+          auto_generated?: boolean
           company_id?: string
           created_at?: string
           created_by?: string | null
@@ -3719,6 +3724,7 @@ export type Database = {
           quantity?: number
           response_deadline?: string | null
           rfq_number?: string | null
+          source_order_id?: string | null
           status?: string
           supplier_ids?: string[] | null
           target_delivery_date?: string | null
