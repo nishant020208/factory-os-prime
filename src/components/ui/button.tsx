@@ -9,16 +9,18 @@ const buttonVariants = cva(
   [
     "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer",
     // Base transition — covers color, transform, shadow in one declaration
-    "transition-all duration-150 ease-out",
-    // Focus ring (keyboard navigation)
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-    // Hover lift + Active press
-    "hover:scale-[1.02] hover:shadow-md",
-    "active:scale-[0.97] active:shadow-none",
+    "transition-all duration-200 ease-out",
+    // Focus ring (keyboard navigation) - WCAG AA compliant
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+    // Hover lift + Active press - using transform that doesn't cause layout shift
+    "hover:translate-y-[-1px] hover:shadow-md",
+    "active:translate-y-[0] active:shadow-sm",
     // Disabled
-    "disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 disabled:shadow-none",
+    "disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-[0] disabled:shadow-none",
     // SVG icons
     "[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+    // Ensure minimum touch target size (44px)
+    "min-h-[44px] min-w-[44px]",
   ].join(" "),
   {
     variants: {
@@ -29,7 +31,7 @@ const buttonVariants = cva(
           "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground hover:shadow-none",
-        link: "text-primary underline-offset-4 hover:underline hover:scale-100 hover:shadow-none",
+        link: "text-primary underline-offset-4 hover:underline hover:shadow-none",
       },
       size: {
         default: "h-9 px-4 py-2",
