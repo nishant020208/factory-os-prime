@@ -47,10 +47,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useMemo, useState, useCallback, useRef, type DragEvent } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
-import { safeDate } from "@/lib/utils";
+import { safeDate, resolveRelation } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/quality")({
   head: () => ({
@@ -527,7 +535,6 @@ function QualityPage() {
     [],
   );
 
-  // Fetch inspections
   const { data: inspections } = useQuery({
     queryKey: ["q-inspections", companyId],
     queryFn: async () =>
@@ -540,6 +547,67 @@ function QualityPage() {
       ).data ?? [],
     enabled: !!companyId,
   });
+
+  // Incoming material inspections (from GRN)
+  const { data: incomingInspections } = useQuery({
+    queryKey: ["incoming-inspections", companyId],
+    queryFn: async () =>
+      (
+        await (supabase
+          .from("incoming_material_inspections" as any) as any)
+          .select("*, materials(name, unit), warehouses(name, code), purchase_orders(po_number)")
+          .eq("company_id", companyId!)
+          .order("created_at", { ascending: false })
+          .limit(100)
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [inspNotes, setInspNotes] = useState<Record<string, string>>({});
+  const [rejectDialogInspection, setRejectDialogInspection] = useState<any | null>(null);
+  const [rejectDialogReason, setRejectDialogReason] = useState<string>("Failed visual/dimensional inspection");
+  const [rejectDialogNotes, setRejectDialogNotes] = useState<string>("");
+
+  const processInspectionMutation = useMutation({
+    mutationFn: async ({
+      id,
+      decision,
+      notes,
+      reason,
+    }: {
+      id: string;
+      decision: "approved" | "rejected";
+      notes?: string;
+      reason?: string;
+    }) => {
+      const { data, error } = await (supabase.rpc as any)("process_incoming_inspection", {
+        p_inspection_id: id,
+        p_decision: decision,
+        p_notes: notes ?? inspNotes[id] ?? null,
+        p_rejection_reason: decision === "rejected" ? (reason || "Failed incoming inspection") : null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_d, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["incoming-inspections"] });
+      queryClient.invalidateQueries({ queryKey: ["wh-inventory"] });
+      setProcessingId(null);
+      setRejectDialogInspection(null);
+      setRejectDialogNotes("");
+      if (vars.decision === "approved") {
+        toast.success("Material approved — stock added to usable inventory");
+      } else {
+        toast.error("Material rejected — quantity quarantined, procurement notified");
+      }
+    },
+    onError: (e: any) => {
+      setProcessingId(null);
+      toast.error(e.message);
+    },
+  });
+  const pendingIncoming = (incomingInspections ?? []).filter((i: any) => i.status === "pending").length;
 
   // Fetch parameters for detail view
   const { data: detailParams } = useQuery({
@@ -767,6 +835,14 @@ function QualityPage() {
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="inspections">Inspections</TabsTrigger>
           <TabsTrigger value="parameters">Parameter Trends</TabsTrigger>
+          <TabsTrigger value="incoming" className="relative">
+            Incoming Materials
+            {pendingIncoming > 0 && (
+              <span className="ml-1.5 h-4 w-4 rounded-full bg-amber-500 text-[10px] font-medium text-white inline-flex items-center justify-center">
+                {pendingIncoming}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* ─── DASHBOARD TAB ─── */}
@@ -886,6 +962,136 @@ function QualityPage() {
               Parameter-level trend analysis will populate as inspections with itemized parameters accumulate.
               <br />
               Check back after running several inspections — the system tracks pass/fail rates per individual parameter.
+            </div>
+          </Panel>
+        </TabsContent>
+
+        {/* ─── INCOMING MATERIALS TAB ─── */}
+        <TabsContent value="incoming" className="space-y-4">
+          <Panel
+            title={`Incoming Material Inspections · ${(incomingInspections ?? []).length} records`}
+            right={
+              pendingIncoming > 0 ? (
+                <span className="text-xs text-amber-400 font-medium">
+                  {pendingIncoming} awaiting QC gate approval
+                </span>
+              ) : undefined
+            }
+          >
+            {(incomingInspections ?? []).length === 0 ? (
+              <EmptyState
+                title="No incoming material inspections"
+                sub="Confirm a Goods Receipt in the Goods Receipt module to trigger incoming QC inspections."
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent border-white/5">
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Material</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">PO #</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Destination Warehouse</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Qty</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Status</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Notes / Reason</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(incomingInspections ?? []).map((insp: any) => {
+                      const mat = resolveRelation<{ name?: string; unit?: string }>(insp.materials);
+                      const wh = resolveRelation<{ name?: string; code?: string }>(insp.warehouses);
+                      const po = resolveRelation<{ po_number?: string }>(insp.purchase_orders);
+                      const isPending = insp.status === "pending";
+
+                      return (
+                        <TableRow key={insp.id} className="border-white/5">
+                          <TableCell className="font-medium text-sm">
+                            {mat?.name ?? "—"}{" "}
+                            {mat?.unit && <span className="text-muted-foreground text-xs font-normal">({mat.unit})</span>}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-primary">{po?.po_number ?? "—"}</TableCell>
+                          <TableCell className="text-xs">
+                            {wh ? (
+                              <span>
+                                <span className="font-mono text-muted-foreground">{wh.code ? `[${wh.code}] ` : ""}</span>
+                                {wh.name}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs font-semibold">{insp.quantity}</TableCell>
+                          <TableCell>
+                            <StatusBadge status={insp.status} />
+                          </TableCell>
+                          <TableCell>
+                            {isPending && !isAuditor ? (
+                              <Input
+                                value={inspNotes[insp.id] ?? ""}
+                                onChange={(e) =>
+                                  setInspNotes((n) => ({ ...n, [insp.id]: e.target.value }))
+                                }
+                                placeholder="Inspection notes..."
+                                className="h-7 text-xs w-48"
+                              />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                {insp.rejection_reason ? `Rejected: ${insp.rejection_reason}` : insp.notes ?? "—"}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {isPending && !isAuditor ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  loading={processingId === insp.id && processInspectionMutation.isPending}
+                                  disabled={processingId !== null}
+                                  onClick={() => {
+                                    setProcessingId(insp.id);
+                                    processInspectionMutation.mutate({
+                                      id: insp.id,
+                                      decision: "approved",
+                                      notes: inspNotes[insp.id],
+                                    });
+                                  }}
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve &amp; Stock
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs border-red-500/50 text-red-400 hover:bg-red-500/10"
+                                  disabled={processingId !== null}
+                                  onClick={() => {
+                                    setRejectDialogInspection(insp);
+                                    setRejectDialogReason("Failed visual/dimensional inspection");
+                                    setRejectDialogNotes(inspNotes[insp.id] || "");
+                                  }}
+                                >
+                                  <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground font-mono">
+                                {safeDate(insp.inspected_at || insp.created_at)}
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <div className="mt-3 p-3 rounded-lg bg-card/60 border border-white/5 flex items-start gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+              <div className="text-[11px] text-muted-foreground leading-relaxed">
+                <strong className="text-foreground font-medium">Quality Gate Architecture:</strong> Goods receipts do not enter active inventory until verified here. Approving credits the usable stock in the assigned warehouse. Rejecting quarantines the batch, triggers an alert for procurement, and flags the PO line item.
+              </div>
             </div>
           </Panel>
         </TabsContent>
@@ -1024,6 +1230,71 @@ function QualityPage() {
             >
               {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
               Submit Inspection
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── REJECT INCOMING INSPECTION DIALOG ─── */}
+      <Dialog
+        open={!!rejectDialogInspection}
+        onOpenChange={(open) => !open && setRejectDialogInspection(null)}
+      >
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="text-red-400 flex items-center gap-2 text-base">
+              <XCircle className="h-5 w-5" /> Reject Incoming Material
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Rejecting this material will quarantine the stock. It will <strong className="text-foreground">not</strong> enter usable inventory, and procurement will be flagged.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Rejection Reason *</Label>
+              <Select value={rejectDialogReason} onValueChange={setRejectDialogReason}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Failed visual/dimensional inspection">Failed visual/dimensional inspection</SelectItem>
+                  <SelectItem value="Damaged packaging / moisture damage">Damaged packaging / moisture damage</SelectItem>
+                  <SelectItem value="Incorrect specifications / wrong grade">Incorrect specifications / wrong grade</SelectItem>
+                  <SelectItem value="Moisture content above tolerance">Moisture content above tolerance</SelectItem>
+                  <SelectItem value="Contamination or surface defects">Contamination or surface defects</SelectItem>
+                  <SelectItem value="Missing compliance certificates / COC">Missing compliance certificates / COC</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Additional Inspector Notes</Label>
+              <Textarea
+                value={rejectDialogNotes}
+                onChange={(e) => setRejectDialogNotes(e.target.value)}
+                placeholder="Specific batch defect details..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialogInspection(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              loading={processInspectionMutation.isPending}
+              onClick={() => {
+                if (!rejectDialogInspection) return;
+                setProcessingId(rejectDialogInspection.id);
+                processInspectionMutation.mutate({
+                  id: rejectDialogInspection.id,
+                  decision: "rejected",
+                  reason: rejectDialogReason,
+                  notes: rejectDialogNotes,
+                });
+              }}
+            >
+              Confirm Rejection &amp; Quarantine
             </Button>
           </DialogFooter>
         </DialogContent>
