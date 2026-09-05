@@ -18,14 +18,68 @@ import { PageHeader, Panel } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
+import { primaryRole } from "@/lib/route-access";
+import {
+  checkRoleScope,
+  getBlockMessage,
+  getAllowedLabels,
+  DOMAIN_LABELS,
+  ROLE_DOMAIN_MAP,
+} from "@/lib/role-scope";
+import { answerCopilot, answerCopilotStream } from "@/lib/copilot-engine";
+import { checkCopilotProviderHealth } from "@/lib/copilot-llm.server";
 
 /** Simple markdown-to-HTML renderer for copilot responses */
 function renderMarkdown(text: string): React.ReactNode {
-  // Split by double newlines for paragraphs
   const paragraphs = text.split(/\n\n+/);
   return (
     <>
       {paragraphs.map((para, i) => {
+        // Check for markdown table
+        const tableMatch = para.match(/^(\|.+\|)\n\|[-| :]+\|(\n\|.+\|)+$/);
+        if (tableMatch) {
+          const rows = para.split("\n");
+          const headers = rows[0]
+            .split("|")
+            .map((c) => c.trim())
+            .filter(Boolean);
+          const bodyRows = rows.slice(2).map((r) =>
+            r
+              .split("|")
+              .map((c) => c.trim())
+              .filter(Boolean),
+          );
+          return (
+            <table key={i} className="w-full border-collapse mb-2 text-xs">
+              <thead>
+                <tr className="border-b-2 border-primary">
+                  {headers.map((h, j) => (
+                    <th
+                      key={j}
+                      className="border border-white/20 px-2 py-1 text-left font-medium text-primary"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {bodyRows.map((row, ri) => (
+                  <tr key={ri} className={ri % 2 === 0 ? "bg-white/5" : ""}>
+                    {row.map((cell, ci) => (
+                      <td
+                        key={ci}
+                        className="border border-white/10 px-2 py-1"
+                        dangerouslySetInnerHTML={{ __html: formatInline(cell) }}
+                      />
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          );
+        }
         // Check if it's a list (lines starting with • or -)
         const lines = para.split("\n");
         const isList = lines.every((l) => /^[•-]\s/.test(l.trim()));
@@ -59,18 +113,6 @@ function formatInline(text: string): string {
     .replace(/`(.+?)`/g, '<code class="bg-muted px-1 rounded text-xs">$1</code>')
     .replace(/\n/g, "<br />");
 }
-import { useAuth } from "@/hooks/use-auth";
-import { primaryRole } from "@/lib/route-access";
-import {
-  checkRoleScope,
-  getBlockMessage,
-  getAllowedLabels,
-  DOMAIN_LABELS,
-  ROLE_DOMAIN_MAP,
-} from "@/lib/role-scope";
-import { answerCopilot, answerCopilotStream } from "@/lib/copilot-engine";
-import { hasCerebrasKey, checkCerebrasHealth } from "@/lib/cerebras";
-import { hasGroqKey, checkGroqHealth } from "@/lib/groq";
 
 const copilotPlaceholder: Record<string, string> = {
   root_super_admin: "Ask about companies, registrations, platform health…",
@@ -137,8 +179,10 @@ function AICenter() {
 
   // Check provider health on mount
   useEffect(() => {
-    checkGroqHealth().then(setGroqStatus);
-    checkCerebrasHealth().then(setCerebrasStatus);
+    checkCopilotProviderHealth().then((h) => {
+      setGroqStatus(h.groq);
+      setCerebrasStatus(h.cerebras);
+    });
   }, []);
   const greetingMap: Record<string, string> = {
     root_super_admin: `Hi, I'm your **Platform Copilot** — powered by Groq AI. I can help with platform-wide data: companies, registrations, and platform health. What would you like to know?`,
