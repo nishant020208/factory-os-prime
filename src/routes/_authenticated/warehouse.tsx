@@ -141,12 +141,45 @@ function WarehousePage() {
         {
           key: "code",
           header: "Code",
-          render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+          render: (r) => <span className="font-mono text-xs font-semibold text-primary">{r.code}</span>,
         },
         {
           key: "name",
           header: "Name",
           render: (r) => <span className="font-medium">{r.name}</span>,
+        },
+        {
+          key: "skus",
+          header: "Stocked SKUs",
+          render: (r) => {
+            const whInv = (inventory ?? []).filter((i: any) => i.warehouse_id === r.id);
+            return <span className="text-xs font-mono">{whInv.length} SKUs</span>;
+          },
+        },
+        {
+          key: "stock",
+          header: "Usable Stock",
+          render: (r) => {
+            const whInv = (inventory ?? []).filter((i: any) => i.warehouse_id === r.id);
+            const total = whInv.reduce((sum: number, i: any) => sum + Number(i.quantity ?? 0), 0);
+            return <span className="text-xs font-mono font-medium">{total.toLocaleString()} units</span>;
+          },
+        },
+        {
+          key: "quarantined",
+          header: "Quarantined",
+          render: (r) => {
+            const whInv = (inventory ?? []).filter((i: any) => i.warehouse_id === r.id);
+            const quarantined = whInv.reduce((sum: number, i: any) => sum + Number(i.quarantined_quantity ?? 0), 0);
+            if (quarantined > 0) {
+              return (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  {quarantined.toLocaleString()} units
+                </span>
+              );
+            }
+            return <span className="text-xs text-muted-foreground font-mono">0</span>;
+          },
         },
         {
           key: "plant_id",
