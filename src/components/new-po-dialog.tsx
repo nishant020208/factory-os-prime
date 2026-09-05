@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Package, X } from "lucide-react";
+import { Package, X, Warehouse } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,6 +53,7 @@ export function NewPoDialog({
   const [poNumber, setPoNumber] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
+  const [deliveryWarehouseId, setDeliveryWarehouseId] = useState("");
   const [lines, setLines] = useState<LineItem[]>([]);
 
   const { data: suppliers } = useQuery({
@@ -62,6 +63,20 @@ export function NewPoDialog({
         await supabase
           .from("suppliers")
           .select("id, name")
+          .eq("company_id", companyId ?? "")
+          .order("name")
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+
+  // Warehouses for "Deliver To" dropdown
+  const { data: warehouses } = useQuery({
+    queryKey: ["warehouses", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("warehouses")
+          .select("id, name, code")
           .eq("company_id", companyId ?? "")
           .order("name")
       ).data ?? [],
@@ -102,8 +117,16 @@ export function NewPoDialog({
     setPoNumber(nextPoNumber(poRows ?? []));
     setSupplierId("");
     setExpectedDate("");
+    setDeliveryWarehouseId("");
     setLines([]);
   }, [open, poRows]);
+
+  // Auto-select the first warehouse when the list loads and nothing is chosen yet
+  useEffect(() => {
+    if (!deliveryWarehouseId && warehouses && warehouses.length > 0) {
+      setDeliveryWarehouseId((warehouses[0] as any).id);
+    }
+  }, [warehouses, deliveryWarehouseId]);
 
   const catalogForSupplier = useMemo(
     () =>
@@ -146,6 +169,7 @@ export function NewPoDialog({
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!supplierId) throw new Error("Select a supplier first");
+      if (!deliveryWarehouseId) throw new Error("Select a delivery warehouse");
       if (lines.length === 0) throw new Error("Add at least one material line to the order");
       for (const l of lines) {
         if (!(parseFloat(l.quantity) > 0)) throw new Error("Every line needs a quantity above zero");
@@ -164,14 +188,23 @@ export function NewPoDialog({
       if (error) throw error;
       const r = res as any;
       if (!r?.ok) throw new Error(r?.error ?? "Failed to create the purchase order");
+
+      // Stamp the delivery warehouse on the new PO row
+      if (r.po_id && deliveryWarehouseId) {
+        await (supabase
+          .from("purchase_orders") as any)
+          .update({ delivery_warehouse_id: deliveryWarehouseId })
+          .eq("id", r.po_id);
+      }
       return r;
     },
     onSuccess: (r: any) => {
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-pos"] });
       queryClient.invalidateQueries({ queryKey: ["po-number-hint"] });
+      const whName = (warehouses as any[])?.find((w: any) => w.id === deliveryWarehouseId)?.name ?? "";
       toast.success(
-        `Purchase order ${r.po_number ?? ""} created — sent to supplier, total ${fmtMoney(r.total)}`,
+        `Purchase order ${r.po_number ?? ""} created — total ${fmtMoney(r.total)}${whName ? ` → ${whName}` : ""}`,
       );
       onOpenChange(false);
       setLines([]);
@@ -217,6 +250,31 @@ export function NewPoDialog({
               </Select>
             </div>
           </div>
+
+          {/* Delivery Warehouse — required */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Warehouse className="h-3.5 w-3.5" />
+              Deliver To Warehouse *
+            </Label>
+            <Select value={deliveryWarehouseId} onValueChange={setDeliveryWarehouseId}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Select destination warehouse" />
+              </SelectTrigger>
+              <SelectContent>
+                {(warehouses as any[] ?? []).map((w: any) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    <span className="font-mono text-xs text-muted-foreground mr-2">{w.code}</span>
+                    {w.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">
+              The receiving warehouse where goods will be stocked after GRN.
+            </p>
+          </div>
+
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Expected Date</Label>
             <Input
@@ -261,7 +319,7 @@ export function NewPoDialog({
             {lines.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">
                 {supplierId
-                  ? "Use “+ Add material from catalog” to build the order."
+                  ? 'Use "+ Add material from catalog" to build the order.'
                   : "Select a supplier to see the materials they supply."}
               </p>
             ) : (
@@ -316,7 +374,8 @@ export function NewPoDialog({
           </Button>
           <Button
             className="bg-[image:var(--gradient-primary)]"
-            disabled={!supplierId || lines.length === 0 || createMutation.isPending}
+            disabled={!supplierId || !deliveryWarehouseId || lines.length === 0 || createMutation.isPending}
+            loading={createMutation.isPending}
             onClick={() => createMutation.mutate()}
           >
             {createMutation.isPending ? "Creating…" : "Send to Supplier"}
