@@ -122,7 +122,6 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
           bold: true,
         },
         { to: "/customers", label: "Customers", icon: UserRound },
-        { to: "/materials", label: "Materials", icon: Database },
       ],
     },
     {
