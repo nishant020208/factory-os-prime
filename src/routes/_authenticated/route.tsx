@@ -20,9 +20,11 @@ export const Route = createFileRoute("/_authenticated")({
   pendingMs: 300,
   pendingMinMs: 0,
   beforeLoad: async ({ location }) => {
-    // Direct URL entry / new tab / refresh must route through landing page first.
-    // The flag is set by in-app navigation (sidebar clicks, login flow) and cleared
-    // on beforeunload so fresh loads always hit the landing page.
+    // Direct URL entry in a brand-new tab must route through the landing page
+    // first. The flag is set by the login flow and by in-app clicks. Because it
+    // lives in sessionStorage it survives same-tab reloads (so F5 does NOT log
+    // the user out) but a new tab starts with empty sessionStorage and therefore
+    // lands on /auth first, as the direct-entry guard requires.
     const hasNavigated = sessionStorage.getItem("factoryos-navigated");
     if (!hasNavigated) {
       throw redirect({ to: "/auth", search: { redirect: location.href } });
@@ -131,13 +133,11 @@ function AuthErrorBoundary({ error, reset }: { error: Error; reset: () => void }
 function Layout() {
   const { role } = Route.useRouteContext();
 
-  // Clear the navigation flag on page unload so fresh loads (new tab, refresh,
-  // typed URL) always route through the landing page first.
+  // Keep the navigation flag for the life of the tab (sessionStorage survives
+  // same-tab reloads, so refreshing keeps the user signed in to their page) and
+  // set it on any in-app click so sidebar/link navigation works. A fresh tab
+  // starts with empty sessionStorage and routes through the landing page.
   useEffect(() => {
-    const unloadHandler = () => sessionStorage.removeItem("factoryos-navigated");
-    window.addEventListener("beforeunload", unloadHandler);
-
-    // Set the flag on any in-app click so sidebar/link navigation works
     const clickHandler = (e: MouseEvent) => {
       const target = (e.target as HTMLElement).closest("a, button[data-to], [role='menuitem']");
       if (target) sessionStorage.setItem("factoryos-navigated", "1");
@@ -145,7 +145,6 @@ function Layout() {
     document.addEventListener("click", clickHandler, true);
 
     return () => {
-      window.removeEventListener("beforeunload", unloadHandler);
       document.removeEventListener("click", clickHandler, true);
     };
   }, []);
