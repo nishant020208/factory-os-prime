@@ -9,6 +9,9 @@ import {
   MessageSquare,
   QrCode,
   Loader2,
+  Eye,
+  Download,
+  Copy,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, MaterialsCell } from "@/components/ui-parts";
@@ -79,6 +82,35 @@ function SupplierPosPage() {
     tracking_number: "",
   });
   const [dispatching, setDispatching] = useState(false);
+  const [qrDialog, setQrDialog] = useState<{
+    open: boolean;
+    po: any | null;
+    scanUrl: string | null;
+    loading: boolean;
+  }>({ open: false, po: null, scanUrl: null, loading: false });
+
+  const openQr = async (po: any) => {
+    setQrDialog({ open: true, po, scanUrl: null, loading: true });
+    try {
+      const { data } = await supabase
+        .from("qr_codes")
+        .select("token")
+        .eq("entity_id", po.id)
+        .eq("type", "inbound_shipment")
+        .maybeSingle();
+
+      if (data?.token) {
+        const scanUrl = `${window.location.origin}/scan?t=${data.token}`;
+        setQrDialog({ open: true, po, scanUrl, loading: false });
+      } else {
+        setQrDialog({ open: true, po, scanUrl: null, loading: false });
+        toast.info("Inbound QR not found for this shipment");
+      }
+    } catch (err: any) {
+      toast.error("Failed to load QR: " + err.message);
+      setQrDialog({ open: true, po, scanUrl: null, loading: false });
+    }
+  };
 
   const { mySupplier } = useSupplier();
   const supplierId = mySupplier?.id ?? null;
@@ -361,20 +393,8 @@ function SupplierPosPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-7 text-xs text-emerald-400"
-                            onClick={() => {
-                              const viewQr = async (poId: string) => {
-                                const { data } = await supabase
-                                  .from("qr_codes")
-                                  .select("token")
-                                  .eq("entity_id", poId)
-                                  .eq("type", "inbound_shipment")
-                                  .maybeSingle();
-                                if (data?.token) window.open(`${window.location.origin}/scan?t=${data.token}`, "_blank");
-                                else toast.info("Inbound QR not found for this shipment");
-                              };
-                              viewQr(po.id);
-                            }}
+                            className="h-7 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                            onClick={() => openQr(po)}
                           >
                             <QrCode className="h-3 w-3 mr-1" />
                             View QR
@@ -570,6 +590,98 @@ function SupplierPosPage() {
               Mark Dispatched
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* QR Dialog */}
+      <Dialog open={qrDialog.open} onOpenChange={(o) => setQrDialog((d) => ({ ...d, open: o }))}>
+        <DialogContent className="sm:max-w-[380px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-4 w-4 text-primary" />
+              Inbound Shipment QR Code
+            </DialogTitle>
+          </DialogHeader>
+          {qrDialog.po && (
+            <div className="flex flex-col items-center gap-4 py-2">
+              <div className="bg-white rounded-2xl p-4 shadow-lg flex items-center justify-center">
+                {qrDialog.loading ? (
+                  <div className="w-48 h-48 flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  </div>
+                ) : qrDialog.scanUrl ? (
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(qrDialog.scanUrl)}`}
+                    alt="Inbound Shipment QR Code"
+                    className="w-48 h-48 rounded-lg object-contain"
+                  />
+                ) : (
+                  <div className="w-48 h-48 flex items-center justify-center text-xs text-muted-foreground text-center p-4">
+                    QR code not available for this shipment
+                  </div>
+                )}
+              </div>
+
+              <div className="text-center space-y-1">
+                <div className="font-semibold">{qrDialog.po.po_number ?? "PO"}</div>
+                <div className="text-xs text-muted-foreground">
+                  Status: <StatusBadge status={qrDialog.po.status} />
+                </div>
+              </div>
+
+              {qrDialog.scanUrl && (
+                <div className="w-full rounded-lg bg-muted/50 border border-border px-3 py-2 flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground flex-1 truncate font-mono">
+                    {qrDialog.scanUrl}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(qrDialog.scanUrl!);
+                      toast.success("Scan link copied!");
+                    }}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+
+              <p className="text-[10px] text-muted-foreground text-center max-w-xs">
+                Scan with any phone camera — no app needed. Links to the warehouse receipt and verification page.
+              </p>
+
+              <div className="flex gap-2">
+                {qrDialog.scanUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(qrDialog.scanUrl!, "_blank")}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1" />
+                    Preview
+                  </Button>
+                )}
+                {qrDialog.scanUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const link = document.createElement("a");
+                      link.href = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(qrDialog.scanUrl!)}`;
+                      link.download = `qr-shipment-${qrDialog.po.po_number ?? "po"}.png`;
+                      link.click();
+                      toast.success("QR code downloaded");
+                    }}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1" />
+                    Download
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
