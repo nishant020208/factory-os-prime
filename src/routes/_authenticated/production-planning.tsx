@@ -105,25 +105,26 @@ function ProductionPlanningPage() {
     enabled: !!companyId,
   });
 
-  // Operators for assignment — pull from whitelist (accepted production_operators)
+  // Operators for assignment — pull from user_roles (production_operator)
+  // joined to profiles. user_roles is the authoritative source of active
+  // roles; whitelist is invite-management data that production managers
+  // cannot read under RLS, which made this list empty.
   const { data: operators } = useQuery({
     queryKey: ["pp-operators", companyId],
     queryFn: async () => {
-      // Get whitelisted production operators for this company
-      const { data: wl } = await supabase
-        .from("whitelist")
-        .select("email")
-        .eq("company_id", companyId!)
-        .eq("role", "production_operator")
-        .eq("status", "accepted");
-      if (!wl?.length) return [];
-      const emails = wl.map((w: any) => w.email);
-      // Get profiles for those emails
+      if (!companyId) return [];
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("company_id", companyId)
+        .eq("role", "production_operator");
+      if (!roles?.length) return [];
+      const ids = roles.map((r) => r.user_id);
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, full_name, email")
-        .eq("company_id", companyId!)
-        .in("email", emails);
+        .eq("company_id", companyId)
+        .in("id", ids);
       return profiles ?? [];
     },
     enabled: !!companyId,
