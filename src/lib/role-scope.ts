@@ -248,12 +248,20 @@ export function checkRoleScope(role: string | null, question: string): string | 
 
   const lowerQ = question.toLowerCase();
 
+  // A question can legitimately straddle domains ("purchase order" matches
+  // both `orders` and `procurement`). Resolve the ambiguity in the caller's
+  // favour: block only when NO matched domain is allowed for the role —
+  // a procurement manager asking about purchase orders is in scope, while a
+  // warehouse manager asking the same is still blocked (neither matches).
+  const matchedDomains = [];
   for (const [domain, keywords] of Object.entries(domainKeywords)) {
     if (keywords.some((kw) => lowerQ.includes(kw))) {
-      if (!allowedSet.has(domain)) {
-        return domain;
-      }
+      matchedDomains.push(domain);
     }
+  }
+
+  if (matchedDomains.length > 0 && !matchedDomains.some((d) => allowedSet.has(d))) {
+    return matchedDomains[0];
   }
 
   return null;
@@ -376,10 +384,12 @@ export function getRoleIdentityCard(role: string | null, companyName?: string | 
     ``,
     `I'm scoped to ${scope}`,
     ``,
-    `- **Tenant isolation:** ${tenant}`,
-    `- **I can answer about:** ${allowed.join(", ") || "—"}`,
-    `- **I cannot answer about:** ${blocked.length ? blocked.join(", ") : "nothing outside your scope — you have full-module visibility for your company"}`,
-    `- **Actions:** ${isReadOnlyRole(role) ? "read-only — I never create, edit, approve or delete anything" : "advisory only — I read live data and guide you; you perform actions in the module UI"}`,
+    `| Aspect | Details |`,
+    `|--------|---------|`,
+    `| Tenant isolation | ${tenant} |`,
+    `| Can answer about | ${allowed.join(", ") || "—"} |`,
+    `| Cannot answer about | ${blocked.length ? blocked.join(", ") : "nothing outside your scope"} |`,
+    `| Actions | ${isReadOnlyRole(role) ? "read-only — never create/edit/approve/delete" : "advisory only — read live data, guide you"} |`,
     ``,
     `No God-mode: I don't switch roles, and I can't read another role's or another company's records.`,
   ].join("\n");
