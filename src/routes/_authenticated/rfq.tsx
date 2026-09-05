@@ -60,6 +60,9 @@ interface RfqWithResponses {
   notes: string | null;
   status: string;
   supplier_ids: string[] | null;
+  response_deadline: string | null;
+  auto_generated: boolean;
+  source_order_id: string | null;
   created_by: string | null;
   created_at: string;
   rfq_responses: Array<{
@@ -85,6 +88,8 @@ function RfqPage() {
   const [showNew, setShowNew] = useState(false);
   const [showSendTo, setShowSendTo] = useState<string | null>(null);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
+  const [editRfq, setEditRfq] = useState<RfqWithResponses | null>(null);
+  const [editForm, setEditForm] = useState({ quantity: "1", notes: "", response_deadline: "" });
   const [respondTo, setRespondTo] = useState<string | null>(null);
   const [viewRfq, setViewRfq] = useState<RfqWithResponses | null>(null);
   const [convertToPo, setConvertToPo] = useState<{
@@ -132,8 +137,7 @@ function RfqPage() {
   // Fetch materials for Procurement Manager
   const { data: materials } = useQuery({
     queryKey: ["rfq-materials", companyId],
-    queryFn: async () =>
-      (await supabase.from("materials").select("id, name, unit")).data ?? [],
+    queryFn: async () => (await supabase.from("materials").select("id, name, unit")).data ?? [],
     enabled: !!companyId && !isSupplier,
   });
 
@@ -147,9 +151,46 @@ function RfqPage() {
           .select("id, name")
           .eq("status", "active")
           .eq("company_id", companyId!)
-          .not("user_id", "is", null)  // Only suppliers with linked portal accounts
-      ).data ?? [],
+          .not("user_id", "is", null)
+      ) // Only suppliers with linked portal accounts
+      .data ?? [],
     enabled: !!companyId && !isSupplier,
+  });
+
+  // Edit an auto-created (or any draft) RFQ before sending it out.
+  const updateRfq = useMutation({
+    mutationFn: async ({
+      rfqId,
+      quantity,
+      notes,
+      response_deadline,
+    }: {
+      rfqId: string;
+      quantity: string;
+      notes: string;
+      response_deadline: string;
+    }) => {
+      if (!companyId) throw new Error("Not authenticated");
+      const qty = Number(quantity);
+      if (!(qty > 0)) throw new Error("Quantity must be greater than 0");
+      const patch = {
+        quantity: qty,
+        notes: notes || null,
+        response_deadline: response_deadline || null,
+      } as const;
+      const { error } = await supabase
+        .from("rfqs")
+        .update(patch)
+        .eq("id", rfqId)
+        .eq("status", "draft");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rfq-list"] });
+      toast.success("RFQ updated — send it to suppliers when ready");
+      setEditRfq(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   // Computed stats
@@ -198,15 +239,13 @@ function RfqPage() {
       if (!supplierIds.length) throw new Error("Select at least one supplier");
 
       // Create rfq_responses rows for each selected supplier
-      const { error } = await supabase
-        .from("rfq_responses")
-        .insert(
-          supplierIds.map((sid) => ({
-            rfq_id: rfqId,
-            supplier_id: sid,
-            status: "pending",
-          }))
-        );
+      const { error } = await supabase.from("rfq_responses").insert(
+        supplierIds.map((sid) => ({
+          rfq_id: rfqId,
+          supplier_id: sid,
+          status: "pending",
+        })),
+      );
       if (error) throw error;
 
       // Update RFQ status and store which suppliers it was sent to
@@ -262,7 +301,7 @@ function RfqPage() {
           notes: respForm.notes || null,
           status: "quoted",
         },
-        { onConflict: "rfq_id,supplier_id" }
+        { onConflict: "rfq_id,supplier_id" },
       );
       if (error) throw error;
 
@@ -398,10 +437,7 @@ function RfqPage() {
         .neq("id", convertToPo.responseId);
 
       for (const resp of allResponses ?? []) {
-        await supabase
-          .from("rfq_responses")
-          .update({ status: "declined" })
-          .eq("id", resp.id);
+        await supabase.from("rfq_responses").update({ status: "declined" }).eq("id", resp.id);
 
         // Notify losing supplier
         const { data: supplier } = await supabase
@@ -640,6 +676,71 @@ function RfqPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Draft RFQ Dialog — review auto-created RFQs before sending */}
+      <Dialog open={!!editRfq} onOpenChange={(o) => !o && setEditRfq(null)}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Review RFQ</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {editRfq && editRfq.auto_generated && (
+              <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2.5">
+                ⚡ This RFQ was auto-created from a production material shortfall. Adjust the
+                quantity or delivery deadline if needed, then send it to your chosen suppliers.
+              </p>
+            )}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Material</Label>
+              <div className="text-sm">{editRfq?.title ?? "—"}</div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Quantity Needed *</Label>
+              <Input
+                type="number"
+                value={editForm.quantity}
+                onChange={(e) => setEditForm((f) => ({ ...f, quantity: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Response Deadline</Label>
+              <Input
+                type="date"
+                value={editForm.response_deadline}
+                onChange={(e) => setEditForm((f) => ({ ...f, response_deadline: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Notes / Specifications</Label>
+              <Input
+                value={editForm.notes}
+                onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditRfq(null)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-[image:var(--gradient-primary)]"
+              onClick={() =>
+                editRfq &&
+                updateRfq.mutate({
+                  rfqId: editRfq.id,
+                  quantity: editForm.quantity,
+                  notes: editForm.notes,
+                  response_deadline: editForm.response_deadline,
+                })
+              }
+              disabled={updateRfq.isPending}
+            >
+              {updateRfq.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Supplier Quote Submission Dialog */}
       <Dialog open={!!respondTo} onOpenChange={(o) => !o && setRespondTo(null)}>
         <DialogContent className="sm:max-w-[480px]">
@@ -810,9 +911,7 @@ function RfqPage() {
                                     setPoForm({
                                       po_number: `PO-${Date.now().toString().slice(-6)}`,
                                       expected_date: "",
-                                      total_amount: String(
-                                        quote.unit_price * viewRfq.quantity
-                                      ),
+                                      total_amount: String(quote.unit_price * viewRfq.quantity),
                                     });
                                   }}
                                 >
@@ -843,7 +942,9 @@ function RfqPage() {
                                 1
                               </span>
                             )}
-                            <span className="font-medium">{quote.suppliers?.name ?? "Supplier"}</span>
+                            <span className="font-medium">
+                              {quote.suppliers?.name ?? "Supplier"}
+                            </span>
                           </div>
                           {idx === 0 && (
                             <span className="text-[10px] text-success font-medium">BEST PRICE</span>
@@ -901,9 +1002,8 @@ function RfqPage() {
               {viewRfq.rfq_responses.filter((r) => r.status === "pending").length > 0 && (
                 <div className="bg-muted/30 rounded-lg p-3 text-sm">
                   <span className="text-muted-foreground">
-                    Waiting for{" "}
-                    {viewRfq.rfq_responses.filter((r) => r.status === "pending").length} supplier(s)
-                    to respond…
+                    Waiting for {viewRfq.rfq_responses.filter((r) => r.status === "pending").length}{" "}
+                    supplier(s) to respond…
                   </span>
                 </div>
               )}
@@ -952,12 +1052,7 @@ function RfqPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Total Amount</Label>
-              <Input
-                type="number"
-                value={poForm.total_amount}
-                disabled
-                className="h-9 font-mono"
-              />
+              <Input type="number" value={poForm.total_amount} disabled className="h-9 font-mono" />
               <p className="text-[10px] text-muted-foreground">
                 Auto-calculated from the supplier's quote — {fmtMoney(Number(poForm.total_amount))}
               </p>
@@ -1012,6 +1107,11 @@ function RfqPage() {
                         <span className="font-mono text-xs text-muted-foreground">
                           {rfq.rfq_number ?? "RFQ"}
                         </span>
+                        {rfq.auto_generated && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 text-[10px] font-medium">
+                            ⚡ Auto — shortfall
+                          </span>
+                        )}
                         <span className="text-sm font-medium">{rfq.title ?? "Material"}</span>
                         <span className="text-xs text-muted-foreground">
                           × {Number(rfq.quantity).toLocaleString()}
@@ -1021,8 +1121,8 @@ function RfqPage() {
                             rfq.status === "converted"
                               ? "completed"
                               : rfq.status === "sent"
-                              ? "active"
-                              : "pending"
+                                ? "active"
+                                : "pending"
                           }
                         />
                       </div>
@@ -1039,17 +1139,34 @@ function RfqPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       {/* Procurement Manager Actions */}
                       {!isSupplier && rfq.status === "draft" && (
-                        <Button
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={() => {
-                            setShowSendTo(rfq.id);
-                            setSelectedSuppliers([]);
-                          }}
-                          disabled={sendRfq.isPending}
-                        >
-                          <Send className="h-3 w-3 mr-1" /> Send to Suppliers
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              setEditRfq(rfq);
+                              setEditForm({
+                                quantity: String(rfq.quantity ?? 1),
+                                notes: rfq.notes ?? "",
+                                response_deadline: rfq.response_deadline ?? "",
+                              });
+                            }}
+                          >
+                            <FileText className="h-3 w-3 mr-1" /> Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              setShowSendTo(rfq.id);
+                              setSelectedSuppliers([]);
+                            }}
+                            disabled={sendRfq.isPending}
+                          >
+                            <Send className="h-3 w-3 mr-1" /> Send to Suppliers
+                          </Button>
+                        </>
                       )}
 
                       {!isSupplier && (rfq.status === "sent" || rfq.status === "converted") && (
