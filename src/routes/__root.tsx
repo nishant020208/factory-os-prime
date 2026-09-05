@@ -12,7 +12,7 @@ import { useEffect, useState, lazy, Suspense, type ReactNode } from "react";
 const TargetCursor = lazy(() => import("../components/TargetCursor"));
 
 import appCss from "../styles.css?url";
-import { reportRuntimeError } from "../lib/lovable-error-reporting";
+import { reportRuntimeError } from "../lib/runtime-error";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { SoundProvider, GlobalClickSoundLayer } from "@/hooks/use-click-sound";
 import { Toaster } from "@/components/ui/sonner";

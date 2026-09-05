@@ -52,5 +52,3 @@ export function reportRuntimeError(error: unknown, context: Record<string, unkno
   });
 }
 
-export const reportLovableError = reportRuntimeError;
-export const reportError = reportRuntimeError;
