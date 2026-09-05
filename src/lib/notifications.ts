@@ -1038,6 +1038,32 @@ export async function notifyGRNToSupplier(
   );
 }
 
+/** Trigger 26c: GRN stock-in resumes a procurement-pending sales order →
+ * the Production Manager of that order's plant (to_user targeting; falls
+ * back to role-wide when the plant's PM cannot be resolved).
+ */
+export async function notifyMaterialsReceivedForOrder(
+  companyId: string,
+  orderNumber: string,
+  orderId: string,
+  plantId?: string | null,
+) {
+  const pmUserId = plantId
+    ? await getRoleUserIdByPlant(companyId, "production_manager", plantId)
+    : null;
+  const [pmRole, pmUser] = resolveTarget("production_manager", pmUserId);
+  await fireNotification(
+    companyId,
+    pmRole,
+    pmUser,
+    "🧰 Materials Received — Start Production",
+    `Order ${orderNumber} materials are now in stock. Start production.`,
+    "success",
+    "sales_orders",
+    orderId,
+  );
+}
+
 /** Trigger 27: New employee → Department pending for HR Manager */
 export async function notifyNewEmployeeDepartmentRequest(
   companyId: string,
