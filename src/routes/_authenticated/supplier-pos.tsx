@@ -363,12 +363,17 @@ function SupplierPosPage() {
                             variant="ghost"
                             className="h-7 text-xs text-emerald-400"
                             onClick={() => {
-                              const qr = supabase.from("qr_codes").select("token").eq("entity_id", po.id).eq("type", "inbound_shipment").maybeSingle();
-                              qr.then(({ data: d }) => {
-                                if (d?.token)
-                                  window.open(`${window.location.origin}/scan?t=${d.token}`, "_blank");
-                                else toast.info("Inbound QR not found");
-                              });
+                              const viewQr = async (poId: string) => {
+                                const { data } = await supabase
+                                  .from("qr_codes")
+                                  .select("token")
+                                  .eq("entity_id", poId)
+                                  .eq("type", "inbound_shipment")
+                                  .maybeSingle();
+                                if (data?.token) window.open(`${window.location.origin}/scan?t=${data.token}`, "_blank");
+                                else toast.info("Inbound QR not found for this shipment");
+                              };
+                              viewQr(po.id);
                             }}
                           >
                             <QrCode className="h-3 w-3 mr-1" />

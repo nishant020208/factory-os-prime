@@ -464,6 +464,23 @@ function InvoicesPage() {
               customerUserId ?? "",
               inserted.id,
             );
+
+            // Auto-generate QR code for the newly created invoice
+            try {
+              await supabase.from("qr_codes").insert({
+                company_id: companyId,
+                entity_type: "invoice",
+                entity_id: inserted.id,
+                type: "invoice",
+                status: "active",
+                qr_data: inserted.id,
+                label: formData.invoice_number,
+                sub_label: `Status: ${formData.status || "draft"}`,
+              });
+            } catch (qrError) {
+              console.error("Failed to auto-generate QR code for invoice:", qrError);
+              // Don't fail the invoice creation if QR generation fails
+            }
           }
         }}
         kpis={
