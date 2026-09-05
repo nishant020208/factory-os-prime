@@ -183,7 +183,7 @@
   color-scheme: light;
 }
 [data-theme="aesthetic"] {
-  color-scheme: light;
+  color-scheme: dark; /* warm near-black palette — native UI must render dark */
 }
 
 /* ============================================================ */
@@ -609,4 +609,36 @@
     font-size: 1.5rem;
     line-height: 1.2;
   }
+}
+
+/* ──────────────────────────────────────────────────────────
+   Native <select> dropdowns — readable in every theme.
+   Dark theme is the :root default (no attribute), aesthetic
+   uses a warm DARK palette, light is light. Without explicit
+   option colors the popup inherits foreground (light text)
+   over the OS-default white surface → unreadable entries.
+   ────────────────────────────────────────────────────────── */
+
+/* Dark (default) + Aesthetic: dark surfaces, light text */
+:root select option,
+:root select optgroup,
+[data-theme="aesthetic"] select option,
+[data-theme="aesthetic"] select optgroup {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+}
+
+/* Light theme: light surface, dark text (pin it so OS dark
+   mode can't invert the popup into dark-on-dark) */
+[data-theme="light"] select option,
+.light select option {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+}
+
+/* Make the closed select's own text follow the theme too
+   (some UAs paint it with system colors otherwise). */
+select {
+  background-color: transparent;
+  color: inherit;
 }
