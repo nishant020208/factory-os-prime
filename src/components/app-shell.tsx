@@ -406,6 +406,7 @@ function TopBar() {
   async function signOut() {
     const email = profile?.email ?? undefined;
     await supabase.auth.signOut();
+    sessionStorage.removeItem("factoryos-navigated");
     if (email) void recordAccessLog(email, "logout", "success");
     toast.success("Signed out");
     router.navigate({ to: "/auth", replace: true });
