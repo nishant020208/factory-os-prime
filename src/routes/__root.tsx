@@ -9,7 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useState, lazy, Suspense, type ReactNode } from "react";
 
-const TargetCursor = lazy(() => import('../components/TargetCursor'));
+const TargetCursor = lazy(() => import("../components/TargetCursor"));
 
 import appCss from "../styles.css?url";
 import { reportRuntimeError } from "../lib/lovable-error-reporting";
@@ -243,6 +243,14 @@ function RootComponent() {
       "payroll",
       "approvals",
       "knowledge_articles",
+      // Master/catalog data — supplier-added raw materials and BOM edits must
+      // appear live in Production Planning, Procurement and the catalogs.
+      "materials",
+      "products",
+      "bom",
+      "bom_items",
+      "supplier_materials",
+      "purchase_requisitions",
     ];
     let cleanup: (() => void) | undefined;
     let cancelled = false;
