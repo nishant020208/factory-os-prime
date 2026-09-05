@@ -68,6 +68,7 @@ import {
 } from "@/lib/role-scope";
 import { answerCopilot, answerCopilotStream } from "@/lib/copilot-engine";
 import { hasCerebrasKey, checkCerebrasHealth } from "@/lib/cerebras";
+import { hasGroqKey, checkGroqHealth } from "@/lib/groq";
 
 const copilotPlaceholder: Record<string, string> = {
   root_super_admin: 'Ask about companies, registrations, platform health…',
@@ -121,29 +122,32 @@ function AICenter() {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  const [groqStatus, setGroqStatus] = useState<{ connected: boolean; message: string }>({ connected: false, message: "Checking..." });
   const [cerebrasStatus, setCerebrasStatus] = useState<{ connected: boolean; message: string }>({ connected: false, message: "Checking..." });
+  const groqReady = groqStatus.connected;
   const cerebrasReady = cerebrasStatus.connected;
 
-  // Check Cerebras health on mount
+  // Check provider health on mount
   useEffect(() => {
+    checkGroqHealth().then(setGroqStatus);
     checkCerebrasHealth().then(setCerebrasStatus);
   }, []);
   const greetingMap: Record<string, string> = {
-    root_super_admin: `Hi, I'm your **Platform Copilot** — powered by Cerebras AI. I can help with platform-wide data: companies, registrations, and platform health. What would you like to know?`,
-    company_admin: `Hi, I'm your **Company Copilot** — powered by Cerebras AI. I have full cross-module visibility across your company: orders, production, inventory, quality, maintenance, finance, HR, suppliers and more. What would you like to check?`,
-    production_manager: `Hi, I'm your **Production Copilot** — powered by Cerebras AI. I can help with production orders, work orders, BOM, machines, inventory and quality data. What do you need?`,
-    warehouse_manager: `Hi, I'm your **Warehouse Copilot** — powered by Cerebras AI. I can help with inventory, stock levels, products, and dispatch/shipments. What's on your mind?`,
-    quality_inspector: `Hi, I'm your **Quality Copilot** — powered by Cerebras AI. I can help with inspections, defects, CAPA, and quality parameters. What would you like to check?`,
-    maintenance_engineer: `Hi, I'm your **Maintenance Copilot** — powered by Cerebras AI. I can help with machine status, maintenance tickets, breakdowns and spare parts. What do you need?`,
-    finance_manager: `Hi, I'm your **Finance Copilot** — powered by Cerebras AI. I can help with invoices, payments, expenses, budgets and taxes. What would you like to know?`,
-    hr_manager: `Hi, I'm your **HR Copilot** — powered by Cerebras AI. I can help with employees, attendance, leaves, payroll and training. What do you need?`,
-    customer_portal: `Hi, I'm your **Customer Copilot** — powered by Cerebras AI. I can help with your orders, shipments, invoices and support tickets. What would you like to check?`,
-    supplier_portal: `Hi, I'm your **Supplier Copilot** — powered by Cerebras AI. I can help with your purchase orders, deliveries, invoices and payments. What do you need?`,
+    root_super_admin: `Hi, I'm your **Platform Copilot** — powered by Groq AI. I can help with platform-wide data: companies, registrations, and platform health. What would you like to know?`,
+    company_admin: `Hi, I'm your **Company Copilot** — powered by Groq AI. I have full cross-module visibility across your company: orders, production, inventory, quality, maintenance, finance, HR, suppliers and more. What would you like to check?`,
+    production_manager: `Hi, I'm your **Production Copilot** — powered by Groq AI. I can help with production orders, work orders, BOM, machines, inventory and quality data. What do you need?`,
+    warehouse_manager: `Hi, I'm your **Warehouse Copilot** — powered by Groq AI. I can help with inventory, stock levels, products, and dispatch/shipments. What's on your mind?`,
+    quality_inspector: `Hi, I'm your **Quality Copilot** — powered by Groq AI. I can help with inspections, defects, CAPA, and quality parameters. What would you like to check?`,
+    maintenance_engineer: `Hi, I'm your **Maintenance Copilot** — powered by Groq AI. I can help with machine status, maintenance tickets, breakdowns and spare parts. What do you need?`,
+    finance_manager: `Hi, I'm your **Finance Copilot** — powered by Groq AI. I can help with invoices, payments, expenses, budgets and taxes. What would you like to know?`,
+    hr_manager: `Hi, I'm your **HR Copilot** — powered by Groq AI. I can help with employees, attendance, leaves, payroll and training. What do you need?`,
+    customer_portal: `Hi, I'm your **Customer Copilot** — powered by Groq AI. I can help with your orders, shipments, invoices and support tickets. What would you like to check?`,
+    supplier_portal: `Hi, I'm your **Supplier Copilot** — powered by Groq AI. I can help with your purchase orders, deliveries, invoices and payments. What do you need?`,
   };
   const [msgs, setMsgs] = useState<{ role: "user" | "ai"; text: string; conf?: number }[]>([
     {
       role: "ai",
-      text: greetingMap[role ?? ""] ?? `Hi, I'm your FactoryOS Copilot — powered by Cerebras AI. I'm scoped to **${role?.replace(/_/g, " ")}** data. I can help you with: **${allowedLabels}**.`,
+      text: greetingMap[role ?? ""] ?? `Hi, I'm your FactoryOS Copilot — powered by Groq AI. I'm scoped to **${role?.replace(/_/g, " ")}** data. I can help you with: **${allowedLabels}**.`,
       conf: 100,
     },
   ]);
@@ -224,6 +228,10 @@ function AICenter() {
           title="Copilot"
           right={
             <div className="flex items-center gap-3">
+              <span className={`text-[10px] flex items-center gap-1 ${groqReady ? 'text-green-400' : 'text-yellow-400'}`} title={groqStatus.message}>
+                <span className={`h-1.5 w-1.5 rounded-full ${groqReady ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
+                {groqReady ? 'Groq Connected' : `Groq: ${groqStatus.message}`}
+              </span>
               <span className={`text-[10px] flex items-center gap-1 ${cerebrasReady ? 'text-green-400' : 'text-yellow-400'}`} title={cerebrasStatus.message}>
                 <span className={`h-1.5 w-1.5 rounded-full ${cerebrasReady ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
                 {cerebrasReady ? 'Cerebras Connected' : `Cerebras: ${cerebrasStatus.message}`}
