@@ -1377,6 +1377,29 @@ export async function notifyProcurementTriggered(
   );
 }
 
+/** Production Manager triggers the procurement branch → the SPECIFIC Procurement
+ * Manager, mentioning the auto-created shortfall RFQs that need supplier selection. */
+export async function notifyAutoRfqCreated(
+  companyId: string,
+  orderNumber: string,
+  materialNames: string[],
+  rfqNumbers: string[],
+) {
+  const procurementUserId = await getRoleUserId(companyId, "procurement_manager");
+  const [ntRole, ntUser] = resolveTarget("procurement_manager", procurementUserId);
+  const rfqLabel = rfqNumbers.length ? rfqNumbers.join(", ") : "an RFQ";
+  await fireNotification(
+    companyId,
+    ntRole,
+    ntUser,
+    "📦 Auto-RFQ Created — Material Shortfall",
+    `Auto-RFQ ${rfqLabel} created for ${materialNames.join(", ")} (order ${orderNumber}). Review in the RFQ tab and select suppliers to send it.`,
+    "warning",
+    "rfq",
+    null,
+  );
+}
+
 /** Support ticket status updated → Customer */
 export async function notifySupportTicketUpdate(
   companyId: string,
@@ -1516,10 +1539,7 @@ export async function markAllNotificationsRead(
 ) {
   try {
     if (isRootRole(role)) {
-      const q = supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .eq("is_read", false);
+      const q = supabase.from("notifications").update({ is_read: true }).eq("is_read", false);
       if (userId) {
         q.or(`to_user.eq.${userId},to_role.eq.root_super_admin`);
       } else {
