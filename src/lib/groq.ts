@@ -15,17 +15,15 @@ const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 function getGroqKey(): string {
-  const key = (import.meta as any).env?.VITE_GROQ_API_KEY as string | undefined;
+  const key = (import.meta as { env: { VITE_GROQ_API_KEY?: string } }).env.VITE_GROQ_API_KEY;
   if (!key) {
-    throw new Error(
-      "Groq API key not configured. Add VITE_GROQ_API_KEY to .env.local",
-    );
+    throw new Error("Groq API key not configured. Add VITE_GROQ_API_KEY to .env.local");
   }
   return key;
 }
 
 export function hasGroqKey(): boolean {
-  const key = (import.meta as any).env?.VITE_GROQ_API_KEY as string | undefined;
+  const key = (import.meta as { env: { VITE_GROQ_API_KEY?: string } }).env.VITE_GROQ_API_KEY;
   return !!key && key.length > 10;
 }
 
@@ -34,7 +32,7 @@ export async function checkGroqHealth(): Promise<{ connected: boolean; message: 
     return { connected: false, message: "API key not configured" };
   }
   try {
-    const key = (import.meta as any).env?.VITE_GROQ_API_KEY as string;
+    const key = (import.meta as { env: { VITE_GROQ_API_KEY?: string } }).env.VITE_GROQ_API_KEY!;
     const res = await fetch(GROQ_API_URL, {
       method: "POST",
       headers: {
@@ -49,8 +47,9 @@ export async function checkGroqHealth(): Promise<{ connected: boolean; message: 
     });
     if (res.ok) return { connected: true, message: "Connected" };
     const data = await res.json().catch(() => ({}));
-    const msg = (data as any)?.message ?? `HTTP ${res.status}`;
-    if (res.status === 402) return { connected: false, message: "No credits — add billing at groq.com" };
+    const msg = (data as { message?: string })?.message ?? `HTTP ${res.status}`;
+    if (res.status === 402)
+      return { connected: false, message: "No credits — add billing at groq.com" };
     return { connected: false, message: msg };
   } catch (err) {
     return { connected: false, message: "Network error" };
