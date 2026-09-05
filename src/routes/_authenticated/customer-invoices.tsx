@@ -94,8 +94,8 @@ function CustomerInvoicesPage() {
     (inv: any) => inv.status === "sent" || inv.status === "overdue",
   ).length;
 
-  const createOrGetQrToken = async (invoice: any) => {
-    const { data: existing } = await supabase
+  const getQrToken = async (invoice: any) => {
+    const { data: existing, error } = await supabase
       .from("qr_codes")
       .select("token")
       .eq("entity_id", invoice.id)
@@ -103,37 +103,23 @@ function CustomerInvoicesPage() {
       .eq("status", "active")
       .maybeSingle();
 
-    let token: string;
-    if (existing?.token) {
-      token = existing.token;
-    } else {
-      const { data: inserted, error } = await supabase
-        .from("qr_codes")
-        .insert({
-          company_id: invoice.company_id,
-          entity_type: "invoice",
-          entity_id: invoice.id,
-          type: "invoice",
-          status: "active",
-          qr_data: invoice.id,
-          label: invoice.invoice_number,
-          sub_label: `Status: ${invoice.status}`,
-        })
-        .select("token")
-        .single();
-      if (error) throw error;
-      token = inserted.token;
-    }
-    return `${window.location.origin}/scan?t=${token}`;
+    if (error) throw error;
+    return existing?.token ?? null;
   };
 
   const openQrDialog = async (invoice: any) => {
     setQrDialog({ open: true, invoice, scanUrl: null, generating: true });
     try {
-      const scanUrl = await createOrGetQrToken(invoice);
-      setQrDialog((d) => ({ ...d, scanUrl, generating: false }));
+      const token = await getQrToken(invoice);
+      if (token) {
+        const scanUrl = `${window.location.origin}/scan?t=${token}`;
+        setQrDialog((d) => ({ ...d, scanUrl, generating: false }));
+      } else {
+        setQrDialog((d) => ({ ...d, generating: false, scanUrl: null }));
+        toast.info("QR code not available for this invoice");
+      }
     } catch (err: any) {
-      toast.error("Failed to generate QR: " + err.message);
+      toast.error("Failed to load QR: " + err.message);
       setQrDialog((d) => ({ ...d, generating: false }));
     }
   };
