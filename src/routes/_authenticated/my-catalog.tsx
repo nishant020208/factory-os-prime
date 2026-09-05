@@ -1,6 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Package, Pencil, DollarSign, ListChecks, AlertTriangle } from "lucide-react";
+import {
+  Package,
+  Pencil,
+  Plus,
+  DollarSign,
+  ListChecks,
+  AlertTriangle,
+  Link2,
+  Sparkles,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge } from "@/components/ui-parts";
 import { Button } from "@/components/ui/button";
@@ -41,12 +50,25 @@ export const Route = createFileRoute("/_authenticated/my-catalog")({
       {
         name: "description",
         content:
-          "The raw materials you are registered to supply — pulled from the company's real material master — with the unit price Procurement auto-uses on your purchase orders.",
+          "The raw materials you supply — add new ones or link materials from the buyer's master, each with the unit price Procurement auto-uses on your purchase orders.",
       },
     ],
   }),
   component: MyCatalogPage,
 });
+
+const COMMON_UNITS = [
+  "pcs",
+  "kg",
+  "liters",
+  "meters",
+  "sq ft",
+  "cubic feet",
+  "pairs",
+  "box",
+  "rolls",
+  "set",
+];
 
 interface CatalogRow {
   id: string;
@@ -59,14 +81,31 @@ interface CatalogRow {
   materials?: { name: string; unit: string } | { name: string; unit: string }[] | null;
 }
 
+interface MaterialRow {
+  id: string;
+  name: string;
+  unit: string | null;
+}
+
+type AddMode = "existing" | "new";
+
 function MyCatalogPage() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, companyId } = useAuth();
   const [showDialog, setShowDialog] = useState<{ open: boolean; editing: CatalogRow | null }>({
     open: false,
     editing: null,
   });
   const [form, setForm] = useState({ unit_price: "0", status: "active" });
+  const [showAdd, setShowAdd] = useState(false);
+  const [addMode, setAddMode] = useState<AddMode>("existing");
+  const [addForm, setAddForm] = useState({
+    material_id: "",
+    name: "",
+    unit: "pcs",
+    unit_price: "",
+    status: "active",
+  });
 
   // Which supplier record belongs to this portal account
   const { data: mySupplier } = useQuery({
@@ -83,8 +122,7 @@ function MyCatalogPage() {
     enabled: !!user,
   });
 
-  // This supplier's linked materials (RLS returns ONLY the materials this
-  // supplier is registered to supply — never another supplier's list).
+  // This supplier's linked materials — the Raw Materials list shown on the page.
   const { data: catalog } = useQuery({
     queryKey: ["my-catalog", mySupplier?.id],
     queryFn: async () => {
@@ -100,6 +138,17 @@ function MyCatalogPage() {
     },
     enabled: !!mySupplier,
   });
+
+  // The buyer's raw-material master — browsed when adding a material we supply.
+  const { data: materials } = useQuery({
+    queryKey: ["catalog-materials", companyId],
+    queryFn: async () =>
+      (await supabase.from("materials").select("id, name, unit").order("name")).data ?? [],
+    enabled: !!companyId && !!mySupplier,
+  });
+
+  const linkedMaterialIds = new Set((catalog ?? []).map((r) => r.material_id));
+  const addableMaterials = (materials ?? []).filter((m) => !linkedMaterialIds.has(m.id));
 
   const updateMutation = useMutation({
     mutationFn: async () => {
@@ -121,6 +170,63 @@ function MyCatalogPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      if (!mySupplier || !companyId) throw new Error("No supplier linked to this account");
+      const price = parseFloat(addForm.unit_price) || 0;
+      if (price <= 0) throw new Error("Enter a unit price greater than zero");
+
+      let materialId = addForm.material_id;
+      if (addMode === "new") {
+        const name = addForm.name.trim();
+        if (!name) throw new Error("Enter the raw material name");
+        // Reuse an existing master material with the same name (case-insensitive)
+        // instead of creating a duplicate company-level row.
+        const existing = (materials ?? []).find(
+          (m) => m.name.trim().toLowerCase() === name.toLowerCase(),
+        );
+        if (existing) {
+          materialId = existing.id;
+        } else {
+          const { data: created, error: matErr } = await supabase
+            .from("materials")
+            .insert({
+              company_id: companyId,
+              name,
+              unit: addForm.unit || "pcs",
+              is_active: true,
+              description: `Added by supplier ${mySupplier.name ?? ""}`.trim(),
+            })
+            .select("id")
+            .single();
+          if (matErr) throw matErr;
+          materialId = created.id;
+        }
+      }
+      if (!materialId) throw new Error("Choose a material to add");
+
+      const { error } = await supabase.from("supplier_materials").insert({
+        company_id: companyId,
+        supplier_id: mySupplier.id,
+        material_id: materialId,
+        unit_price: price,
+        status: addForm.status,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-catalog"] });
+      queryClient.invalidateQueries({ queryKey: ["catalog-materials"] });
+      toast.success(
+        "Raw material added — it is now visible to your buyer's production and procurement teams",
+      );
+      setShowAdd(false);
+      setAddMode("existing");
+      setAddForm({ material_id: "", name: "", unit: "pcs", unit_price: "", status: "active" });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const rows = catalog ?? [];
   const activeRows = rows.filter((r) => r.status === "active");
   const avgPrice = rows.length
@@ -135,12 +241,24 @@ function MyCatalogPage() {
     setShowDialog({ open: true, editing: row });
   };
 
+  const openAdd = () => {
+    setAddMode("existing");
+    setAddForm({ material_id: "", name: "", unit: "pcs", unit_price: "", status: "active" });
+    setShowAdd(true);
+  };
+
   return (
     <div className="max-w-[1600px] mx-auto">
       <PageHeader
         eyebrow="Supplier Portal"
         title="Raw Materials I Supply"
-        sub="The raw materials you're registered to supply — pulled from the same real material master your buyer manages. Your unit price is what Procurement auto-prices every purchase order from; the master material name, unit and official cost stay with Company Admin."
+        sub="Raw materials you supply for your buyer's production — add a new one any time and it becomes part of the company master, ready for BOM and Production Planning. Your unit price is what Procurement auto-prices every purchase order from."
+        actions={
+          <Button onClick={openAdd} className="bg-[image:var(--gradient-primary)] shadow-glow">
+            <Plus className="h-4 w-4 mr-1.5" />
+            Add Raw Material
+          </Button>
+        }
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
@@ -155,7 +273,7 @@ function MyCatalogPage() {
             <AlertTriangle className="h-8 w-8 text-warning mb-2" />
             <p className="text-sm text-muted-foreground">
               This portal account is not linked to a supplier record yet. Contact your buyer to link
-              it before your materials appear here.
+              it before adding the raw materials you supply.
             </p>
           </div>
         </Panel>
@@ -211,8 +329,7 @@ function MyCatalogPage() {
                     colSpan={6}
                     className="text-center text-muted-foreground py-10 text-sm"
                   >
-                    No materials linked to your supplier record yet — contact your buyer to register
-                    the raw materials you supply.
+                    No raw materials added yet — click “Add Raw Material” to list what you supply.
                   </TableCell>
                 </TableRow>
               )}
@@ -221,6 +338,163 @@ function MyCatalogPage() {
         </Panel>
       )}
 
+      {/* Add Raw Material dialog */}
+      <Dialog
+        open={showAdd}
+        onOpenChange={(o) => {
+          if (!o) {
+            setShowAdd(false);
+            setAddForm({
+              material_id: "",
+              name: "",
+              unit: "pcs",
+              unit_price: "",
+              status: "active",
+            });
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Add Raw Material</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <Button
+              type="button"
+              variant={addMode === "existing" ? "default" : "outline"}
+              className={addMode === "existing" ? "bg-[image:var(--gradient-primary)]" : ""}
+              onClick={() => setAddMode("existing")}
+            >
+              <Link2 className="h-3.5 w-3.5 mr-1.5" />
+              Link existing
+            </Button>
+            <Button
+              type="button"
+              variant={addMode === "new" ? "default" : "outline"}
+              className={addMode === "new" ? "bg-[image:var(--gradient-primary)]" : ""}
+              onClick={() => setAddMode("new")}
+            >
+              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+              New material
+            </Button>
+          </div>
+
+          <div className="space-y-4 py-2">
+            {addMode === "existing" ? (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Raw Material *</Label>
+                <Select
+                  value={addForm.material_id}
+                  onValueChange={(v) => setAddForm((f) => ({ ...f, material_id: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pick from your buyer's material master" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(addableMaterials as MaterialRow[]).map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name} ({m.unit})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {addableMaterials.length === 0 && (
+                  <p className="text-[10px] text-warning">
+                    Everything in the master is already on your list — switch to “New material” to
+                    add something brand-new.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Material Name *</Label>
+                  <Input
+                    value={addForm.name}
+                    onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="e.g. Rosewood Planks"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Created in the company's material master, so your buyer's BOM, Production
+                    Planning and Procurement can use it immediately.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Unit *</Label>
+                  <Select
+                    value={addForm.unit}
+                    onValueChange={(v) => setAddForm((f) => ({ ...f, unit: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMMON_UNITS.map((u) => (
+                        <SelectItem key={u} value={u}>
+                          {u}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Your Unit Price *</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={addForm.unit_price}
+                onChange={(e) => setAddForm((f) => ({ ...f, unit_price: e.target.value }))}
+                placeholder="e.g. 850"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                This price is what the buyer's purchase orders auto-calculate from.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Status</Label>
+              <Select
+                value={addForm.status}
+                onValueChange={(v) => setAddForm((f) => ({ ...f, status: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAdd(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-[image:var(--gradient-primary)]"
+              disabled={
+                addMutation.isPending ||
+                (addMode === "existing" && !addForm.material_id) ||
+                (addMode === "new" && !addForm.name.trim())
+              }
+              onClick={() => addMutation.mutate()}
+            >
+              {addMutation.isPending ? "Adding…" : "Add to My Materials"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit own unit price dialog */}
       <Dialog
         open={showDialog.open}
         onOpenChange={(o) => {
@@ -241,7 +515,7 @@ function MyCatalogPage() {
                 {resolveRelation(showDialog.editing?.materials)?.name ?? "—"}
               </div>
               <p className="text-[10px] text-muted-foreground">
-                Material name and unit are master data managed by Company Admin — you update only
+                The master material name and unit are managed on the company side — you update only
                 your own pricing here.
               </p>
             </div>
