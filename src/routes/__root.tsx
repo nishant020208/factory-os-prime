@@ -251,6 +251,10 @@ function RootComponent() {
       "bom_items",
       "supplier_materials",
       "purchase_requisitions",
+      // Auto-RFQs raised from production shortfalls must appear live in
+      // Procurement's RFQ tab without a manual reload.
+      "rfqs",
+      "rfq_responses",
     ];
     let cleanup: (() => void) | undefined;
     let cancelled = false;
