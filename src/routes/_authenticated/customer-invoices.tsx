@@ -116,7 +116,7 @@ function CustomerInvoicesPage() {
         setQrDialog((d) => ({ ...d, scanUrl, generating: false }));
       } else {
         setQrDialog((d) => ({ ...d, generating: false, scanUrl: null }));
-        toast.info("QR code not available for this invoice");
+        toast.info("QR code not yet available for this invoice");
       }
     } catch (err: any) {
       toast.error("Failed to load QR: " + err.message);
@@ -233,8 +233,8 @@ function CustomerInvoicesPage() {
                     className="w-48 h-48 rounded-lg object-contain"
                   />
                 ) : (
-                  <div className="w-48 h-48 flex items-center justify-center text-xs text-muted-foreground">
-                    Failed to generate
+                  <div className="w-48 h-48 flex items-center justify-center text-xs text-muted-foreground text-center p-4">
+                    QR code not yet available for this invoice
                   </div>
                 )}
               </div>
