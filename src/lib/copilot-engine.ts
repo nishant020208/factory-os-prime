@@ -270,9 +270,9 @@ function evaluateMath(raw: string): string | null {
     }
   }
   // general expression — strip words, keep digits + operators
-  let expr = q
+  const expr = q
     .replace(
-      /what\s*is|what'?s|calculate|compute|equals?|times|multiplied\s*by|divided\s*by|\bof\b|\bto\b|\bthe\b|\bresult\b|\?|\!/g,
+      /what\s*is|what'?s|calculate|compute|equals?|times|multiplied\s*by|divided\s*by|\bof\b|\bto\b|\bthe\b|\bresult\b|\?|!/g,
       " ",
     )
     .replace(/\bx\b/g, "*")
@@ -435,10 +435,7 @@ async function materialStockAnswer(question: string): Promise<string | null> {
     //    or via the product row that shares the material's name (legacy seeds).
     let qty = 0;
     const { data: byMaterial } = await scoped(
-      supabase
-        .from("inventory")
-        .select("quantity, material_id")
-        .eq("material_id", mat.id),
+      supabase.from("inventory").select("quantity, material_id").eq("material_id", mat.id),
     );
     const rows = (byMaterial as any[] | null) ?? [];
     if (rows.length) {
@@ -461,7 +458,10 @@ async function materialStockAnswer(question: string): Promise<string | null> {
           0,
         );
         const reorder = Number(prod.reorder_level ?? 0);
-        const flag = qty <= reorder ? `⚠️ **low** — at/below the reorder threshold of ${reorder}` : `healthy (reorder threshold ${reorder})`;
+        const flag =
+          qty <= reorder
+            ? `⚠️ **low** — at/below the reorder threshold of ${reorder}`
+            : `healthy (reorder threshold ${reorder})`;
         return `📦 **${mat.name}** — real live stock: **${qty} ${prod.unit ?? mat.unit ?? "units"}** · ${flag}.\n\nThis is read from the live inventory table — the same number Warehouse sees on the Raw Material Stock screen.`;
       }
     }
@@ -978,7 +978,13 @@ async function gatherRoleData(
   // Helper to safely query a table
   async function safeQuery(table: string, cols = "*", filters?: (q: any) => any): Promise<any[]> {
     try {
-      let query = scoped(supabase.from(table as never).select(cols).order("created_at", { ascending: false }).limit(8));
+      let query = scoped(
+        supabase
+          .from(table as never)
+          .select(cols)
+          .order("created_at", { ascending: false })
+          .limit(8),
+      );
       if (filters) query = filters(query);
       const { data } = await query;
       return (data as any[]) ?? [];
@@ -994,13 +1000,21 @@ async function gatherRoleData(
   if (role === "customer_portal") {
     const customerId = await resolveCustomerId(userId);
     if (customerId) {
-      const orders = await safeQuery("customer_orders", "*", (query) => query.eq("customer_id", customerId));
+      const orders = await safeQuery("customer_orders", "*", (query) =>
+        query.eq("customer_id", customerId),
+      );
       if (orders.length) {
-        parts.push(`YOUR ORDERS (${orders.length}):\n${orders.map((o: any) => `  ${o.order_number} | ${o.product} | Qty: ${o.quantity} | Status: ${o.status} | Total: ${fmtMoney(Number(o.order_total ?? 0))} | Delivery: ${o.delivery_date ?? "—"}`).join("\n")}`);
+        parts.push(
+          `YOUR ORDERS (${orders.length}):\n${orders.map((o: any) => `  ${o.order_number} | ${o.product} | Qty: ${o.quantity} | Status: ${o.status} | Total: ${fmtMoney(Number(o.order_total ?? 0))} | Delivery: ${o.delivery_date ?? "—"}`).join("\n")}`,
+        );
       }
-      const shipments = await safeQuery("shipments", "*", (query) => query.eq("customer_id", customerId));
+      const shipments = await safeQuery("shipments", "*", (query) =>
+        query.eq("customer_id", customerId),
+      );
       if (shipments.length) {
-        parts.push(`YOUR SHIPMENTS (${shipments.length}):\n${shipments.map((s: any) => `  ${s.shipment_number} | Status: ${s.status} | Carrier: ${s.carrier ?? "—"} | Tracking: ${s.tracking_number ?? "—"}`).join("\n")}`);
+        parts.push(
+          `YOUR SHIPMENTS (${shipments.length}):\n${shipments.map((s: any) => `  ${s.shipment_number} | Status: ${s.status} | Carrier: ${s.carrier ?? "—"} | Tracking: ${s.tracking_number ?? "—"}`).join("\n")}`,
+        );
       }
     }
   }
@@ -1008,9 +1022,13 @@ async function gatherRoleData(
   else if (role === "supplier_portal") {
     const supplierId = await resolveSupplierId(userId);
     if (supplierId) {
-      const pos = await safeQuery("purchase_orders", "*", (query) => query.eq("supplier_id", supplierId));
+      const pos = await safeQuery("purchase_orders", "*", (query) =>
+        query.eq("supplier_id", supplierId),
+      );
       if (pos.length) {
-        parts.push(`YOUR PURCHASE ORDERS (${pos.length}):\n${pos.map((p: any) => `  ${p.po_number} | Status: ${p.status} | Amount: ${fmtMoney(Number(p.total_amount ?? 0))}`).join("\n")}`);
+        parts.push(
+          `YOUR PURCHASE ORDERS (${pos.length}):\n${pos.map((p: any) => `  ${p.po_number} | Status: ${p.status} | Amount: ${fmtMoney(Number(p.total_amount ?? 0))}`).join("\n")}`,
+        );
       }
     }
   }
@@ -1021,80 +1039,178 @@ async function gatherRoleData(
       if (orders.length) {
         const pending = orders.filter((o: any) => o.status === "pending_approval").length;
         const inProd = orders.filter((o: any) => o.status === "in_production").length;
-        parts.push(`CUSTOMER ORDERS (${orders.length} total, ${pending} pending approval, ${inProd} in production):\n${orders.slice(0, 5).map((o: any) => `  ${o.order_number} | ${o.product} | Qty: ${o.quantity} | Status: ${o.status}`).join("\n")}`);
+        parts.push(
+          `CUSTOMER ORDERS (${orders.length} total, ${pending} pending approval, ${inProd} in production):\n${orders
+            .slice(0, 5)
+            .map(
+              (o: any) =>
+                `  ${o.order_number} | ${o.product} | Qty: ${o.quantity} | Status: ${o.status}`,
+            )
+            .join("\n")}`,
+        );
       }
     }
     if (allowed.has("production") || mentions(["production", "work order", "manufacturing"])) {
       const prodOrders = await safeQuery("production_orders");
       const workOrders = await safeQuery("work_orders");
       if (prodOrders.length) {
-        parts.push(`PRODUCTION ORDERS (${prodOrders.length}):\n${prodOrders.slice(0, 5).map((p: any) => `  ${p.order_number} | Status: ${p.status} | Priority: ${p.priority} | Progress: ${p.progress ?? 0}%`).join("\n")}`);
+        parts.push(
+          `PRODUCTION ORDERS (${prodOrders.length}):\n${prodOrders
+            .slice(0, 5)
+            .map(
+              (p: any) =>
+                `  ${p.order_number} | Status: ${p.status} | Priority: ${p.priority} | Progress: ${p.progress ?? 0}%`,
+            )
+            .join("\n")}`,
+        );
       }
       if (workOrders.length) {
-        parts.push(`WORK ORDERS (${workOrders.length}):\n${workOrders.slice(0, 5).map((w: any) => `  ${w.wo_number} | Status: ${w.status} | Progress: ${w.progress_percent ?? 0}%`).join("\n")}`);
+        parts.push(
+          `WORK ORDERS (${workOrders.length}):\n${workOrders
+            .slice(0, 5)
+            .map(
+              (w: any) =>
+                `  ${w.wo_number} | Status: ${w.status} | Progress: ${w.progress_percent ?? 0}%`,
+            )
+            .join("\n")}`,
+        );
       }
     }
     if (allowed.has("inventory") || mentions(["inventory", "stock", "warehouse"])) {
       const inv = await safeQuery("inventory");
       if (inv.length) {
-        parts.push(`INVENTORY (${inv.length} items):\n${inv.slice(0, 5).map((i: any) => `  ${i.product_id?.slice(0, 8)} | Qty: ${i.quantity}`).join("\n")}`);
+        parts.push(
+          `INVENTORY (${inv.length} items):\n${inv
+            .slice(0, 5)
+            .map((i: any) => `  ${i.product_id?.slice(0, 8)} | Qty: ${i.quantity}`)
+            .join("\n")}`,
+        );
       }
     }
-    if (allowed.has("machines") || allowed.has("maintenance") || mentions(["machine", "maintenance"])) {
+    if (
+      allowed.has("machines") ||
+      allowed.has("maintenance") ||
+      mentions(["machine", "maintenance"])
+    ) {
       const machines = await safeQuery("machines");
       if (machines.length) {
         const down = machines.filter((m: any) => ["down", "maintenance"].includes(m.status));
-        parts.push(`MACHINES (${machines.length} total, ${down.length} down/in maintenance):\n${machines.slice(0, 5).map((m: any) => `  ${m.name} | Code: ${m.code} | Status: ${m.status}`).join("\n")}`);
+        parts.push(
+          `MACHINES (${machines.length} total, ${down.length} down/in maintenance):\n${machines
+            .slice(0, 5)
+            .map((m: any) => `  ${m.name} | Code: ${m.code} | Status: ${m.status}`)
+            .join("\n")}`,
+        );
       }
     }
     if (allowed.has("quality") || mentions(["quality", "inspection", "defect"])) {
       const insp = await safeQuery("quality_inspections");
       if (insp.length) {
-        parts.push(`QUALITY INSPECTIONS (${insp.length}):\n${insp.slice(0, 5).map((i: any) => `  ${i.inspection_number} | Result: ${i.result} | Defects: ${i.defects_found ?? 0}`).join("\n")}`);
+        parts.push(
+          `QUALITY INSPECTIONS (${insp.length}):\n${insp
+            .slice(0, 5)
+            .map(
+              (i: any) =>
+                `  ${i.inspection_number} | Result: ${i.result} | Defects: ${i.defects_found ?? 0}`,
+            )
+            .join("\n")}`,
+        );
       }
     }
     if (allowed.has("finance") || mentions(["invoice", "payment", "finance"])) {
       const invoices = await safeQuery("invoices");
       if (invoices.length) {
-        parts.push(`INVOICES (${invoices.length}):\n${invoices.slice(0, 5).map((i: any) => `  ${i.invoice_number} | Status: ${i.status} | Amount: ${fmtMoney(Number(i.total_amount ?? 0))}`).join("\n")}`);
+        parts.push(
+          `INVOICES (${invoices.length}):\n${invoices
+            .slice(0, 5)
+            .map(
+              (i: any) =>
+                `  ${i.invoice_number} | Status: ${i.status} | Amount: ${fmtMoney(Number(i.total_amount ?? 0))}`,
+            )
+            .join("\n")}`,
+        );
       }
     }
     if (allowed.has("suppliers") || mentions(["supplier", "purchase order", "procurement"])) {
       const pos = await safeQuery("purchase_orders");
       const suppliers = await safeQuery("suppliers");
       if (pos.length) {
-        parts.push(`PURCHASE ORDERS (${pos.length}):\n${pos.slice(0, 5).map((p: any) => `  ${p.po_number} | Status: ${p.status} | Amount: ${fmtMoney(Number(p.total_amount ?? 0))}`).join("\n")}`);
+        parts.push(
+          `PURCHASE ORDERS (${pos.length}):\n${pos
+            .slice(0, 5)
+            .map(
+              (p: any) =>
+                `  ${p.po_number} | Status: ${p.status} | Amount: ${fmtMoney(Number(p.total_amount ?? 0))}`,
+            )
+            .join("\n")}`,
+        );
       }
       if (suppliers.length) {
-        parts.push(`SUPPLIERS (${suppliers.length}):\n${suppliers.slice(0, 5).map((s: any) => `  ${s.name} | Status: ${s.status} | Rating: ${s.rating ?? 0}`).join("\n")}`);
+        parts.push(
+          `SUPPLIERS (${suppliers.length}):\n${suppliers
+            .slice(0, 5)
+            .map((s: any) => `  ${s.name} | Status: ${s.status} | Rating: ${s.rating ?? 0}`)
+            .join("\n")}`,
+        );
       }
     }
-    if (allowed.has("hr") || allowed.has("attendance") || mentions(["employee", "hr", "attendance"])) {
+    if (
+      allowed.has("hr") ||
+      allowed.has("attendance") ||
+      mentions(["employee", "hr", "attendance"])
+    ) {
       const employees = await safeQuery("employees");
       if (employees.length) {
-        parts.push(`EMPLOYEES (${employees.length}):\n${employees.slice(0, 5).map((e: any) => `  ${e.full_name} | Dept: ${e.department ?? "—"} | Status: ${e.status}`).join("\n")}`);
+        parts.push(
+          `EMPLOYEES (${employees.length}):\n${employees
+            .slice(0, 5)
+            .map(
+              (e: any) => `  ${e.full_name} | Dept: ${e.department ?? "—"} | Status: ${e.status}`,
+            )
+            .join("\n")}`,
+        );
       }
     }
     if (allowed.has("dispatch") || mentions(["shipment", "dispatch", "delivery"])) {
       const shipments = await safeQuery("shipments");
       if (shipments.length) {
-        parts.push(`SHIPMENTS (${shipments.length}):\n${shipments.slice(0, 5).map((s: any) => `  ${s.shipment_number} | Status: ${s.status} | Carrier: ${s.carrier ?? "—"}`).join("\n")}`);
+        parts.push(
+          `SHIPMENTS (${shipments.length}):\n${shipments
+            .slice(0, 5)
+            .map(
+              (s: any) =>
+                `  ${s.shipment_number} | Status: ${s.status} | Carrier: ${s.carrier ?? "—"}`,
+            )
+            .join("\n")}`,
+        );
       }
     }
     if (allowed.has("products") || mentions(["product", "catalog"])) {
       const products = await safeQuery("products");
       if (products.length) {
-        parts.push(`PRODUCTS (${products.length}):\n${products.slice(0, 5).map((p: any) => `  ${p.name} | SKU: ${p.sku} | Price: ${fmtMoney(Number(p.unit_price ?? 0))}`).join("\n")}`);
+        parts.push(
+          `PRODUCTS (${products.length}):\n${products
+            .slice(0, 5)
+            .map(
+              (p: any) =>
+                `  ${p.name} | SKU: ${p.sku} | Price: ${fmtMoney(Number(p.unit_price ?? 0))}`,
+            )
+            .join("\n")}`,
+        );
       }
     }
     if (role === "root_super_admin") {
       const companies = await safeQuery("companies");
       const registrations = await safeQuery("company_registrations");
       if (companies.length) {
-        parts.push(`COMPANIES (${companies.length}):\n${companies.map((c: any) => `  ${c.name} | Status: ${c.status}`).join("\n")}`);
+        parts.push(
+          `COMPANIES (${companies.length}):\n${companies.map((c: any) => `  ${c.name} | Status: ${c.status}`).join("\n")}`,
+        );
       }
       if (registrations.length) {
-        parts.push(`REGISTRATIONS (${registrations.length}):\n${registrations.map((r: any) => `  ${r.company_name} | Status: ${r.status} | Email: ${r.email}`).join("\n")}`);
+        parts.push(
+          `REGISTRATIONS (${registrations.length}):\n${registrations.map((r: any) => `  ${r.company_name} | Status: ${r.status} | Email: ${r.email}`).join("\n")}`,
+        );
       }
     }
     if (role === "company_admin") {
@@ -1200,16 +1316,62 @@ export async function answerCopilot(opts: {
   //      cricket, jokes, etc.). Decline politely with role context.
   if (intent === "data" || intent === "howto") {
     const manufacturingTerms = [
-      "order", "production", "inventory", "stock", "warehouse", "machine",
-      "quality", "inspection", "defect", "invoice", "payment", "supplier",
-      "customer", "shipment", "dispatch", "delivery", "employee", "hr",
-      "finance", "budget", "revenue", "purchase", "procurement", "rfq",
-      "work order", "batch", "oee", "throughput", "maintenance", "repair",
-      "product", "sku", "catalog", "bom", "attendance", "payroll",
-      "leave", "training", "yield", "ncr", "capa", "reorder",
-      "approved", "pending", "status", "report", "dashboard",
-      "overview", "summary", "metric", "kpi", "performance",
-      "operations", "plant", "factory", "manufacturing",
+      "order",
+      "production",
+      "inventory",
+      "stock",
+      "warehouse",
+      "machine",
+      "quality",
+      "inspection",
+      "defect",
+      "invoice",
+      "payment",
+      "supplier",
+      "customer",
+      "shipment",
+      "dispatch",
+      "delivery",
+      "employee",
+      "hr",
+      "finance",
+      "budget",
+      "revenue",
+      "purchase",
+      "procurement",
+      "rfq",
+      "work order",
+      "batch",
+      "oee",
+      "throughput",
+      "maintenance",
+      "repair",
+      "product",
+      "sku",
+      "catalog",
+      "bom",
+      "attendance",
+      "payroll",
+      "leave",
+      "training",
+      "yield",
+      "ncr",
+      "capa",
+      "reorder",
+      "approved",
+      "pending",
+      "status",
+      "report",
+      "dashboard",
+      "overview",
+      "summary",
+      "metric",
+      "kpi",
+      "performance",
+      "operations",
+      "plant",
+      "factory",
+      "manufacturing",
     ];
     const isManufacturingRelated = manufacturingTerms.some((t) => lower.includes(t));
     if (!isManufacturingRelated) {
@@ -1233,7 +1395,7 @@ Try asking me something like:
   //    more specific than math or the generic role summary. The regex requires
   //    a code prefix so words like "production" never match.
   const entityMatch = question.match(
-    /\b(?:N-08|SO|WO|PO|PR|INV|PUR|ORD|RFQ)[-\s]*[\w.\-]*\d[\w.\-]*\b/i,
+    /\b(?:N-08|SO|WO|PO|PR|INV|PUR|ORD|RFQ)[-\s]*[\w.-]*\d[\w.-]*\b/i,
   );
   if (
     entityMatch &&
@@ -1255,7 +1417,14 @@ Try asking me something like:
 
   // 4.5 Precision step (Bug 4 fix): a named-material stock question returns the
   //    REAL live quantity from the inventory table — never a generic rollup.
-  if (intent === "data" && (role === "warehouse_manager" || role === "procurement_manager" || role === "company_admin" || role === "plant_manager" || role === "auditor")) {
+  if (
+    intent === "data" &&
+    (role === "warehouse_manager" ||
+      role === "procurement_manager" ||
+      role === "company_admin" ||
+      role === "plant_manager" ||
+      role === "auditor")
+  ) {
     const specific = await materialStockAnswer(lower);
     if (specific) return { text: specific, conf: 96 };
   }
@@ -1285,7 +1454,7 @@ Try asking me something like:
   // 6. Gather role-scoped live data and route through Groq (primary), then Cerebras (fallback)
   try {
     const dataContext = await gatherRoleData(role, companyId, userId, lower);
-    
+
     // Try Groq first (primary provider)
     if (hasGroqKey()) {
       const groqResult = await askGroq({
@@ -1298,7 +1467,7 @@ Try asking me something like:
         return { text: groqResult.text, conf: 95 };
       }
     }
-    
+
     // Fallback to Cerebras
     const cerebrasResult = await askCerebras({
       question,
@@ -1309,7 +1478,7 @@ Try asking me something like:
     if (cerebrasResult) {
       return { text: cerebrasResult.text, conf: 95 };
     }
-    
+
     // Fallback to local engine if both providers unavailable
     return await roleDataAnswer(role, companyId, userId, lower);
   } catch {
@@ -1384,16 +1553,62 @@ export async function answerCopilotStream(opts: {
   // Out-of-scope detection for streaming variant
   if (intent === "data" || intent === "howto") {
     const manufacturingTerms = [
-      "order", "production", "inventory", "stock", "warehouse", "machine",
-      "quality", "inspection", "defect", "invoice", "payment", "supplier",
-      "customer", "shipment", "dispatch", "delivery", "employee", "hr",
-      "finance", "budget", "revenue", "purchase", "procurement", "rfq",
-      "work order", "batch", "oee", "throughput", "maintenance", "repair",
-      "product", "sku", "catalog", "bom", "attendance", "payroll",
-      "leave", "training", "yield", "ncr", "capa", "reorder",
-      "approved", "pending", "status", "report", "dashboard",
-      "overview", "summary", "metric", "kpi", "performance",
-      "operations", "plant", "factory", "manufacturing",
+      "order",
+      "production",
+      "inventory",
+      "stock",
+      "warehouse",
+      "machine",
+      "quality",
+      "inspection",
+      "defect",
+      "invoice",
+      "payment",
+      "supplier",
+      "customer",
+      "shipment",
+      "dispatch",
+      "delivery",
+      "employee",
+      "hr",
+      "finance",
+      "budget",
+      "revenue",
+      "purchase",
+      "procurement",
+      "rfq",
+      "work order",
+      "batch",
+      "oee",
+      "throughput",
+      "maintenance",
+      "repair",
+      "product",
+      "sku",
+      "catalog",
+      "bom",
+      "attendance",
+      "payroll",
+      "leave",
+      "training",
+      "yield",
+      "ncr",
+      "capa",
+      "reorder",
+      "approved",
+      "pending",
+      "status",
+      "report",
+      "dashboard",
+      "overview",
+      "summary",
+      "metric",
+      "kpi",
+      "performance",
+      "operations",
+      "plant",
+      "factory",
+      "manufacturing",
     ];
     const isManufacturingRelated = manufacturingTerms.some((t) => lower.includes(t));
     if (!isManufacturingRelated) {
@@ -1416,7 +1631,7 @@ Try asking me something like:
   // Try Groq streaming first (primary), then Cerebras (fallback)
   try {
     const dataContext = await gatherRoleData(role, companyId, userId, lower);
-    
+
     // Try Groq streaming first (primary provider)
     if (hasGroqKey()) {
       const groqResult = await askGroqStream({
@@ -1430,7 +1645,7 @@ Try asking me something like:
         return { text: groqResult.text, conf: 95 };
       }
     }
-    
+
     // Fallback to Cerebras streaming
     const cerebrasResult = await askCerebrasStream({
       question,
@@ -1442,7 +1657,7 @@ Try asking me something like:
     if (cerebrasResult) {
       return { text: cerebrasResult.text, conf: 95 };
     }
-    
+
     // Fallback: collect tokens from local engine (non-streaming, but show at once)
     return await roleDataAnswer(role, companyId, userId, lower);
   } catch {
