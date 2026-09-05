@@ -39,3 +39,9 @@ dist-ssr
 # Freebuff Desktop artifacts
 .freebuff/
 supabase/.temp/
+
+# Skills
+skills/
+.skills/
+.skill
+*.skill
