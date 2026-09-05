@@ -344,18 +344,50 @@ function ProductionPlanningPage() {
 
   const procureMutation = useMutation({
     mutationFn: async (c: CheckedOrder) => {
-      if (!companyId) throw new Error("Not authenticated");
+      if (!companyId || !user) throw new Error("Not authenticated");
+
+      // Raise one real purchase requisition per missing raw material so the
+      // Procurement Manager sees an actionable request (they convert it to a
+      // PO against a supplier quote/catalog price). Never type prices here.
+      const shortfallLines = c.lines.filter((l) => !l.sufficient && l.line.kind === "material");
+      const requested: string[] = [];
+      for (const l of shortfallLines) {
+        const qty = Math.max(1, Math.ceil(l.required - l.stock));
+        const existing = await supabase
+          .from("purchase_requisitions")
+          .select("id")
+          .eq("company_id", companyId)
+          .eq("material_id", l.line.componentId)
+          .ilike("notes", `%${c.order.so_number}%`)
+          .neq("status", "converted")
+          .maybeSingle();
+        if (existing.data?.id) continue;
+        const { error } = await supabase.from("purchase_requisitions").insert({
+          company_id: companyId,
+          pr_number: `PR-${new Date().getFullYear()}-${String(Date.now() % 100000).padStart(5, "0")}`,
+          material_id: l.line.componentId,
+          quantity: qty,
+          status: "pending",
+          notes: `Production shortage for order ${c.order.so_number} (${c.order.product_name}) — raised by Production Manager. Order ${qty} ${l.line.unit} of ${l.line.componentName}.`,
+          created_by: user.id,
+        });
+        if (error) throw error;
+        requested.push(`${l.line.componentName} ×${qty}`);
+      }
+
       const { error } = await supabase
         .from("sales_orders")
         .update({ status: "procurement_pending" })
         .eq("id", c.order.id);
       if (error) throw error;
-      const materialName = c.missing[0] ?? "required materials";
+      const materialName =
+        requested.length > 0 ? requested.join(", ") : (c.missing[0] ?? "required materials");
       await notifyProcurementTriggered(companyId, c.order.so_number, materialName);
     },
-    onSuccess: () => {
+    onSuccess: (_d, c) => {
       queryClient.invalidateQueries({ queryKey: ["pp-orders"] });
-      toast.success("Procurement branch triggered — Procurement Manager notified");
+      queryClient.invalidateQueries({ queryKey: ["pr-list"] });
+      toast.success(`Procurement raised — purchase requisition(s) created and Procurement Manager notified`);
     },
     onError: (err: any) => toast.error(err.message),
   });
