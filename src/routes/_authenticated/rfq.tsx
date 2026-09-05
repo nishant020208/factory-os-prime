@@ -12,6 +12,7 @@ import {
   XCircle,
   ShoppingCart,
   AlertCircle,
+  Warehouse,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
@@ -27,6 +28,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -111,6 +119,7 @@ function RfqPage() {
     po_number: "",
     expected_date: "",
     total_amount: "",
+    delivery_warehouse_id: "",
   });
 
   // Fetch RFQs
@@ -154,6 +163,20 @@ function RfqPage() {
           .not("user_id", "is", null)
       ) // Only suppliers with linked portal accounts
       .data ?? [],
+    enabled: !!companyId && !isSupplier,
+  });
+
+  // Warehouses for delivery destination
+  const { data: warehouses } = useQuery({
+    queryKey: ["warehouses", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("warehouses")
+          .select("id, name, code")
+          .eq("company_id", companyId!)
+          .order("name")
+      ).data ?? [],
     enabled: !!companyId && !isSupplier,
   });
 
@@ -415,6 +438,14 @@ function RfqPage() {
       if (!poResult?.ok) throw new Error(poResult?.error ?? "Failed to create the purchase order");
       const newPo = { id: poResult.po_id, po_number: poResult.po_number };
 
+      // Stamp the delivery warehouse on the new PO
+      if (poResult.po_id && poForm.delivery_warehouse_id) {
+        await (supabase
+          .from("purchase_orders") as any)
+          .update({ delivery_warehouse_id: poForm.delivery_warehouse_id })
+          .eq("id", poResult.po_id);
+      }
+
       // 2. Update RFQ status to converted
       const { error: rfqError } = await supabase
         .from("rfqs")
@@ -483,9 +514,10 @@ function RfqPage() {
     onSuccess: (newPo) => {
       queryClient.invalidateQueries({ queryKey: ["rfq-list"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-pos"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
       toast.success(`PO ${newPo.po_number} created from RFQ`);
       setConvertToPo(null);
-      setPoForm({ po_number: "", expected_date: "", total_amount: "" });
+      setPoForm({ po_number: "", expected_date: "", total_amount: "", delivery_warehouse_id: "" });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -911,6 +943,7 @@ function RfqPage() {
                                     setPoForm({
                                       po_number: `PO-${Date.now().toString().slice(-6)}`,
                                       expected_date: "",
+                                      delivery_warehouse_id: "",
                                       total_amount: String(quote.unit_price * viewRfq.quantity),
                                     });
                                   }}
@@ -979,6 +1012,7 @@ function RfqPage() {
                               setPoForm({
                                 po_number: `PO-${Date.now().toString().slice(-6)}`,
                                 expected_date: "",
+                                delivery_warehouse_id: "",
                                 total_amount: String(quote.unit_price * viewRfq.quantity),
                               });
                             }}
@@ -1051,6 +1085,28 @@ function RfqPage() {
               />
             </div>
             <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Warehouse className="h-3.5 w-3.5" />
+                Deliver To Warehouse *
+              </Label>
+              <Select
+                value={poForm.delivery_warehouse_id}
+                onValueChange={(v) => setPoForm((f) => ({ ...f, delivery_warehouse_id: v }))}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select destination warehouse" />
+                </SelectTrigger>
+                <SelectContent>
+                  {((warehouses ?? []) as any[]).map((w: any) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      <span className="font-mono text-xs text-muted-foreground mr-2">{w.code}</span>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Total Amount</Label>
               <Input type="number" value={poForm.total_amount} disabled className="h-9 font-mono" />
               <p className="text-[10px] text-muted-foreground">
@@ -1065,7 +1121,8 @@ function RfqPage() {
             <Button
               className="bg-success hover:bg-success/90"
               onClick={() => convertToPoMutation.mutate()}
-              disabled={convertToPoMutation.isPending}
+              disabled={convertToPoMutation.isPending || !poForm.delivery_warehouse_id}
+              loading={convertToPoMutation.isPending}
             >
               {convertToPoMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
               <ShoppingCart className="h-4 w-4 mr-1.5" />
