@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PackageOpen, ScanLine, CheckCircle2, Loader2, Camera } from "lucide-react";
+import { PackageOpen, ScanLine, CheckCircle2, Loader2, Camera, Warehouse } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge } from "@/components/ui-parts";
 import { ModuleStatusBar, ModuleCopilot } from "@/components/module-status";
@@ -47,12 +47,23 @@ function GoodsReceiptPage() {
       if (!companyId) return [];
       const { data } = await supabase
         .from("purchase_orders")
-        .select("*, suppliers(name, user_id), supplier_deliveries(*)")
+        .select(
+          "*, suppliers(name, user_id), supplier_deliveries(*), warehouses:delivery_warehouse_id(id, name, code)",
+        )
         .not("supplier_id", "is", null)
         .in("status", ["dispatched", "accepted", "received", "fulfilled"])
         .order("created_at", { ascending: false });
       return data ?? [];
     },
+    enabled: !!companyId,
+  });
+
+  // All warehouses – fallback lookup when PO has no delivery_warehouse_id
+  const { data: allWarehouses } = useQuery({
+    queryKey: ["warehouses", companyId],
+    queryFn: async () =>
+      (await supabase.from("warehouses").select("id, name, code").eq("company_id", companyId ?? "").order("name"))
+        .data ?? [],
     enabled: !!companyId,
   });
 
@@ -81,7 +92,6 @@ function GoodsReceiptPage() {
         if (qrErr) throw qrErr;
         if (!qr) throw new Error("QR does not match this shipment");
         if (qr.status !== "active") throw new Error("QR has already been used for this shipment");
-        // Mark used — cannot be rescanned
         const { error: usedErr } = await supabase
           .from("qr_codes")
           .update({ status: "used" })
@@ -104,62 +114,63 @@ function GoodsReceiptPage() {
         .eq("company_id", companyId);
       if (poErr) throw poErr;
 
-      // 4) Stock the received raw materials into the company's raw-materials
-      // warehouse (creating the row when the material has none yet), so the
-      // Production Manager's BOM shortage check sees the new stock.
-      const { data: rawWarehouses } = await supabase
-        .from("warehouses")
-        .select("id")
-        .eq("company_id", companyId)
-        .or("code.ilike.%raw%,name.ilike.%raw%")
-        .limit(1);
-      let whId = rawWarehouses?.[0]?.id ?? null;
+      // 4) Resolve delivery warehouse: use PO's delivery_warehouse_id if set,
+      //    else fall back to raw-materials or first warehouse.
+      const poWarehouseObj = (po as any).warehouses as { id?: string } | null;
+      let whId: string | null = poWarehouseObj?.id ?? null;
       if (!whId) {
-        const { data: anyWh } = await supabase
-          .from("warehouses")
-          .select("id")
-          .eq("company_id", companyId)
-          .order("created_at", { ascending: true })
-          .limit(1);
-        whId = anyWh?.[0]?.id ?? null;
-      }
-      try {
-        const { data: items } = await supabase
-          .from(
-            "purchase_order_items",
-          )
-          .select("material_id, quantity")
-          .eq("purchase_order_id", poId);
-        for (const it of items ?? []) {
-          if (!it.material_id || !whId) continue;
-          const { data: inv } = await supabase
-            .from("inventory")
-            .select("id, quantity")
-            .eq("company_id", companyId)
-            .eq("warehouse_id", whId)
-            .eq("material_id", it.material_id)
-            .maybeSingle();
-          if (inv?.id) {
-            await supabase
-              .from("inventory")
-              .update({ quantity: Number(inv.quantity ?? 0) + Number(it.quantity ?? 0) })
-              .eq("id", inv.id);
-          } else {
-            await supabase.from("inventory").insert({
-              company_id: companyId,
-              warehouse_id: whId,
-              material_id: it.material_id,
-              quantity: Number(it.quantity ?? 0),
-            });
-          }
-        }
-      } catch (e) {
-        console.warn("Inventory stock-in skipped:", e);
+        const rawWh = (allWarehouses ?? []).find(
+          (w: any) => w.code?.toLowerCase().includes("raw") || w.name?.toLowerCase().includes("raw"),
+        );
+        whId = (rawWh as any)?.id ?? (allWarehouses as any[])?.[0]?.id ?? null;
       }
 
-      // 5) Resume any production orders that were waiting on these materials —
-      // once every BOM component is covered, flip them back to approved and
-      // notify the order's Production Manager to start production.
+      // 5) Fetch PO items
+      const { data: items } = await supabase
+        .from("purchase_order_items")
+        .select("material_id, quantity")
+        .eq("purchase_order_id", poId);
+
+      // 6) Create goods receipt header (audit record)
+      //    Do NOT stock directly — stock flows in only after Quality Inspector approves.
+      let grId: string | null = null;
+      try {
+        const userRes = await supabase.auth.getUser();
+        const { data: grRow, error: grErr } = await (supabase
+          .from("goods_receipts" as any) as any)
+          .insert({
+            company_id: companyId,
+            purchase_order_id: poId,
+            received_by: userRes.data.user?.id,
+            received_at: new Date().toISOString(),
+            status: "received",
+            inspection_status: "pending",
+          })
+          .select("id")
+          .single();
+        if (!grErr && grRow?.id) grId = grRow.id;
+      } catch (_) {
+        // goods_receipts table may not exist in all environments — non-fatal
+      }
+
+      // 7) Insert pending inspection records for each line
+      for (const it of items ?? []) {
+        if (!it.material_id || !whId) continue;
+        try {
+          await (supabase.from("incoming_material_inspections" as any) as any).insert({
+            company_id: companyId,
+            goods_receipt_id: grId,
+            purchase_order_id: poId,
+            material_id: it.material_id,
+            warehouse_id: whId,
+            quantity: Number(it.quantity ?? 0),
+            status: "pending",
+          });
+        } catch (_) {/* non-fatal */}
+      }
+
+      // 8) Resume waiting production orders (stock check will pass post-inspection,
+      //    but run it anyway so approved backlog auto-resumes)
       try {
         const { data: rpc } = await supabase.rpc("resume_orders_when_stocked", {
           p_company_id: companyId,
@@ -176,13 +187,16 @@ function GoodsReceiptPage() {
         console.warn("Order resume skipped:", e);
       }
 
-      // 6) Notify Finance (release payment) + this Supplier (shipment received)
+      // 9) Notify Finance + Supplier
       await notifyGRNConfirmed(companyId, po.po_number ?? "PO", supplier?.name ?? "Supplier");
       await notifyGRNToSupplier(companyId, po.po_number ?? "PO", supplier?.name ?? "Supplier", supplier?.user_id ?? null);
     },
     onSuccess: (_d, poId) => {
       queryClient.invalidateQueries({ queryKey: ["grn-pos"] });
-      toast.success("Goods receipt confirmed — stock updated, supplier & finance notified");
+      queryClient.invalidateQueries({ queryKey: ["incoming-inspections"] });
+      toast.success(
+        "Goods receipt confirmed — pending Quality Inspection before stock is usable",
+      );
       setReceivingId(null);
       setTokens((t) => ({ ...t, [poId]: "" }));
     },
@@ -198,7 +212,7 @@ function GoodsReceiptPage() {
       <PageHeader
         eyebrow="Warehouse"
         title="Goods Receipt"
-        sub="Receive inbound supplier shipments. Scan the Shipment-Inbound QR or confirm manually — the QR becomes single-use."
+        sub="Receive inbound supplier shipments. Scan the Shipment-Inbound QR or confirm manually — materials go to Quality Inspection before entering usable stock."
         actions={<ModuleCopilot moduleName="goods-receipt" />}
       />
 
@@ -213,7 +227,7 @@ function GoodsReceiptPage() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-white/5">
-                {["PO #", "Supplier", "Amount", "Status", "Inbound QR Token", "Action"].map((h) => (
+                {["PO #", "Supplier", "Dest. Warehouse", "Amount", "Status", "Inbound QR Token", "Action"].map((h) => (
                   <TableHead key={h} className="text-[11px] uppercase tracking-wider text-muted-foreground">
                     {h}
                   </TableHead>
@@ -223,11 +237,23 @@ function GoodsReceiptPage() {
             <TableBody>
               {(pos ?? []).map((po) => {
                 const supplier = (po as any).suppliers as { name?: string } | null;
+                const wh = (po as any).warehouses as { name?: string; code?: string } | null;
                 const canReceive = ["dispatched", "accepted"].includes(po.status);
                 return (
                   <TableRow key={po.id} className="border-white/5">
                     <TableCell className="font-medium">{po.po_number ?? po.id.slice(0, 8)}</TableCell>
                     <TableCell className="text-xs">{supplier?.name ?? "—"}</TableCell>
+                    <TableCell>
+                      {wh?.name ? (
+                        <span className="inline-flex items-center gap-1 text-xs">
+                          <Warehouse className="h-3 w-3 text-muted-foreground" />
+                          <span className="font-mono text-muted-foreground">{wh.code}</span>
+                          {wh.name}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="font-mono text-xs">
                       {fmtMoney(po.total_amount)}
                     </TableCell>
@@ -265,22 +291,19 @@ function GoodsReceiptPage() {
                         <Button
                           size="sm"
                           className="h-8 text-xs bg-[image:var(--gradient-primary)]"
+                          loading={receivingId === po.id}
                           onClick={() => {
                             setReceivingId(po.id);
                             grnMutation.mutate(po.id);
                           }}
                           disabled={receivingId === po.id}
                         >
-                          {receivingId === po.id ? (
-                            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                          ) : (
-                            <PackageOpen className="h-3.5 w-3.5 mr-1" />
-                          )}
+                          <PackageOpen className="h-3.5 w-3.5 mr-1" />
                           Confirm Receipt
                         </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          {po.status === "received" ? "In stock" : "—"}
+                          {po.status === "received" ? "Pending Inspection" : "—"}
                         </span>
                       )}
                     </TableCell>
@@ -289,7 +312,7 @@ function GoodsReceiptPage() {
               })}
               {(pos ?? []).length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
                     No supplier POs yet. Dispatched shipments from suppliers will appear here.
                   </TableCell>
                 </TableRow>
@@ -299,8 +322,8 @@ function GoodsReceiptPage() {
         </div>
         <div className="mt-3">
           <Label className="text-[11px] text-muted-foreground">
-            Entering the inbound QR token verifies the shipment and marks the QR as used (single-use). Leaving it blank
-            confirms the receipt manually.
+            Confirming receipt creates a pending Quality Inspection — the Quality Inspector must
+            approve before stock enters usable inventory.
           </Label>
         </div>
       </Panel>
