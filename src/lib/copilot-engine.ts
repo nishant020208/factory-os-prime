@@ -210,6 +210,14 @@ async function listRows(table: string, limit = 8): Promise<any[]> {
   }
 }
 
+/** Generate a markdown table from headers and rows */
+function toMarkdownTable(headers: string[], rows: string[][]): string {
+  if (rows.length === 0) return "";
+  const separator = headers.map(() => "---").join(" | ");
+  const body = rows.map((r) => r.join(" | ")).join("\n");
+  return `| ${headers.join(" | ")} |\n| ${separator} |\n| ${body} |`;
+}
+
 /** Human label for a status field ("in_progress" → "In progress") */
 function label(v: unknown): string {
   if (v === null || v === undefined) return "—";
@@ -365,17 +373,25 @@ async function findEntity(
         const res: any = await q;
         const row = res?.data?.[0];
         if (row) {
-          const status = label(row.status ?? row.state);
-          const pct =
+          const pctStr =
             row.progress != null || row.progress_percent != null
-              ? ` · ${row.progress ?? row.progress_percent ?? 0}%`
-              : "";
-          const amount =
+              ? `${row.progress ?? row.progress_percent ?? 0}%`
+              : "—";
+          const amountStr =
             row.total_amount != null || row.amount != null
-              ? ` · ${fmtMoney(Number(row.total_amount ?? row.amount ?? 0))}`
-              : "";
-          const due = row.due_date ? ` · due ${new Date(row.due_date).toLocaleDateString()}` : "";
-          return `🔎 Found it — **${row[col] ?? probe.table}** (${probe.table.replace(/_/g, " ")}): status **${status}**${pct}${amount}${due}.`;
+              ? fmtMoney(Number(row.total_amount ?? row.amount ?? 0))
+              : "—";
+          const dueStr = row.due_date ? new Date(row.due_date).toLocaleDateString() : "—";
+          const entityTable = toMarkdownTable(
+            ["Field", "Value"],
+            [
+              ["Status", status],
+              ["Progress", pctStr],
+              ["Amount", amountStr],
+              ["Due Date", dueStr],
+            ],
+          );
+          return `🔎 Found it — **${row[col] ?? probe.table}**\n\n${entityTable}`;
         }
       } catch {
         /* probe failed — try next */
@@ -458,14 +474,25 @@ async function materialStockAnswer(question: string): Promise<string | null> {
           0,
         );
         const reorder = Number(prod.reorder_level ?? 0);
-        const flag =
-          qty <= reorder
-            ? `⚠️ **low** — at/below the reorder threshold of ${reorder}`
-            : `healthy (reorder threshold ${reorder})`;
-        return `📦 **${mat.name}** — real live stock: **${qty} ${prod.unit ?? mat.unit ?? "units"}** · ${flag}.\n\nThis is read from the live inventory table — the same number Warehouse sees on the Raw Material Stock screen.`;
+        const flag = qty <= reorder ? "⚠️ Low" : "✅ Healthy";
+        return `📦 **${mat.name}**\n\n${toMarkdownTable(
+          ["Field", "Value"],
+          [
+            ["Material", mat.name],
+            ["Live Stock", `${qty} ${prod.unit ?? mat.unit ?? "units"}`],
+            ["Reorder Level", String(reorder)],
+            ["Status", flag],
+          ],
+        )}\n\nThis is read from the live inventory table — the same number Warehouse sees on the Raw Material Stock screen.`;
       }
     }
-    return `📦 **${mat.name}** — real live stock: **${qty} ${mat.unit ?? "units"}** across all warehouses. This is read live from the inventory table.`;
+    return `📦 **${mat.name}**\n\n${toMarkdownTable(
+      ["Field", "Value"],
+      [
+        ["Material", mat.name],
+        ["Live Stock", `${qty} ${mat.unit ?? "units"}`],
+      ],
+    )}\n\nThis is read live from the inventory table.`;
   } catch {
     return null;
   }
@@ -575,44 +602,77 @@ async function focusedDomainAnswer(
         const inProg = rows.filter((p: any) =>
           ["in_progress", "in-production"].includes(p.status),
         ).length;
-        return `🏭 **Production** — ${rows.length} order(s), ${inProg} in progress.\n\n${rows
-          .slice(0, 3)
-          .map((p: any) => `- ${p.order_number ?? p.id?.slice(0, 8)} · ${label(p.status)}`)
-          .join("\n")}`;
+        const tableRows = rows
+          .slice(0, 5)
+          .map((p: any) => [
+            p.order_number ?? p.id?.slice(0, 8),
+            label(p.status),
+            `${p.priority ?? "—"}`,
+            `${p.progress ?? p.progress_percent ?? 0}%`,
+          ]);
+        return `🏭 **Production** — ${rows.length} order(s), ${inProg} in progress.\n\n${toMarkdownTable(
+          ["Order", "Status", "Priority", "Progress"],
+          tableRows,
+        )}`;
       }
       case "inventory": {
         const rows = await listRows("inventory", 6);
         const low = rows.filter(
           (i: any) => Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0),
         );
-        return `📦 **Inventory** — ${rows.length} SKU(s), ${low.length} at/below reorder level.\n\n${rows
-          .slice(0, 4)
-          .map((i: any) => `- ${i.sku ?? i.product_name ?? i.id?.slice(0, 8)} · ${i.quantity ?? 0}`)
-          .join("\n")}`;
+        const tableRows = rows
+          .slice(0, 6)
+          .map((i: any) => [
+            i.sku ?? i.product_name ?? i.id?.slice(0, 8),
+            `${i.quantity ?? 0}`,
+            `${i.reorder_level ?? 0}`,
+            Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0) ? "⚠️ Low" : "OK",
+          ]);
+        return `📦 **Inventory** — ${rows.length} SKU(s), ${low.length} at/below reorder level.\n\n${toMarkdownTable(
+          ["SKU / Product", "Qty", "Reorder", "Status"],
+          tableRows,
+        )}`;
       }
       case "machines": {
         const rows = await listRows("machines", 6);
         const down = rows.filter((m: any) => ["down", "maintenance"].includes(m.status));
-        return `⚙️ **Machines** — ${rows.length} total, ${down.length} down/in maintenance.\n\n${rows
-          .slice(0, 4)
-          .map((m: any) => `- ${m.name ?? "—"} · ${label(m.status)}`)
-          .join("\n")}`;
+        const tableRows = rows
+          .slice(0, 5)
+          .map((m: any) => [m.name ?? "—", m.code ?? "—", label(m.status)]);
+        return `⚙️ **Machines** — ${rows.length} total, ${down.length} down/in maintenance.\n\n${toMarkdownTable(
+          ["Machine", "Code", "Status"],
+          tableRows,
+        )}`;
       }
       case "quality": {
         const rows = await listRows("quality_inspections", 6);
         const passed = rows.filter((i: any) => ["pass", "passed"].includes(i.result)).length;
-        return `✅ **Quality** — ${rows.length} inspection(s), ${passed} passed.\n\n${rows
-          .slice(0, 3)
-          .map((i: any) => `- ${i.inspection_number ?? i.id?.slice(0, 8)} · ${label(i.result)}`)
-          .join("\n")}`;
+        const tableRows = rows
+          .slice(0, 5)
+          .map((i: any) => [
+            i.inspection_number ?? i.id?.slice(0, 8),
+            label(i.result),
+            `${i.defects_found ?? 0}`,
+          ]);
+        return `✅ **Quality** — ${rows.length} inspection(s), ${passed} passed.\n\n${toMarkdownTable(
+          ["Inspection #", "Result", "Defects"],
+          tableRows,
+        )}`;
       }
       case "finance": {
         const rows = await listRows("invoices", 6);
         const out = rows.filter((i: any) => ["pending", "partial", "unpaid"].includes(i.status));
-        return `💰 **Finance** — ${rows.length} invoice(s), ${out.length} outstanding.\n\n${rows
-          .slice(0, 3)
-          .map((i: any) => `- ${i.invoice_number ?? "INV"} · ${label(i.status)}`)
-          .join("\n")}`;
+        const tableRows = rows
+          .slice(0, 5)
+          .map((i: any) => [
+            i.invoice_number ?? "INV",
+            label(i.status),
+            fmtMoney(Number(i.total_amount ?? 0)),
+          ]);
+        return `💰 **Finance** — ${rows.length} invoice(s), ${out.length} outstanding.\n\n${toMarkdownTable(
+          ["Invoice", "Status", "Amount"],
+          tableRows,
+        )}`;
       }
       case "suppliers": {
         const sq: any = scoped(
@@ -625,13 +685,19 @@ async function focusedDomainAnswer(
         if (supplierId) sq.eq("supplier_id", supplierId);
         const { data } = await sq;
         const rows = (data as any[]) ?? [];
-        return `📋 **Procurement** — ${rows.length} PO(s).\n\n${rows
-          .slice(0, 3)
-          .map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`)
-          .join("\n")}`;
+        const tableRows = rows
+          .slice(0, 5)
+          .map((p: any) => [
+            p.po_number ?? "PO",
+            label(p.status),
+            fmtMoney(Number(p.total_amount ?? 0)),
+          ]);
+        return `📋 **Procurement** — ${rows.length} PO(s).\n\n${toMarkdownTable(
+          ["PO #", "Status", "Amount"],
+          tableRows,
+        )}`;
       }
       case "orders": {
-        // Suppliers never see sales orders — their "orders" are purchase orders.
         if (role === "supplier_portal") {
           const pq: any = scoped(
             supabase
@@ -642,13 +708,18 @@ async function focusedDomainAnswer(
           ).eq("supplier_id", supplierId);
           const { data } = await pq;
           const rows = (data as any[]) ?? [];
-          return `📋 **Your Purchase Orders** — ${rows.length} on record.\n\n${rows
-            .slice(0, 3)
-            .map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`)
-            .join("\n")}`;
+          const tableRows = rows
+            .slice(0, 5)
+            .map((p: any) => [
+              p.po_number ?? "PO",
+              label(p.status),
+              fmtMoney(Number(p.total_amount ?? 0)),
+            ]);
+          return `📋 **Your Purchase Orders** — ${rows.length} on record.\n\n${toMarkdownTable(
+            ["PO #", "Status", "Amount"],
+            tableRows,
+          )}`;
         }
-        // Customers read their own customer_orders; internal roles see the
-        // customer order book (source of truth for the order lifecycle).
         const q: any = scoped(
           supabase
             .from("customer_orders")
@@ -659,14 +730,26 @@ async function focusedDomainAnswer(
         if (customerId) q.eq("customer_id", customerId);
         const { data } = await q;
         const rows = (data as any[]) ?? [];
-        return `📋 **Orders** — ${rows.length} on record.\n\n${rows
-          .slice(0, 3)
-          .map((o: any) => `- ${o.order_number ?? "ORD"} · ${label(o.status)}`)
-          .join("\n")}`;
+        const tableRows = rows
+          .slice(0, 5)
+          .map((o: any) => [
+            o.order_number ?? "ORD",
+            o.product ?? "—",
+            `${o.quantity ?? "—"}`,
+            label(o.status),
+          ]);
+        return `📋 **Orders** — ${rows.length} on record.\n\n${toMarkdownTable(
+          ["Order #", "Product", "Qty", "Status"],
+          tableRows,
+        )}`;
       }
       case "employees": {
         const rows = await listRows("employees", 5);
-        return `👥 **People** — ${rows.length} employee(s) on record.`;
+        const tableRows = rows.map((e: any) => [e.full_name ?? e.name ?? "—", e.department ?? "—"]);
+        return `👥 **People** — ${rows.length} employee(s) on record.\n\n${toMarkdownTable(
+          ["Name", "Department"],
+          tableRows,
+        )}`;
       }
       case "dispatch": {
         const q: any = scoped(
@@ -675,10 +758,18 @@ async function focusedDomainAnswer(
         if (customerId) q.eq("customer_id", customerId);
         const { data } = await q;
         const rows = (data as any[]) ?? [];
-        return `🚚 **Dispatch** — ${rows.length} shipment(s).\n\n${rows
-          .slice(0, 3)
-          .map((s: any) => `- ${s.tracking_number ?? s.id?.slice(0, 8)} · ${label(s.status)}`)
-          .join("\n")}`;
+        const tableRows = rows
+          .slice(0, 5)
+          .map((s: any) => [
+            s.shipment_number ?? s.id?.slice(0, 8),
+            s.carrier ?? "—",
+            s.tracking_number ?? "—",
+            label(s.status),
+          ]);
+        return `🚚 **Dispatch** — ${rows.length} shipment(s).\n\n${toMarkdownTable(
+          ["Shipment", "Carrier", "Tracking", "Status"],
+          tableRows,
+        )}`;
       }
       default:
         return null;
@@ -701,9 +792,7 @@ async function roleDataAnswer(
   switch (role) {
     case "customer_portal": {
       const customerId = await resolveCustomerId(userId);
-      // Fail closed — never fall back to "all orders in the company".
       if (!customerId) return { text: UNLINKED_PORTAL_MSG("customer"), conf: 100 };
-      // customer_orders is the source of truth for customer-placed orders
       const q: any = scoped(
         supabase
           .from("customer_orders")
@@ -714,7 +803,6 @@ async function roleDataAnswer(
       const { data: orders } = await q;
       const myOrders = (orders as any[]) ?? [];
 
-      // Specific order lookup when the question names one
       const asked = myOrders.find(
         (o: any) =>
           (o.order_number ?? "").toLowerCase().includes(topic) ||
@@ -722,7 +810,22 @@ async function roleDataAnswer(
       );
       if (asked) {
         return {
-          text: `📦 **Order ${asked.order_number}** — status: **${label(asked.status)}**\n\n- Product: ${asked.product ?? "—"} × ${asked.quantity ?? "—"}\n- Priority: ${label(asked.priority)}\n- Order total: ${fmtMoney(Number(asked.order_total ?? 0))} · Advance: ${label(asked.advance_payment_status)} · Balance due: ${fmtMoney(Number(asked.balance_due ?? 0))}\n- Delivery date: ${asked.delivery_date ? new Date(asked.delivery_date).toLocaleDateString() : "—"}\n\nTrack it live in **Orders → Order Tracking**.`,
+          text: `📦 **Order ${asked.order_number}**\n\n${toMarkdownTable(
+            ["Field", "Value"],
+            [
+              ["Status", label(asked.status)],
+              ["Product", asked.product ?? "—"],
+              ["Quantity", String(asked.quantity ?? "—")],
+              ["Priority", label(asked.priority)],
+              ["Order Total", fmtMoney(Number(asked.order_total ?? 0))],
+              ["Advance", label(asked.advance_payment_status)],
+              ["Balance Due", fmtMoney(Number(asked.balance_due ?? 0))],
+              [
+                "Delivery Date",
+                asked.delivery_date ? new Date(asked.delivery_date).toLocaleDateString() : "—",
+              ],
+            ],
+          )}\n\nTrack it live in **Orders → Order Tracking**.`,
           conf: 97,
         };
       }
@@ -736,15 +839,27 @@ async function roleDataAnswer(
         (o: any) => !["delivered", "completed", "cancelled", "rejected"].includes(o.status),
       );
       const latest = myOrders[0];
+      const tableRows = myOrders
+        .slice(0, 6)
+        .map((o: any) => [
+          o.order_number ?? "ORD",
+          o.product ?? "—",
+          `${o.quantity ?? "—"}`,
+          fmtMoney(Number(o.order_total ?? 0)),
+          label(o.status),
+          o.delivery_date ? new Date(o.delivery_date).toLocaleDateString() : "—",
+        ]);
       return {
-        text: `You have **${myOrders.length} order(s)**, ${open.length} currently open.\n\nMost recent: **${latest?.order_number ?? "—"}** — ${label(latest?.status)}.\n\nWant the status of a specific one? Just say the order number.`,
+        text: `You have **${myOrders.length} order(s)**, ${open.length} currently open.\n\n${toMarkdownTable(
+          ["Order #", "Product", "Qty", "Total", "Status", "Delivery"],
+          tableRows,
+        )}\n\nWant the status of a specific one? Just say the order number.`,
         conf: 96,
       };
     }
 
     case "supplier_portal": {
       const supplierId = await resolveSupplierId(userId);
-      // Fail closed — a supplier must never see another supplier's POs.
       if (!supplierId) return { text: UNLINKED_PORTAL_MSG("supplier"), conf: 100 };
       const { data } = await scoped(
         supabase
@@ -755,11 +870,19 @@ async function roleDataAnswer(
       ).eq("supplier_id", supplierId);
       const pos = (data as any[]) ?? [];
       const open = pos.filter((p: any) => !["received", "fulfilled"].includes(p.status)).length;
+      const tableRows = pos
+        .slice(0, 6)
+        .map((p: any) => [
+          p.po_number ?? "PO",
+          label(p.status),
+          fmtMoney(Number(p.total_amount ?? 0)),
+          p.due_date ? new Date(p.due_date).toLocaleDateString() : "—",
+        ]);
       return {
-        text: `You have **${pos.length} purchase order(s)** from this company, ${open} currently open.\n\n${pos
-          .slice(0, 3)
-          .map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`)
-          .join("\n")}\n\nAccept or modify POs in the **Purchase Orders** tab.`,
+        text: `You have **${pos.length} purchase order(s)** from this company, ${open} currently open.\n\n${toMarkdownTable(
+          ["PO #", "Status", "Amount", "Due Date"],
+          tableRows,
+        )}\n\nAccept or modify POs in the **Purchase Orders** tab.`,
         conf: 94,
       };
     }
@@ -770,13 +893,19 @@ async function roleDataAnswer(
       const inProgress = prodOrders.filter((p: any) =>
         ["in_progress", "in-production"].includes(p.status),
       ).length;
+      const tableRows = prodOrders
+        .slice(0, 6)
+        .map((p: any) => [
+          p.order_number ?? p.id?.slice(0, 8),
+          label(p.status),
+          `${p.priority ?? "—"}`,
+          `${p.progress ?? p.progress_percent ?? 0}%`,
+        ]);
       return {
-        text: `🏭 **Production**\n\n- Production orders: **${prodOrders.length}** (${inProgress} in progress)\n- Approved customer orders ready to plan: **${approved.filter((s: any) => s.status === "approved").length}**\n\n${prodOrders
-          .slice(0, 3)
-          .map((p: any) => `- ${p.order_number ?? p.id?.slice(0, 8)} · ${label(p.status)}`)
-          .join(
-            "\n",
-          )}\n\nStart production from **Approved Orders** → create production planning → the inventory auto-check runs.`,
+        text: `🏭 **Production**\n\nProduction orders: **${prodOrders.length}** (${inProgress} in progress). Approved ready to plan: **${approved.filter((s: any) => s.status === "approved").length}**.\n\n${toMarkdownTable(
+          ["Order", "Status", "Priority", "Progress"],
+          tableRows,
+        )}\n\nStart production from **Approved Orders** → create production planning → the inventory auto-check runs.`,
         conf: 95,
       };
     }
@@ -787,8 +916,23 @@ async function roleDataAnswer(
         (i: any) => Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0),
       ).length;
       const shipments = await listRows("shipments", 5);
+      const invRows = inv
+        .slice(0, 6)
+        .map((i: any) => [
+          i.sku ?? i.product_name ?? i.id?.slice(0, 8),
+          `${i.quantity ?? 0}`,
+          `${i.reorder_level ?? 0}`,
+          Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0) ? "⚠️ Low" : "OK",
+        ]);
+      const shipRows = shipments
+        .slice(0, 5)
+        .map((s: any) => [
+          s.shipment_number ?? s.id?.slice(0, 8),
+          s.carrier ?? "—",
+          label(s.status),
+        ]);
       return {
-        text: `📦 **Warehouse**\n\n- Inventory SKUs: **${inv.length}** (${low} at/below reorder level)\n- Shipments: **${shipments.length}**\n\n${low > 0 ? `⚠️ ${low} low-stock item(s) need reordering.` : "Stock levels are healthy."}\n\nManage stock in **Inventory**, dispatch in **Dispatch**.`,
+        text: `📦 **Warehouse**\n\nInventory SKUs: **${inv.length}** (${low} at/below reorder level). Shipments: **${shipments.length}**.\n\n${inv.length ? `**Inventory**\n\n${toMarkdownTable(["SKU / Product", "Qty", "Reorder", "Status"], invRows)}\n\n` : ""}${shipments.length ? `**Shipments**\n\n${toMarkdownTable(["Shipment", "Carrier", "Status"], shipRows)}` : ""}\n\nManage stock in **Inventory**, dispatch in **Dispatch**.`,
         conf: 94,
       };
     }
@@ -797,11 +941,18 @@ async function roleDataAnswer(
       const pos = await listRows("purchase_orders", 8);
       const suppliers = await listRows("suppliers", 5);
       const open = pos.filter((p: any) => !["received", "fulfilled"].includes(p.status)).length;
+      const poRows = pos
+        .slice(0, 6)
+        .map((p: any) => [
+          p.po_number ?? "PO",
+          label(p.status),
+          fmtMoney(Number(p.total_amount ?? 0)),
+        ]);
+      const supRows = suppliers
+        .slice(0, 5)
+        .map((s: any) => [s.name ?? "—", label(s.status), `${s.rating ?? 0}`]);
       return {
-        text: `📋 **Procurement**\n\n- Purchase orders: **${pos.length}** (${open} open)\n- Suppliers: **${suppliers.length}**\n\n${pos
-          .slice(0, 3)
-          .map((p: any) => `- ${p.po_number ?? "PO"} · ${label(p.status)}`)
-          .join("\n")}\n\nCreate POs in **Purchase Orders** — suppliers respond in real time.`,
+        text: `📋 **Procurement**\n\nPurchase orders: **${pos.length}** (${open} open). Suppliers: **${suppliers.length}**.\n\n${toMarkdownTable(["PO #", "Status", "Amount"], poRows)}\n\n**Suppliers**\n\n${toMarkdownTable(["Name", "Status", "Rating"], supRows)}\n\nCreate POs in **Purchase Orders** — suppliers respond in real time.`,
         conf: 94,
       };
     }
@@ -809,13 +960,18 @@ async function roleDataAnswer(
     case "quality_inspector": {
       const insp = await listRows("quality_inspections", 8);
       const passed = insp.filter((i: any) => ["pass", "passed"].includes(i.result)).length;
+      const tableRows = insp
+        .slice(0, 6)
+        .map((i: any) => [
+          i.inspection_number ?? i.id?.slice(0, 8),
+          label(i.result),
+          `${i.defects_found ?? 0}`,
+        ]);
       return {
-        text: `✅ **Quality**\n\n- Inspections: **${insp.length}** (${passed} passed)\n\n${insp
-          .slice(0, 3)
-          .map((i: any) => `- ${i.inspection_number ?? i.id?.slice(0, 8)} · ${label(i.result)}`)
-          .join(
-            "\n",
-          )}\n\nPassed batches release as finished goods; failures route back to production with rejection notes.`,
+        text: `✅ **Quality**\n\nInspections: **${insp.length}** (${passed} passed).\n\n${toMarkdownTable(
+          ["Inspection #", "Result", "Defects"],
+          tableRows,
+        )}\n\nPassed batches release as finished goods; failures route back to production with rejection notes.`,
         conf: 94,
       };
     }
@@ -823,11 +979,14 @@ async function roleDataAnswer(
     case "maintenance_engineer": {
       const machines = await listRows("machines", 8);
       const down = machines.filter((m: any) => ["down", "maintenance"].includes(m.status)).length;
+      const tableRows = machines
+        .slice(0, 6)
+        .map((m: any) => [m.name ?? "—", m.code ?? "—", label(m.status)]);
       return {
-        text: `🔧 **Maintenance**\n\n- Machines: **${machines.length}** (${down} down/in maintenance)\n\n${machines
-          .slice(0, 4)
-          .map((m: any) => `- ${m.name ?? "—"} · ${label(m.status)}`)
-          .join("\n")}\n\nFlag machines "under maintenance" to block new work-order assignment.`,
+        text: `🔧 **Maintenance**\n\nMachines: **${machines.length}** (${down} down/in maintenance).\n\n${toMarkdownTable(
+          ["Machine", "Code", "Status"],
+          tableRows,
+        )}\n\nFlag machines "under maintenance" to block new work-order assignment.`,
         conf: 94,
       };
     }
@@ -838,35 +997,39 @@ async function roleDataAnswer(
         ["pending", "partial", "unpaid"].includes(i.status),
       ).length;
       const totalOut = invoices.reduce((s: number, i: any) => s + Number(i.total_amount ?? 0), 0);
+      const tableRows = invoices
+        .slice(0, 6)
+        .map((i: any) => [
+          i.invoice_number ?? "INV",
+          label(i.status),
+          fmtMoney(Number(i.total_amount ?? 0)),
+        ]);
       return {
-        text: `💰 **Finance**\n\n- Invoices: **${invoices.length}** (${outstanding} outstanding)\n- Outstanding value: **${fmtMoney(totalOut)}**\n\n${invoices
-          .slice(0, 3)
-          .map((i: any) => `- ${i.invoice_number ?? "INV"} · ${label(i.status)}`)
-          .join(
-            "\n",
-          )}\n\nInvoices auto-generate at dispatch-ready; balance due = order total minus advance paid.`,
+        text: `💰 **Finance**\n\nInvoices: **${invoices.length}** (${outstanding} outstanding). Outstanding value: **${fmtMoney(totalOut)}**.\n\n${toMarkdownTable(
+          ["Invoice", "Status", "Amount"],
+          tableRows,
+        )}\n\nInvoices auto-generate at dispatch-ready; balance due = order total minus advance paid.`,
         conf: 95,
       };
     }
 
     case "hr_manager": {
       const employees = await listRows("employees", 6);
+      const tableRows = employees.map((e: any) => [
+        e.full_name ?? e.name ?? "—",
+        e.department ?? "—",
+        label(e.status),
+      ]);
       return {
-        text: `👥 **HR**\n\n- Employees on record: **${employees.length}**\n\n${employees
-          .slice(0, 3)
-          .map(
-            (e: any) => `- ${e.full_name ?? e.name ?? e.id?.slice(0, 8)} · ${label(e.department)}`,
-          )
-          .join(
-            "\n",
-          )}\n\nManage records in **Employees** — onboarding and department assignments flow to Company Admin for whitelist approval.`,
+        text: `👥 **HR**\n\nEmployees on record: **${employees.length}**.\n\n${toMarkdownTable(
+          ["Name", "Department", "Status"],
+          tableRows,
+        )}\n\nManage records in **Employees** — onboarding and department assignments flow to Company Admin for whitelist approval.`,
         conf: 92,
       };
     }
 
     case "production_operator": {
-      // Operators see ONLY their own work orders (work_orders.operator_id is
-      // the auth user id). No user id → no data, never the whole table.
       let wos: any[] = [];
       if (userId) {
         const { data } = (await scoped(
@@ -890,16 +1053,18 @@ async function roleDataAnswer(
           conf: 96,
         };
       }
+      const tableRows = wos
+        .slice(0, 6)
+        .map((w: any) => [
+          w.wo_number ?? "WO",
+          label(w.status),
+          `${w.progress_percent ?? w.progress ?? 0}%`,
+        ]);
       return {
-        text: `🔧 **Your Work Orders**\n\n- Assigned to you: **${wos.length}**\n\n${wos
-          .slice(0, 4)
-          .map(
-            (w: any) =>
-              `- ${w.wo_number ?? "WO"} · ${label(w.status)} · ${w.progress_percent ?? w.progress ?? 0}%`,
-          )
-          .join(
-            "\n",
-          )}\n\nUpdate progress (25/50/75/100%) — it pushes live to the customer's tracking page.`,
+        text: `🔧 **Your Work Orders**\n\nAssigned to you: **${wos.length}**.\n\n${toMarkdownTable(
+          ["WO #", "Status", "Progress"],
+          tableRows,
+        )}\n\nUpdate progress (25/50/75/100%) — it pushes live to the customer's tracking page.`,
         conf: 94,
       };
     }
@@ -915,8 +1080,16 @@ async function roleDataAnswer(
           countWhere("customers", "company_id", companyId ?? ""),
           countWhere("customer_requests", "status", "pending"),
         ]);
+      const tableRows = [
+        ["Orders pending approval", String(pendingApproval)],
+        ["Customer requests pending", String(materialReq)],
+        ["Production in progress", String(prodOrders)],
+        ["Machines operational", String(machines)],
+        ["Employees", String(employees)],
+        ["Customers", String(customers)],
+      ];
       return {
-        text: `📊 **Company Overview**\n\n- Orders pending approval: **${pendingApproval}**\n- Customer access requests pending: **${materialReq}**\n- Production in progress: **${prodOrders}**\n- Machines operational: **${machines}**\n- Employees: **${employees}** · Customers: **${customers}**\n\nReview pending items in **Order Approvals** and **Customer Requests** (bolded in your sidebar).`,
+        text: `📊 **Company Overview**\n\n${toMarkdownTable(["Metric", "Count"], tableRows)}\n\nReview pending items in **Order Approvals** and **Customer Requests** (bolded in your sidebar).`,
         conf: 96,
       };
     }
@@ -927,8 +1100,13 @@ async function roleDataAnswer(
         countWhere("company_registrations", "status", "pending"),
         countWhere("company_registrations", "status", "approved"),
       ]);
+      const tableRows = [
+        ["Active companies", String(companies)],
+        ["Pending registrations", String(registrations)],
+        ["Approved registrations", String(approved)],
+      ];
       return {
-        text: `📋 **Platform Overview**\n\n- Active companies: **${companies}**\n- Pending registrations: **${registrations}**\n- Approved registrations: **${approved}**\n\nApprove/reject requests in **Pending Requests**.`,
+        text: `📋 **Platform Overview**\n\n${toMarkdownTable(["Metric", "Count"], tableRows)}\n\nApprove/reject requests in **Pending Requests**.`,
         conf: 96,
       };
     }
@@ -940,8 +1118,14 @@ async function roleDataAnswer(
         countWhere("production_orders", "company_id", companyId ?? ""),
         countWhere("machines", "company_id", companyId ?? ""),
       ]);
+      const tableRows = [
+        ["Audit events", String(audit)],
+        ["Customer orders", String(orders)],
+        ["Production orders", String(prod)],
+        ["Machines", String(machines)],
+      ];
       return {
-        text: `📋 **Read-Only Overview**\n\n- Audit events: **${audit}**\n- Customer orders: **${orders}** · Production orders: **${prod}** · Machines: **${machines}**\n\nYou have read-only access to every module — drill into **Audit Logs**, **Reports**, and **Compliance**.`,
+        text: `📋 **Read-Only Overview**\n\n${toMarkdownTable(["Metric", "Count"], tableRows)}\n\nYou have read-only access to every module — drill into **Audit Logs**, **Reports**, and **Compliance**.`,
         conf: 95,
       };
     }
@@ -975,26 +1159,66 @@ async function gatherRoleData(
   const parts: string[] = [];
   const q = question.toLowerCase();
 
-  // Helper to safely query a table
+  // Helper to safely query a table. Some tables (e.g. inventory) have no
+  // created_at column, so ordering is best-effort with an unordered retry.
   async function safeQuery(table: string, cols = "*", filters?: (q: any) => any): Promise<any[]> {
-    try {
-      let query = scoped(
-        supabase
-          .from(table as never)
-          .select(cols)
-          .order("created_at", { ascending: false })
-          .limit(8),
-      );
+    const run = async (ordered: boolean) => {
+      let base = supabase.from(table as never).select(cols);
+      if (ordered) base = base.order("created_at", { ascending: false });
+      let query = scoped(base.limit(8));
       if (filters) query = filters(query);
-      const { data } = await query;
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
       return (data as any[]) ?? [];
+    };
+    try {
+      return await run(true);
     } catch {
-      return [];
+      try {
+        return await run(false);
+      } catch {
+        return [];
+      }
     }
   }
 
   // Detect which domains the question touches
   const mentions = (terms: string[]) => terms.some((t) => q.includes(t));
+
+  // Build role-specific expertise header
+  const roleExpertise: Record<string, string> = {
+    root_super_admin:
+      "PLATFORM ARCHITECT — platform-wide aggregates only: companies, registrations, approval counts",
+    company_admin:
+      "FACTORY OWNER — full cross-module visibility: orders, production, inventory, quality, maintenance, finance, HR, suppliers, customers, procurement, dispatch",
+    plant_admin:
+      "PLANT MANAGER — plant-level operations: production, inventory, quality, maintenance, machines, work orders, departments",
+    plant_manager:
+      "PLANT OVERSEER — day-to-day operations monitoring: production flow, inventory health, quality trends, machine status, order progress",
+    production_manager:
+      "PRODUCTION PLANNER — production orders, work orders, BOM, operator assignment, machine scheduling, quality feedback",
+    production_operator: "PRODUCTION OPERATOR — own assigned work orders and machine status only",
+    warehouse_manager:
+      "WAREHOUSE GUARDIAN — inventory levels, SKU management, stock alerts, dispatch and shipments",
+    procurement_manager:
+      "PROCUREMENT STRATEGIST — purchase orders, supplier management, RFQ, material stock visibility",
+    quality_inspector:
+      "QUALITY EXERT — furniture QC parameters (moisture, joint tightness, surface finish), defect tracking, CAPA, inspection pass rates",
+    maintenance_engineer:
+      "MAINTENANCE EXPERT — machine health, breakdown diagnosis, preventive maintenance, spare parts, downtime analysis",
+    finance_manager:
+      "FINANCE STEWARD — invoices, payments, expenses, budgets, P&L, supplier payments, cash flow",
+    hr_manager:
+      "PEOPLE EXPERT — employee records, leave management, training, performance reviews, payroll, attendance, recruitment",
+    customer_portal:
+      "CUSTOMER SERVICE — own orders, shipments, invoices, payments, support tickets. Be helpful and transparent.",
+    supplier_portal:
+      "SUPPLIER PARTNER — own purchase orders, deliveries, invoices, payments. Professional and order-focused.",
+    auditor:
+      "COMPLIANCE AUDITOR — read-only cross-module analysis, audit trail, discrepancy detection, compliance monitoring",
+  };
+  const expertiseHeader = `ROLE: ${role ?? "unknown"}. ${roleExpertise[role ?? ""] ?? "General factory operations."}. You are a DOMAIN EXPERT for this role. Answer with specialized knowledge and precision. ALWAYS format data-driven responses as markdown tables with clear headers. NEVER fabricate numbers. Only use the data provided in the context.\n\n`;
+  parts.unshift(expertiseHeader);
 
   // Customer portal — only their own orders
   if (role === "customer_portal") {
@@ -1451,11 +1675,11 @@ Try asking me something like:
     }
   }
 
-  // 6. Gather role-scoped live data and route through Groq (primary), then Cerebras (fallback)
+  // 6. Gather role-scoped live data and route through the server LLM
+  //    gateway (Groq primary, Cerebras fallback, keys + scope server-side).
   try {
     const dataContext = await gatherRoleData(role, companyId, userId, lower);
 
-    // Try Groq first (primary provider)
     if (hasGroqKey()) {
       const groqResult = await askGroq({
         question,
