@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
 import { fmtMoney } from "@/lib/currency";
-import { notifyGRNConfirmed, notifyGRNToSupplier } from "@/lib/notifications";
+import { notifyGRNConfirmed, notifyGRNToSupplier, notifyMaterialsReceivedForOrder } from "@/lib/notifications";
 import { toast } from "sonner";
 import { useState } from "react";
 import { QrCameraScanner } from "@/components/qr-camera-scanner";
@@ -104,20 +104,39 @@ function GoodsReceiptPage() {
         .eq("company_id", companyId);
       if (poErr) throw poErr;
 
-      // 4) Bump inventory from the PO line items (best-effort)
+      // 4) Stock the received raw materials into the company's raw-materials
+      // warehouse (creating the row when the material has none yet), so the
+      // Production Manager's BOM shortage check sees the new stock.
+      const { data: rawWarehouses } = await supabase
+        .from("warehouses")
+        .select("id")
+        .eq("company_id", companyId)
+        .or("code.ilike.%raw%,name.ilike.%raw%")
+        .limit(1);
+      let whId = rawWarehouses?.[0]?.id ?? null;
+      if (!whId) {
+        const { data: anyWh } = await supabase
+          .from("warehouses")
+          .select("id")
+          .eq("company_id", companyId)
+          .order("created_at", { ascending: true })
+          .limit(1);
+        whId = anyWh?.[0]?.id ?? null;
+      }
       try {
         const { data: items } = await supabase
-          .from("purchase_order_items")
+          .from(
+            "purchase_order_items",
+          )
           .select("material_id, quantity")
           .eq("purchase_order_id", poId);
         for (const it of items ?? []) {
-          if (!it.material_id) continue;
-          // Only bump existing inventory rows — inventory requires product_id +
-          // warehouse_id, which a PO line item does not carry.
+          if (!it.material_id || !whId) continue;
           const { data: inv } = await supabase
             .from("inventory")
             .select("id, quantity")
             .eq("company_id", companyId)
+            .eq("warehouse_id", whId)
             .eq("material_id", it.material_id)
             .maybeSingle();
           if (inv?.id) {
@@ -126,16 +145,38 @@ function GoodsReceiptPage() {
               .update({ quantity: Number(inv.quantity ?? 0) + Number(it.quantity ?? 0) })
               .eq("id", inv.id);
           } else {
-            console.warn(
-              `No inventory row for material ${it.material_id} — stock bump skipped (needs product/warehouse)`,
-            );
+            await supabase.from("inventory").insert({
+              company_id: companyId,
+              warehouse_id: whId,
+              material_id: it.material_id,
+              quantity: Number(it.quantity ?? 0),
+            });
           }
         }
       } catch (e) {
-        console.warn("Inventory bump skipped:", e);
+        console.warn("Inventory stock-in skipped:", e);
       }
 
-      // 5) Notify Finance (release payment) + this Supplier (shipment received)
+      // 5) Resume any production orders that were waiting on these materials —
+      // once every BOM component is covered, flip them back to approved and
+      // notify the order's Production Manager to start production.
+      try {
+        const { data: rpc } = await supabase.rpc("resume_orders_when_stocked", {
+          p_company_id: companyId,
+        });
+        const resumed = ((rpc as any)?.resumed ?? []) as {
+          id: string;
+          so_number: string;
+          plant_id?: string | null;
+        }[];
+        for (const r of resumed) {
+          await notifyMaterialsReceivedForOrder(companyId, r.so_number, r.id, r.plant_id ?? null);
+        }
+      } catch (e) {
+        console.warn("Order resume skipped:", e);
+      }
+
+      // 6) Notify Finance (release payment) + this Supplier (shipment received)
       await notifyGRNConfirmed(companyId, po.po_number ?? "PO", supplier?.name ?? "Supplier");
       await notifyGRNToSupplier(companyId, po.po_number ?? "PO", supplier?.name ?? "Supplier", supplier?.user_id ?? null);
     },
