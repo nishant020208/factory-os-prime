@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Calendar,
@@ -11,6 +11,7 @@ import {
   CreditCard,
   UserCheck,
   Banknote,
+  Layers,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
@@ -26,7 +27,8 @@ export const Route = createFileRoute("/_authenticated/production-planning")({
       { title: "Production Planning — FactoryOS AI" },
       {
         name: "description",
-        content: "Check materials against BOM and warehouse stock, reserve, and start production on approved orders.",
+        content:
+          "Check materials against BOM and warehouse stock, reserve, and start production on approved orders.",
       },
     ],
   }),
@@ -56,12 +58,7 @@ function ProductionPlanningPage() {
           customers!left(name),
           sales_order_items(product_id, quantity, unit_price, products!left(name, unit_cost))`,
         )
-        .in("status", [
-          "approved",
-          "material_reserved",
-          "procurement_pending",
-          "in_production",
-        ])
+        .in("status", ["approved", "material_reserved", "procurement_pending", "in_production"])
         .order("created_at", { ascending: false });
       return (data ?? []).map((o: any) => {
         const item = o.sales_order_items?.[0];
@@ -80,24 +77,23 @@ function ProductionPlanningPage() {
   // BOM per product + components.
   const { data: boms } = useQuery({
     queryKey: ["pp-boms", companyId],
-    queryFn: async () =>
-      (await supabase.from("bom").select("*, bom_items(*)")).data ?? [],
+    queryFn: async () => (await supabase.from("bom").select("*, bom_items(*)")).data ?? [],
     enabled: !!companyId,
   });
 
   const { data: materials } = useQuery({
     queryKey: ["pp-materials", companyId],
     queryFn: async () =>
-      (await supabase.from("materials").select("id, name, unit").eq("company_id", companyId!)).data ??
-      [],
+      (await supabase.from("materials").select("id, name, unit").eq("company_id", companyId!))
+        .data ?? [],
     enabled: !!companyId,
   });
 
   const { data: products } = useQuery({
     queryKey: ["pp-products", companyId],
     queryFn: async () =>
-      (await supabase.from("products").select("id, name, unit").eq("company_id", companyId!)).data ??
-      [],
+      (await supabase.from("products").select("id, name, unit").eq("company_id", companyId!))
+        .data ?? [],
     enabled: !!companyId,
   });
 
@@ -137,8 +133,8 @@ function ProductionPlanningPage() {
   const { data: machines } = useQuery({
     queryKey: ["pp-machines", companyId],
     queryFn: async () =>
-      (await supabase.from("machines").select("id, name, status").eq("company_id", companyId!)).data ??
-      [],
+      (await supabase.from("machines").select("id, name, status").eq("company_id", companyId!))
+        .data ?? [],
     enabled: !!companyId,
   });
 
@@ -164,7 +160,9 @@ function ProductionPlanningPage() {
   const stockFor = (componentId: string): number =>
     (inventory ?? []).reduce(
       (sum: number, r: any) =>
-        (r.material_id === componentId || r.product_id === componentId) ? sum + Number(r.quantity ?? 0) : sum,
+        r.material_id === componentId || r.product_id === componentId
+          ? sum + Number(r.quantity ?? 0)
+          : sum,
       0,
     );
 
@@ -240,7 +238,17 @@ function ProductionPlanningPage() {
 
   // Operator assignment mutation
   const assignOperatorMutation = useMutation({
-    mutationFn: async ({ order, operatorId, machineId, operation }: { order: any; operatorId: string; machineId?: string | null; operation?: string | null }) => {
+    mutationFn: async ({
+      order,
+      operatorId,
+      machineId,
+      operation,
+    }: {
+      order: any;
+      operatorId: string;
+      machineId?: string | null;
+      operation?: string | null;
+    }) => {
       if (!companyId) throw new Error("Not authenticated");
 
       // Create or update work order with assigned operator + machine
@@ -383,11 +391,33 @@ function ProductionPlanningPage() {
       const materialName =
         requested.length > 0 ? requested.join(", ") : (c.missing[0] ?? "required materials");
       await notifyProcurementTriggered(companyId, c.order.so_number, materialName);
+
+      // File an audit entry so the shortage → procurement trigger leaves a
+      // trail (viewable by Auditor / Company Admin). Never blocks the flow.
+      try {
+        await supabase.from("audit_logs").insert({
+          company_id: companyId,
+          user_id: user.id,
+          action: "material_shortage_triggered_procurement",
+          entity: "sales_orders",
+          entity_id: c.order.id,
+          metadata: {
+            so_number: c.order.so_number,
+            product: c.order.product_name,
+            materials_short: requested,
+            order_status: "procurement_pending",
+          },
+        });
+      } catch (auditErr) {
+        console.warn("Audit log skipped:", auditErr);
+      }
     },
     onSuccess: (_d, c) => {
       queryClient.invalidateQueries({ queryKey: ["pp-orders"] });
       queryClient.invalidateQueries({ queryKey: ["pr-list"] });
-      toast.success(`Procurement raised — purchase requisition(s) created and Procurement Manager notified`);
+      toast.success(
+        `Procurement raised — purchase requisition(s) created and Procurement Manager notified`,
+      );
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -408,7 +438,12 @@ function ProductionPlanningPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
         <Kpi label="Awaiting Start" value={String(awaiting)} icon={Calendar} tone="warning" />
         <Kpi label="Materials Reserved" value={String(reserved)} icon={Package} tone="success" />
-        <Kpi label="Procurement Pending" value={String(procPending)} icon={ShoppingCart} tone="info" />
+        <Kpi
+          label="Procurement Pending"
+          value={String(procPending)}
+          icon={ShoppingCart}
+          tone="info"
+        />
         <Kpi label="In Production" value={String(inProd)} icon={Factory} tone="primary" />
       </div>
 
@@ -479,6 +514,16 @@ function OrderPanel({
         <div className="flex gap-2">
           {c.order.status === "approved" && (
             <>
+              {c.lines.length === 0 && (
+                <Link
+                  to="/bom"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 text-sm text-muted-foreground hover:border-white/30 hover:text-foreground"
+                  title="Pick the raw materials that go into this product"
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  Define BOM
+                </Link>
+              )}
               <Button
                 size="sm"
                 className="h-8"
@@ -536,7 +581,9 @@ function OrderPanel({
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-white/5">
               {["Component", "Type", "Per Unit", "Required", "On Hand", "Status"].map((h) => (
-                <th key={h} className="py-2 px-2 font-medium">{h}</th>
+                <th key={h} className="py-2 px-2 font-medium">
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
@@ -544,7 +591,19 @@ function OrderPanel({
             {c.lines.length === 0 && (
               <tr>
                 <td colSpan={6} className="py-3 px-2 text-muted-foreground text-xs">
-                  No BOM defined for this product — add one in the BOM tab to run the material check.
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>
+                      No BOM defined for this product yet — pick the raw materials that make it so
+                      the stock check can run.
+                    </span>
+                    <Link
+                      to="/bom"
+                      className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[11px] text-foreground hover:border-white/30"
+                    >
+                      <Layers className="h-3 w-3" />
+                      Define BOM
+                    </Link>
+                  </div>
                 </td>
               </tr>
             )}
@@ -577,14 +636,20 @@ function OrderPanel({
             <CreditCard className="h-4 w-4 text-blue-400" />
             <span className="text-sm font-medium">Advance Payment</span>
             {paymentStatus && (
-              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                isPaymentConfirmed
-                  ? "bg-green-500/20 text-green-400"
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full ${
+                  isPaymentConfirmed
+                    ? "bg-green-500/20 text-green-400"
+                    : isPaymentRequested
+                      ? "bg-yellow-500/20 text-yellow-400"
+                      : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {isPaymentConfirmed
+                  ? "Confirmed"
                   : isPaymentRequested
-                  ? "bg-yellow-500/20 text-yellow-400"
-                  : "bg-muted text-muted-foreground"
-              }`}>
-                {isPaymentConfirmed ? "Confirmed" : isPaymentRequested ? "Awaiting Payment" : paymentStatus}
+                    ? "Awaiting Payment"
+                    : paymentStatus}
               </span>
             )}
           </div>
@@ -601,7 +666,10 @@ function OrderPanel({
                 className="w-16 h-7 px-2 text-sm bg-background border border-white/10 rounded"
               />
               <span className="text-xs text-muted-foreground">
-                = ₹{((Number(c.order.total_amount ?? 0) * advancePercent) / 100).toLocaleString("en-IN")}
+                = ₹
+                {((Number(c.order.total_amount ?? 0) * advancePercent) / 100).toLocaleString(
+                  "en-IN",
+                )}
               </span>
               <Button
                 size="sm"
