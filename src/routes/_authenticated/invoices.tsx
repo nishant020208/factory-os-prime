@@ -456,15 +456,7 @@ function InvoicesPage() {
             .single();
           if (error) throw error;
 
-          if (inserted && formData.customer_id) {
-            const customerUserId = await getCustomerUserId(formData.customer_id);
-            await notifyInvoiceGenerated(
-              companyId,
-              formData.invoice_number,
-              customerUserId ?? "",
-              inserted.id,
-            );
-
+          if (inserted) {
             // Auto-generate QR code for the newly created invoice
             try {
               await supabase.from("qr_codes").insert({
@@ -479,7 +471,20 @@ function InvoicesPage() {
               });
             } catch (qrError) {
               console.error("Failed to auto-generate QR code for invoice:", qrError);
-              // Don't fail the invoice creation if QR generation fails
+            }
+
+            if (formData.customer_id) {
+              try {
+                const customerUserId = await getCustomerUserId(formData.customer_id);
+                await notifyInvoiceGenerated(
+                  companyId,
+                  formData.invoice_number,
+                  customerUserId ?? "",
+                  inserted.id,
+                );
+              } catch (notifyErr) {
+                console.error("Failed to notify customer for invoice:", notifyErr);
+              }
             }
           }
         }}
@@ -680,8 +685,8 @@ function QrCodeDialog({
                   className="w-48 h-48 rounded-lg object-contain"
                 />
               ) : (
-                <div className="w-48 h-48 flex items-center justify-center text-xs text-muted-foreground">
-                  Failed to generate
+                <div className="w-48 h-48 flex items-center justify-center text-xs text-muted-foreground text-center p-4">
+                  QR code not available for this invoice
                 </div>
               )}
             </div>
