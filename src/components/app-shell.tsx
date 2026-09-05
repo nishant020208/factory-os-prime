@@ -608,9 +608,33 @@ function TopBar() {
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => { setDropdownOpen(false); signOut(); }} className="text-destructive">
-                <LogOut className="h-3.5 w-3.5 mr-2" />
-                {t("Sign out")}
+              <DropdownMenuItem
+                asChild
+                onClick={() => {
+                  setDropdownOpen(false);
+                  playClick("primary");
+                  signOut();
+                }}
+                className="text-destructive group"
+              >
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 22, duration: 0.1 }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-left"
+                >
+                  <span className="relative inline-flex h-5 w-5">
+                    <LogOut className="h-3.5 w-3.5 mr-2 text-destructive" />
+                    <motion.span
+                      layoutId="logoutGlow"
+                      className="absolute inset-0 rounded-full bg-destructive/20 blur-sm"
+                      animate={{ opacity: [0, 0.6, 0] }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                    />
+                  </span>
+                  <span className="text-destructive group-hover:underline">{t("Sign out")}</span>
+                </motion.button>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
