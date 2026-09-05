@@ -127,13 +127,10 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/receiving": ONLY("company_admin", "warehouse_manager", "auditor"),
   "/dispatch": ONLY("company_admin", "warehouse_manager", "auditor"),
   "/cycle-count": ONLY("company_admin", "warehouse_manager", "auditor"),
-  "/products": ONLY(
-    "company_admin",
-    "plant_admin",
-    "production_manager",
-    "warehouse_manager",
-    "auditor",
-  ),
+  // Product Catalog is master data owned by Company Admin (auditor keeps
+  // read-only review). Plant roles read products through their own pages
+  // (Production Planning, BOM) via RLS, not through the catalog manager.
+  "/products": ONLY("company_admin", "auditor"),
 
   "/procurement": ONLY("company_admin", "procurement_manager", "auditor"),
   "/suppliers": ONLY("company_admin", "procurement_manager", "plant_admin", "auditor"),

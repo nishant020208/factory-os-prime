@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Package, DollarSign, Layers, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,6 +73,24 @@ function ProductsPage() {
     queryKey: ["products"],
     queryFn: async () => (await supabase.from("products").select("*").order("sku")).data ?? [],
   });
+
+  // BOM links: how many raw-material components each product's BOM consumes,
+  // so the catalog shows the product → BOM → materials connection at a glance.
+  const { data: bomData } = useQuery({
+    queryKey: ["products-bom-links"],
+    queryFn: async () =>
+      (await supabase.from("bom").select("product_id, bom_items(id)")).data ?? [],
+  });
+  const bomCountByProduct = (bomData ?? []).reduce<Record<string, number>>((m, b) => {
+    const row = b as { product_id: string; bom_items?: unknown[] };
+    m[row.product_id] = (m[row.product_id] ?? 0) + (row.bom_items?.length ?? 0);
+    return m;
+  }, {});
+  const rows = (data ?? []).map((p) => ({
+    ...p,
+    bom_components: bomCountByProduct[p.id] ?? 0,
+  }));
+
   const totalValue = (data ?? []).reduce(
     (s, p) => s + Number(p.unit_price ?? 0) * Number(p.reorder_level ?? 0),
     0,
@@ -143,7 +161,7 @@ function ProductsPage() {
       title="Products"
       sub="Every SKU manufactured, purchased or sold across your plants."
       moduleName="products"
-      rows={data}
+      rows={rows}
       searchKeys={["sku", "name", "description"]}
       formFields={PRODUCT_FORM_FIELDS}
       onSubmit={async (formData, editingRow) => {
@@ -200,6 +218,21 @@ function ProductsPage() {
           render: (r) => Number(r.reorder_level).toLocaleString(),
         },
         { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
+        {
+          key: "bom_components",
+          header: "BOM",
+          render: (r) => (
+            <Link
+              to="/bom"
+              className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-muted-foreground hover:border-white/25 hover:text-foreground"
+            >
+              <Layers className="h-3 w-3" />
+              {Number(r.bom_components) > 0
+                ? `${r.bom_components} component${Number(r.bom_components) === 1 ? "" : "s"}`
+                : "No BOM"}
+            </Link>
+          ),
+        },
       ]}
     />
   );
