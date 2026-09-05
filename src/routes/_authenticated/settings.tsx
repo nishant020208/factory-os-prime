@@ -279,6 +279,9 @@ function SettingsPage() {
     enabled: clickSoundEnabled,
     setEnabled: setClickSoundEnabled,
     play: playClickSound,
+    hoverEnabled,
+    setHoverEnabled,
+    playHover,
   } = useClickSound();
   // Allow deep-linking to a tab (e.g. /settings?tab=change-requests from nav)
   const search = useSearch({ from: "/_authenticated/settings" });
@@ -988,6 +991,25 @@ function SettingsPage() {
                   if (v) playClickSound();
                 }}
                 aria-label="Toggle click sounds"
+              />
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-card/50 px-4 py-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
+                  <Label className="text-sm font-medium">Hover sounds</Label>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    Gentle micro-ticks when hovering over interactive buttons and navigation (muted by default).
+                  </div>
+                </div>
+              </div>
+              <Switch
+                checked={hoverEnabled}
+                onCheckedChange={(v) => {
+                  setHoverEnabled(v);
+                  if (v) playHover();
+                }}
+                aria-label="Toggle hover sounds"
               />
             </div>
           </Panel>
