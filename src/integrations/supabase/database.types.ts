@@ -1470,7 +1470,7 @@ export type Database = {
           company_id: string
           id: string
           material_id: string | null
-          product_id: string
+          product_id: string | null
           quantity: number
           updated_at: string
           warehouse_id: string
@@ -1479,7 +1479,7 @@ export type Database = {
           company_id: string
           id?: string
           material_id?: string | null
-          product_id: string
+          product_id?: string | null
           quantity?: number
           updated_at?: string
           warehouse_id: string
@@ -1488,7 +1488,7 @@ export type Database = {
           company_id?: string
           id?: string
           material_id?: string | null
-          product_id?: string
+          product_id?: string | null
           quantity?: number
           updated_at?: string
           warehouse_id?: string
@@ -5141,6 +5141,10 @@ export type Database = {
           _to_status: string
         }
         Returns: undefined
+      }
+      resume_orders_when_stocked: {
+        Args: { p_company_id: string }
+        Returns: Json
       }
       transfer_stock: {
         Args: {
