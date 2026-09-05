@@ -29,6 +29,7 @@ import {
   ROLE_DOMAIN_MAP,
 } from "@/lib/role-scope";
 import { fmtMoney } from "@/lib/currency";
+import { askGroq, askGroqStream, hasGroqKey } from "@/lib/groq";
 import { askCerebras, askCerebrasStream } from "@/lib/cerebras";
 
 export interface CopilotTurn {
@@ -1281,9 +1282,24 @@ Try asking me something like:
     }
   }
 
-  // 6. Gather role-scoped live data and route through Cerebras
+  // 6. Gather role-scoped live data and route through Groq (primary), then Cerebras (fallback)
   try {
     const dataContext = await gatherRoleData(role, companyId, userId, lower);
+    
+    // Try Groq first (primary provider)
+    if (hasGroqKey()) {
+      const groqResult = await askGroq({
+        question,
+        role: role ?? "company_admin",
+        dataContext,
+        history,
+      });
+      if (groqResult) {
+        return { text: groqResult.text, conf: 95 };
+      }
+    }
+    
+    // Fallback to Cerebras
     const cerebrasResult = await askCerebras({
       question,
       role: role ?? "company_admin",
@@ -1293,10 +1309,11 @@ Try asking me something like:
     if (cerebrasResult) {
       return { text: cerebrasResult.text, conf: 95 };
     }
-    // Fallback to local engine if Cerebras unavailable
+    
+    // Fallback to local engine if both providers unavailable
     return await roleDataAnswer(role, companyId, userId, lower);
   } catch {
-    // If Cerebras fails, fall back to local engine
+    // If both providers fail, fall back to local engine
     try {
       return await roleDataAnswer(role, companyId, userId, lower);
     } catch {
@@ -1396,9 +1413,25 @@ Try asking me something like:
     }
   }
 
-  // Try Cerebras streaming
+  // Try Groq streaming first (primary), then Cerebras (fallback)
   try {
     const dataContext = await gatherRoleData(role, companyId, userId, lower);
+    
+    // Try Groq streaming first (primary provider)
+    if (hasGroqKey()) {
+      const groqResult = await askGroqStream({
+        question,
+        role: role ?? "company_admin",
+        dataContext,
+        history,
+        onToken,
+      });
+      if (groqResult) {
+        return { text: groqResult.text, conf: 95 };
+      }
+    }
+    
+    // Fallback to Cerebras streaming
     const cerebrasResult = await askCerebrasStream({
       question,
       role: role ?? "company_admin",
@@ -1409,6 +1442,7 @@ Try asking me something like:
     if (cerebrasResult) {
       return { text: cerebrasResult.text, conf: 95 };
     }
+    
     // Fallback: collect tokens from local engine (non-streaming, but show at once)
     return await roleDataAnswer(role, companyId, userId, lower);
   } catch {
