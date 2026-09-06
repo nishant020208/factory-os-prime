@@ -183,7 +183,12 @@ function TransfersPage() {
     const row = (stock.data ?? []).find(
       (s: any) => s.warehouse_id === form.from_warehouse_id && s.product_id === form.product_id,
     );
-    return row ? Number(row.quantity ?? 0) : 0;
+    if (!row) return 0;
+    const onHand = Number(row.quantity ?? 0);
+    const reserved = Number(row.reserved_quantity ?? 0);
+    const quarantined = Number(row.quarantined_quantity ?? 0);
+    const damaged = Number(row.damaged_qty ?? 0);
+    return Math.max(0, onHand - reserved - quarantined - damaged);
   }, [stock.data, form.from_warehouse_id, form.product_id]);
 
   const createTransfer = useMutation({
