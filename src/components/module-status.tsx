@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { BrainCircuit, Shield, Radio, Send, Sparkles, Loader2 } from "lucide-react";
+import { BrainCircuit, Shield, Radio, Send, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { primaryRole } from "@/lib/route-access";
 import { answerCopilot } from "@/lib/copilot-engine";
 import { CopilotMarkdown } from "@/components/copilot-markdown";
+import { playInspectStart } from "@/hooks/use-click-sound";
 
 /**
  * Status bar shown on every module page:
@@ -36,7 +37,7 @@ export function ModuleStatusBar({ moduleName }: { moduleName: string }) {
  * Shows contextual insights, answers questions, and provides recommendations.
  * Now role-scoped: blocks answers about domains outside the user's role.
  */
-export function ModuleCopilot({ moduleName }: { moduleName: string }) {
+export function ModuleCopilot({ moduleName, showStartButton, onStart }: { moduleName: string; showStartButton?: boolean; onStart?: () => void }) {
   const { roles, companyId, user } = useAuth();
   const role = primaryRole(roles);
   const [open, setOpen] = useState(false);
@@ -66,25 +67,41 @@ export function ModuleCopilot({ moduleName }: { moduleName: string }) {
 
   return (
     <>
-      <Button
-        variant="outline"
-        className="glass border-primary/20 text-primary hover:bg-primary/10"
-        onClick={() => {
-          setOpen(true);
-          if (messages.length === 0) {
-            setMessages([
-              {
-                role: "ai",
-                text: `Hey! 👋 I'm your **${moduleName}** Copilot. Ask me anything about this module — I'll pull live, role-scoped data. Try "show the latest orders", "any low stock?", or "how do I create a record?".`,
-              },
-            ]);
-          }
-        }}
-      >
-        <BrainCircuit className="h-4 w-4 mr-1.5" />
-        <span className="hidden sm:inline">AI Copilot</span>
-        <span className="sm:hidden">AI</span>
-      </Button>
+      {showStartButton && onStart ? (
+          <Button
+            variant="outline"
+            className="glass border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/40 active:scale-[0.97] transition-transform duration-150 active:bg-emerald-500/20"
+            onClick={() => {
+              playInspectStart();
+              onStart();
+              setTimeout(() => setOpen(true), 150);
+            }}
+          >
+            <CheckCircle2 className="h-4 w-4 mr-1.5" />
+            <span className="hidden sm:inline">Inspect</span>
+            <span className="sm:hidden">Check</span>
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            className="glass border-primary/20 text-primary hover:bg-primary/10"
+            onClick={() => {
+              setOpen(true);
+              if (messages.length === 0) {
+                setMessages([
+                  {
+                    role: "ai",
+                    text: `Hey! 👋 I'm your **${moduleName}** Copilot. Ask me anything about this module — I'll pull live, role-scoped data. Try "show the latest orders", "any low stock?", or "how do I create a record?".`,
+                  },
+                ]);
+              }
+            }}
+          >
+            <BrainCircuit className="h-4 w-4 mr-1.5" />
+            <span className="hidden sm:inline">AI Copilot</span>
+            <span className="sm:hidden">AI</span>
+          </Button>
+        )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[500px] max-h-[80vh] flex flex-col p-0">
