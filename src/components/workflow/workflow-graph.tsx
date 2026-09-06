@@ -372,8 +372,11 @@ export function WorkflowGraph({
           transformOrigin: "0 0",
         }}
       >
-        {/* Edges (SVG) */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+        {/* Edges (SVG) — use overflow-visible so paths render beyond the SVG box */}
+        <svg
+          className="pointer-events-none"
+          style={{ position: "absolute", top: 0, left: 0, width: 1, height: 1, overflow: "visible" }}
+        >
           <defs>
             <marker
               id="arrowhead"
@@ -419,10 +422,10 @@ export function WorkflowGraph({
                   className={cn(
                     "transition-colors",
                     isRelatedToSelected
-                      ? "stroke-primary/60"
-                      : "stroke-muted-foreground/25"
+                      ? "stroke-primary/80"
+                      : "stroke-muted-foreground/40"
                   )}
-                  strokeWidth={isRelatedToSelected ? 2 : 1.5}
+                  strokeWidth={isRelatedToSelected ? 2.5 : 1.5}
                   markerEnd="url(#arrowhead)"
                 />
               </g>
