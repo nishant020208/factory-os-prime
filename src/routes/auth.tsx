@@ -28,7 +28,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ROLES, ROLE_MAP, type AppRole } from "@/lib/roles";
 import { notifyCompanyRegistrationRequest, notifyCustomerAccessRequest } from "@/lib/notifications";
 import { recordAccessLog } from "@/lib/access-log";
-import { geocodeAddress } from "@/lib/plant-location";
+import {
+  geocodeAddress,
+  plantsForLocation,
+  type PlantWithDistance,
+} from "@/lib/plant-location";
 
 const searchSchema = z.object({
   role: z.string().optional(),
@@ -510,6 +514,38 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
     city: "",
   });
   const [busy, setBusy] = useState(false);
+  // Live location preview: geocode as the user types, list all plants with
+  // distances, and show an OSM map centered on the resolved coordinate.
+  const [plants, setPlants] = useState<PlantWithDistance[]>([]);
+  const [locCoords, setLocCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locLoading, setLocLoading] = useState(false);
+  const lastLocQuery = useRef("");
+
+  useEffect(() => {
+    const q = [form.address, form.city].filter(Boolean).join(", ").trim();
+    // Guard with a ref, not state: writing state here would re-run the effect
+    // and its cleanup would cancel the timer, leaving the UI stuck "Locating…".
+    if (!q || q === lastLocQuery.current) return;
+    lastLocQuery.current = q;
+    let cancelled = false;
+    setLocLoading(true);
+    const timer = setTimeout(async () => {
+      const coords = await geocodeAddress(q);
+      if (cancelled) return;
+      setLocCoords(coords);
+      if (coords) {
+        const rows = await plantsForLocation(form.company_id, coords.lat, coords.lng);
+        if (!cancelled) setPlants(rows);
+      } else {
+        if (!cancelled) setPlants([]);
+      }
+      if (!cancelled) setLocLoading(false);
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [form.address, form.city, form.company_id]);
 
   useEffect(() => {
     let mounted = true;
@@ -682,6 +718,69 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
           <p className="text-xs text-muted-foreground">
             Your nearest plant is chosen automatically from this location.
           </p>
+
+          {/* Live location → plant map preview */}
+          {locLoading && (
+            <div className="text-xs text-muted-foreground flex items-center gap-2">
+              <Loader2 className="h-3 w-3 animate-spin" /> Locating…
+            </div>
+          )}
+          {!locLoading && locCoords && (
+            <div className="space-y-2">
+              <div className="rounded-xl overflow-hidden border border-white/10">
+                <iframe
+                  title="Your location on the map"
+                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${locCoords.lng - 4}%2C${locCoords.lat - 3}%2C${locCoords.lng + 4}%2C${locCoords.lat + 3}&layer=mapnik&marker=${locCoords.lat}%2C${locCoords.lng}`}
+                  className="w-full h-44 bg-muted"
+                  loading="lazy"
+                />
+              </div>
+              {plants.length > 0 && (
+                <div className="rounded-xl border border-white/10 bg-card/50 p-3 space-y-1.5">
+                  <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Our plants · nearest first
+                  </div>
+                  {plants.map((p, i) => (
+                    <div
+                      key={p.id}
+                      className={`flex items-center justify-between gap-2 text-xs rounded-lg px-2 py-1.5 ${
+                        i === 0
+                          ? "bg-teal-500/10 border border-teal-500/30 text-teal-500"
+                          : "bg-muted/20"
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 truncate">
+                        {i === 0 && <MapPin className="h-3 w-3 shrink-0" />}
+                        <span className="truncate font-medium">{p.name}</span>
+                        {p.code && (
+                          <span className="font-mono text-[10px] text-muted-foreground">
+                            {p.code}
+                          </span>
+                        )}
+                      </span>
+                      <span className="font-mono tabular-nums text-[10px] shrink-0">
+                        {p.distanceKm != null
+                          ? `${p.distanceKm.toFixed(1)} km`
+                          : p.city ?? ""}
+                      </span>
+                    </div>
+                  ))}
+                  {plants[0] && (
+                    <div className="text-[11px] text-muted-foreground pt-1">
+                      ✓ Your request will route to{" "}
+                      <span className="font-medium text-teal-500">{plants[0].name}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {!locLoading && !locCoords && form.city.trim() && (
+            <div className="text-[11px] text-amber-500">
+              Couldn't pinpoint this location — we'll route you to the company's
+              primary plant instead.
+            </div>
+          )}
 
           <RippleButton
             type="submit"
