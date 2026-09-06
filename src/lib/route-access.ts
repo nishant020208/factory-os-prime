@@ -45,6 +45,7 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/departments": ONLY("company_admin", "plant_admin", "hr_manager"),
   "/roles": ONLY("company_admin"),
   "/whitelist": ONLY("company_admin", "plant_admin"),
+  "/workflow": ONLY("company_admin", "plant_admin"),
   "/knowledge": ALL_COMPANY,
   "/notifications": ALL_COMPANY,
   "/analytics": ONLY("company_admin", "plant_admin", "plant_manager", "finance_manager"),
@@ -68,12 +69,12 @@ export const ROUTE_ACCESS: Record<string, AppRole[]> = {
     "auditor",
     "production_operator",
   ),
-  "/leaves": ONLY("company_admin", "hr_manager", "auditor"),
+  "/leaves": ONLY("company_admin", "hr_manager", "plant_admin", "plant_manager", "production_manager", "warehouse_manager", "quality_inspector", "maintenance_engineer", "production_operator", "auditor"),
   "/recruitment": ONLY("company_admin", "hr_manager", "auditor"),
   "/training": ONLY("company_admin", "hr_manager", "auditor"),
   "/performance": ONLY("company_admin", "hr_manager", "auditor"),
   "/hr-reports": ONLY("company_admin", "hr_manager", "auditor"),
-  "/payroll": ONLY("company_admin", "hr_manager", "auditor"),
+  "/payroll": ONLY("company_admin", "hr_manager", "plant_admin", "plant_manager", "production_manager", "warehouse_manager", "quality_inspector", "maintenance_engineer", "auditor"),
   "/team": ONLY("company_admin", "plant_admin", "hr_manager", "auditor"),
 
   "/production": ONLY(

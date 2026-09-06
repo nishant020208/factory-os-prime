@@ -108,6 +108,7 @@ import { Route as AuthenticatedVendorComparisonRouteImport } from './routes/_aut
 import { Route as AuthenticatedWarehouseRouteImport } from './routes/_authenticated/warehouse'
 import { Route as AuthenticatedWhitelistRouteImport } from './routes/_authenticated/whitelist'
 import { Route as AuthenticatedWorkOrdersRouteImport } from './routes/_authenticated/work-orders'
+import { Route as AuthenticatedWorkflowRouteImport } from './routes/_authenticated/workflow'
 import { Route as AuthenticatedPlatformIndexRouteImport } from './routes/_authenticated/platform/index'
 import { Route as AuthenticatedPlatformAuditRouteImport } from './routes/_authenticated/platform/audit'
 import { Route as AuthenticatedPlatformCompaniesRouteImport } from './routes/_authenticated/platform/companies'
@@ -647,6 +648,11 @@ const AuthenticatedWorkOrdersRoute = AuthenticatedWorkOrdersRouteImport.update({
   path: '/work-orders',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedWorkflowRoute = AuthenticatedWorkflowRouteImport.update({
+  id: '/workflow',
+  path: '/workflow',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedPlatformIndexRoute =
   AuthenticatedPlatformIndexRouteImport.update({
     id: '/platform/',
@@ -807,6 +813,7 @@ export interface FileRoutesByFullPath {
   '/warehouse': typeof AuthenticatedWarehouseRoute
   '/whitelist': typeof AuthenticatedWhitelistRoute
   '/work-orders': typeof AuthenticatedWorkOrdersRoute
+  '/workflow': typeof AuthenticatedWorkflowRoute
   '/platform/audit': typeof AuthenticatedPlatformAuditRoute
   '/platform/companies': typeof AuthenticatedPlatformCompaniesRoute
   '/platform/pending': typeof AuthenticatedPlatformPendingRoute
@@ -917,6 +924,7 @@ export interface FileRoutesByTo {
   '/warehouse': typeof AuthenticatedWarehouseRoute
   '/whitelist': typeof AuthenticatedWhitelistRoute
   '/work-orders': typeof AuthenticatedWorkOrdersRoute
+  '/workflow': typeof AuthenticatedWorkflowRoute
   '/platform/audit': typeof AuthenticatedPlatformAuditRoute
   '/platform/companies': typeof AuthenticatedPlatformCompaniesRoute
   '/platform/pending': typeof AuthenticatedPlatformPendingRoute
@@ -1029,6 +1037,7 @@ export interface FileRoutesById {
   '/_authenticated/warehouse': typeof AuthenticatedWarehouseRoute
   '/_authenticated/whitelist': typeof AuthenticatedWhitelistRoute
   '/_authenticated/work-orders': typeof AuthenticatedWorkOrdersRoute
+  '/_authenticated/workflow': typeof AuthenticatedWorkflowRoute
   '/_authenticated/platform/audit': typeof AuthenticatedPlatformAuditRoute
   '/_authenticated/platform/companies': typeof AuthenticatedPlatformCompaniesRoute
   '/_authenticated/platform/pending': typeof AuthenticatedPlatformPendingRoute
@@ -1141,6 +1150,7 @@ export interface FileRouteTypes {
     | '/warehouse'
     | '/whitelist'
     | '/work-orders'
+    | '/workflow'
     | '/platform/audit'
     | '/platform/companies'
     | '/platform/pending'
@@ -1251,6 +1261,7 @@ export interface FileRouteTypes {
     | '/warehouse'
     | '/whitelist'
     | '/work-orders'
+    | '/workflow'
     | '/platform/audit'
     | '/platform/companies'
     | '/platform/pending'
@@ -1362,6 +1373,7 @@ export interface FileRouteTypes {
     | '/_authenticated/warehouse'
     | '/_authenticated/whitelist'
     | '/_authenticated/work-orders'
+    | '/_authenticated/workflow'
     | '/_authenticated/platform/audit'
     | '/_authenticated/platform/companies'
     | '/_authenticated/platform/pending'
@@ -2076,6 +2088,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWorkOrdersRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/workflow': {
+      id: '/_authenticated/workflow'
+      path: '/workflow'
+      fullPath: '/workflow'
+      preLoaderRoute: typeof AuthenticatedWorkflowRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/platform/': {
       id: '/_authenticated/platform/'
       path: '/platform'
@@ -2245,6 +2264,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedWarehouseRoute: typeof AuthenticatedWarehouseRoute
   AuthenticatedWhitelistRoute: typeof AuthenticatedWhitelistRoute
   AuthenticatedWorkOrdersRoute: typeof AuthenticatedWorkOrdersRoute
+  AuthenticatedWorkflowRoute: typeof AuthenticatedWorkflowRoute
   AuthenticatedPlatformAuditRoute: typeof AuthenticatedPlatformAuditRoute
   AuthenticatedPlatformCompaniesRoute: typeof AuthenticatedPlatformCompaniesRoute
   AuthenticatedPlatformPendingRoute: typeof AuthenticatedPlatformPendingRoute
@@ -2353,6 +2373,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedWarehouseRoute: AuthenticatedWarehouseRoute,
   AuthenticatedWhitelistRoute: AuthenticatedWhitelistRoute,
   AuthenticatedWorkOrdersRoute: AuthenticatedWorkOrdersRoute,
+  AuthenticatedWorkflowRoute: AuthenticatedWorkflowRoute,
   AuthenticatedPlatformAuditRoute: AuthenticatedPlatformAuditRoute,
   AuthenticatedPlatformCompaniesRoute: AuthenticatedPlatformCompaniesRoute,
   AuthenticatedPlatformPendingRoute: AuthenticatedPlatformPendingRoute,
