@@ -232,13 +232,13 @@ export const NOTIFICATION_TRIGGERS = {
 export const NOTIFICATION_COUNTS_BY_ROLE: Record<string, number> = {
   root_super_admin: 1,
   company_admin: 7,
-  plant_admin: 3,
+  plant_admin: 4,
   plant_manager: 3,
   production_manager: 8,
   production_operator: 4,
   warehouse_manager: 4,
   procurement_manager: 3,
-  quality_inspector: 1,
+  quality_inspector: 2,
   maintenance_engineer: 1,
   finance_manager: 3,
   hr_manager: 3, // pending dept assignments, whitelist decisions, whitelist confirmation
@@ -740,6 +740,46 @@ export async function notifyBatchFailed(
     "error",
     "work_orders",
     workOrderId,
+  );
+}
+
+/** Trigger 34: GRN creates pending inspection → Quality Inspector */
+export async function notifyIncomingInspectionPending(
+  companyId: string,
+  poNumber: string,
+  materialNames: string,
+  warehouseName: string,
+) {
+  await fireNotification(
+    companyId,
+    "quality_inspector",
+    null,
+    "📦 Incoming Material Awaiting QC Inspection",
+    `PO ${poNumber} — ${materialNames} received at ${warehouseName}. Approve or reject on the Quality page.`,
+    "info",
+    "purchase_orders",
+    null,
+  );
+}
+
+/** Trigger 35: NCR raised → Plant Admin */
+export async function notifyNcrCreated(
+  companyId: string,
+  ncrNumber: string,
+  defectCategory: string,
+  severity: string,
+  batchNumber: string | null,
+) {
+  const severityLabel = severity === "high" || severity === "critical" ? "warning" : "info";
+  await fireNotification(
+    companyId,
+    "plant_admin",
+    null,
+    `⚠️ New NCR Raised: ${ncrNumber}`,
+    `Defect: ${defectCategory} (Severity: ${severity}).${batchNumber ? ` Batch: ${batchNumber}.` : ""} Review on the Defects page.`,
+    severityLabel,
+    "ncr",
+    null,
   );
 }
 
