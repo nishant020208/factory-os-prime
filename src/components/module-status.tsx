@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { primaryRole } from "@/lib/route-access";
 import { answerCopilot } from "@/lib/copilot-engine";
+import { CopilotMarkdown } from "@/components/copilot-markdown";
 
 /**
  * Status bar shown on every module page:
@@ -106,7 +107,7 @@ export function ModuleCopilot({ moduleName }: { moduleName: string }) {
                     : "bg-primary/10 border border-primary/20 rounded-xl p-3 ml-8"
                 }`}
               >
-                {msg.text.replace(/\*\*/g, "")}
+                {msg.role === "ai" ? <CopilotMarkdown text={msg.text} /> : <span>{msg.text}</span>}
               </motion.div>
             ))}
             {loading && (
