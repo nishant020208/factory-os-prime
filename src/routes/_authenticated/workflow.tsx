@@ -54,44 +54,63 @@ function WorkflowPage() {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Query whitelist as the source of truth for all invited employees.
+  // LEFT JOIN profiles to get avatar/full_name for users who have signed up.
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ["workflow-users", companyId, plantId, refreshKey],
     queryFn: async () => {
       if (!companyId) return [];
-      let query = supabase
-        .from("profiles")
-        .select(
-          `
-          id,
-          full_name,
-          email,
-          avatar_url,
-          status,
-          user_roles!inner (
-            role,
-            company_id,
-            plant_id
-          )
-        `
-        )
-        .eq("user_roles.company_id", companyId)
-        .eq("status", "active");
+
+      // 1) Fetch all whitelist rows for this company
+      let wlQuery = supabase
+        .from("whitelist")
+        .select("id, email, role, company_id, plant_id, status")
+        .eq("company_id", companyId)
+        .not("role", "in", "(root_super_admin,customer_portal,supplier_portal)");
 
       if (isPlantAdmin && plantId) {
-        query = query.eq("user_roles.plant_id", plantId);
+        wlQuery = wlQuery.or(`plant_id.eq.${plantId},plant_id.is.null`);
       }
 
-      const { data: profiles, error } = await query;
-      if (error) throw error;
+      const { data: whitelistRows, error: wlError } = await wlQuery;
+      if (wlError) throw wlError;
+      if (!whitelistRows?.length) return [];
 
+      // 2) Fetch profiles for users who have signed up (matched by email)
+      const emails = whitelistRows.map((w: any) => w.email?.toLowerCase()).filter(Boolean);
+      const { data: profileRows } = await supabase
+        .from("profiles")
+        .select("id, email, full_name, avatar_url, status")
+        .eq("company_id", companyId)
+        .in("email", emails.length > 0 ? emails : ["__none__"]);
+
+      const profileByEmail = new Map(
+        (profileRows ?? []).map((p: any) => [p.email?.toLowerCase(), p])
+      );
+
+      // 3) Fetch user_roles to get the authoritative role + plant_id per user
+      const profileIds = (profileRows ?? []).map((p: any) => p.id).filter(Boolean);
+      const { data: roleRows } = profileIds.length > 0
+        ? await supabase
+            .from("user_roles")
+            .select("user_id, role, company_id, plant_id")
+            .eq("company_id", companyId)
+            .in("user_id", profileIds)
+        : { data: [] };
+
+      const rolesByUserId = new Map<string, any>();
+      (roleRows ?? []).forEach((r: any) => {
+        if (!rolesByUserId.has(r.user_id)) rolesByUserId.set(r.user_id, r);
+      });
+
+      // 4) Fetch plant names
       const plantIds = [
         ...new Set(
-          (profiles ?? [])
-            .map((p: any) => p.user_roles?.[0]?.plant_id)
+          whitelistRows
+            .map((w: any) => w.plant_id)
             .filter(Boolean)
         ),
       ];
-
       let plantMap: Record<string, string> = {};
       if (plantIds.length > 0) {
         const { data: plants } = await supabase
@@ -103,18 +122,24 @@ function WorkflowPage() {
         });
       }
 
-      return (profiles ?? []).map((p: any) => ({
-        id: p.id,
-        full_name: p.full_name,
-        email: p.email,
-        avatar_url: p.avatar_url,
-        role: p.user_roles?.[0]?.role ?? "unknown",
-        plant_id: p.user_roles?.[0]?.plant_id ?? null,
-        plant_name: p.user_roles?.[0]?.plant_id
-          ? plantMap[p.user_roles[0].plant_id] ?? "Unknown Plant"
-          : "Company-wide",
-        status: p.status,
-      })) as WorkflowUser[];
+      // 5) Build the unified user list: every whitelist row = one employee
+      return whitelistRows.map((w: any) => {
+        const profile = profileByEmail.get(w.email?.toLowerCase());
+        const userRole = profile ? rolesByUserId.get(profile.id) : null;
+        const resolvedPlantId = userRole?.plant_id ?? w.plant_id ?? null;
+        return {
+          id: profile?.id ?? `wl-${w.id}`,
+          full_name: profile?.full_name ?? w.email?.split("@")[0] ?? "Unknown",
+          email: w.email,
+          avatar_url: profile?.avatar_url ?? null,
+          role: userRole?.role ?? w.role ?? "unknown",
+          plant_id: resolvedPlantId,
+          plant_name: resolvedPlantId
+            ? plantMap[resolvedPlantId] ?? "Unknown Plant"
+            : "Company-wide",
+          status: profile?.status ?? (w.status === "accepted" ? "active" : w.status ?? "pending"),
+        } as WorkflowUser;
+      });
     },
     enabled: !!companyId,
   });
@@ -129,17 +154,19 @@ function WorkflowPage() {
         .eq("company_id", companyId);
 
       if (isPlantAdmin && plantId) {
-        const plantUserIds = users.map((u) => u.id);
-        query = query.or(
-          `from_user_id.in.(${plantUserIds.join(",")}),to_user_id.in.(${plantUserIds.join(",")})`
-        );
+        const plantUserIds = users.map((u) => u.id).filter((id) => !id.startsWith("wl-"));
+        if (plantUserIds.length > 0) {
+          query = query.or(
+            `from_user_id.in.(${plantUserIds.join(",")}),to_user_id.in.(${plantUserIds.join(",")})`
+          );
+        }
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as unknown as WorkflowLink[];
     },
-    enabled: !!companyId && users.length > 0,
+    enabled: !!companyId,
   });
 
   const handleRefresh = useCallback(() => {
