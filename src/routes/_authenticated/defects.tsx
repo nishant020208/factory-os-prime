@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { AlertOctagon, ShieldCheck, Clock, Loader2, FileWarning } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
 import { ModuleStatusBar } from "@/components/module-status";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -27,6 +29,7 @@ export const Route = createFileRoute("/_authenticated/defects")({
 
 function DefectsPage() {
   const { companyId } = useAuth();
+  const [severityTab, setSeverityTab] = useState("all");
 
   const { data: ncrs, isLoading } = useQuery({
     queryKey: ["defects-ncrs", companyId],
@@ -45,10 +48,21 @@ function DefectsPage() {
   const critical = ncrs?.filter((n) => n.severity === "critical" || n.severity === "high").length ?? 0;
   const resolved = ncrs?.filter((n) => n.status === "closed").length ?? 0;
 
-  const breakdown = (ncrs ?? []).reduce<Record<string, number>>((acc, n) => {
+  const filteredNcrs = severityTab === "all"
+    ? (ncrs ?? [])
+    : (ncrs ?? []).filter((n) => n.severity === severityTab);
+
+  const breakdown = filteredNcrs.reduce<Record<string, number>>((acc, n) => {
     acc[n.defect_category] = (acc[n.defect_category] ?? 0) + 1;
     return acc;
   }, {});
+
+  const severityCounts = {
+    high: ncrs?.filter((n) => n.severity === "high").length ?? 0,
+    critical: ncrs?.filter((n) => n.severity === "critical").length ?? 0,
+    medium: ncrs?.filter((n) => n.severity === "medium").length ?? 0,
+    low: ncrs?.filter((n) => n.severity === "low").length ?? 0,
+  };
 
   return (
     <div className="max-w-[1600px] mx-auto">
@@ -65,81 +79,126 @@ function DefectsPage() {
         <Kpi label="Total NCRs" value={String(ncrs?.length ?? 0)} icon={Clock} tone="info" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Panel title="Defect Breakdown by Category">
-          {Object.keys(breakdown).length === 0 ? (
-            <EmptyState title="No defects yet" sub="NCRs will be categorized here." />
-          ) : (
-            <div className="space-y-3">
-              {Object.entries(breakdown)
-                .sort((a, b) => b[1] - a[1])
-                .map(([cat, count]) => (
-                  <div key={cat} className="rounded-xl bg-card/60 border border-white/5 p-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{cat}</span>
-                      <span className="font-semibold tabular-nums">{count}</span>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </Panel>
-
-        <div className="lg:col-span-2">
-          <Panel title={`${ncrs?.length ?? 0} NCR Log`}>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12 text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading…
-              </div>
-            ) : (ncrs ?? []).length === 0 ? (
-              <EmptyState title="No NCRs" sub="Defects recorded from inspections and manual NCRs appear here." />
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent border-white/5">
-                      {["NCR #", "Batch", "Defect Category", "Severity", "Description", "Status", "Raised"].map((h) => (
-                        <TableHead key={h} className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                          {h}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(ncrs ?? []).map((n) => (
-                      <TableRow key={n.id} className="border-white/5">
-                        <TableCell className="font-mono text-xs">{n.ncr_number}</TableCell>
-                        <TableCell className="font-mono text-xs">{n.batch_number ?? "—"}</TableCell>
-                        <TableCell className="text-sm">{n.defect_category}</TableCell>
-                        <TableCell>
-                          <StatusBadge
-                            status={
-                              n.severity === "critical"
-                                ? "critical"
-                                : n.severity === "high"
-                                  ? "warning"
-                                  : "info"
-                            }
-                          />
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-[240px] truncate">
-                          {n.description ?? "—"}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge
-                            status={n.status === "closed" ? "completed" : n.status === "in_rework" ? "in_progress" : "pending"}
-                          />
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{safeDate(n.created_at)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+      <Tabs value={severityTab} onValueChange={setSeverityTab}>
+        <TabsList>
+          <TabsTrigger value="all">
+            All
+            <span className="ml-1.5 h-4 w-4 rounded-full bg-muted text-[10px] font-medium inline-flex items-center justify-center">
+              {ncrs?.length ?? 0}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="high">
+            High
+            {severityCounts.high > 0 && (
+              <span className="ml-1.5 h-4 w-4 rounded-full bg-warning/20 text-warning text-[10px] font-medium inline-flex items-center justify-center">
+                {severityCounts.high}
+              </span>
             )}
-          </Panel>
-        </div>
-      </div>
+          </TabsTrigger>
+          <TabsTrigger value="critical">
+            Critical
+            {severityCounts.critical > 0 && (
+              <span className="ml-1.5 h-4 w-4 rounded-full bg-destructive/20 text-destructive text-[10px] font-medium inline-flex items-center justify-center">
+                {severityCounts.critical}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="medium">
+            Medium
+            {severityCounts.medium > 0 && (
+              <span className="ml-1.5 h-4 w-4 rounded-full bg-info/20 text-info text-[10px] font-medium inline-flex items-center justify-center">
+                {severityCounts.medium}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="low">
+            Low
+            {severityCounts.low > 0 && (
+              <span className="ml-1.5 h-4 w-4 rounded-full bg-muted text-[10px] font-medium inline-flex items-center justify-center">
+                {severityCounts.low}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={severityTab} className="mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <Panel title="Defect Breakdown by Category">
+              {Object.keys(breakdown).length === 0 ? (
+                <EmptyState title="No defects yet" sub="NCRs will be categorized here." />
+              ) : (
+                <div className="space-y-3">
+                  {Object.entries(breakdown)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([cat, count]) => (
+                      <div key={cat} className="rounded-xl bg-card/60 border border-white/5 p-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">{cat}</span>
+                          <span className="font-semibold tabular-nums">{count}</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </Panel>
+
+            <div className="lg:col-span-2">
+              <Panel title={`${filteredNcrs.length} NCR Log`}>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading…
+                  </div>
+                ) : filteredNcrs.length === 0 ? (
+                  <EmptyState title="No NCRs" sub="Defects recorded from inspections and manual NCRs appear here." />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent border-white/5">
+                          {["NCR #", "Batch", "Defect Category", "Severity", "Description", "Status", "Raised"].map((h) => (
+                            <TableHead key={h} className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                              {h}
+                            </TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredNcrs.map((n) => (
+                          <TableRow key={n.id} className="border-white/5">
+                            <TableCell className="font-mono text-xs">{n.ncr_number}</TableCell>
+                            <TableCell className="font-mono text-xs">{n.batch_number ?? "—"}</TableCell>
+                            <TableCell className="text-sm">{n.defect_category}</TableCell>
+                            <TableCell>
+                              <StatusBadge
+                                status={
+                                  n.severity === "critical"
+                                    ? "critical"
+                                    : n.severity === "high"
+                                      ? "warning"
+                                      : "info"
+                                }
+                              />
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground max-w-[240px] truncate">
+                              {n.description ?? "—"}
+                            </TableCell>
+                            <TableCell>
+                              <StatusBadge
+                                status={n.status === "closed" ? "completed" : n.status === "in_rework" ? "in_progress" : "pending"}
+                              />
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{safeDate(n.created_at)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </Panel>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
