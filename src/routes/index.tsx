@@ -3412,6 +3412,7 @@ function TopNav() {
     enabled: soundEnabled,
     setEnabled: setSoundEnabled,
     play: playClick,
+    toggle,
   } = useClickSound();
 
   useEffect(() => {
