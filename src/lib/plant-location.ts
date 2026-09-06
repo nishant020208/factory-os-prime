@@ -114,43 +114,56 @@ export function haversineKm(
  * returns the company's primary plant — the one serving most plant-level
  * employees, else the first plant.
  */
+export type PlantWithDistance = {
+  id: string;
+  name: string;
+  code?: string | null;
+  city?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  distanceKm?: number;
+};
+
+/**
+ * Return every active plant for a company, each annotated with its distance
+ * from the given coordinate (when both the plant and the point have
+ * coordinates). Sorted nearest-first. No coordinates → plants stay unsorted
+ * and distanceKm is undefined.
+ */
+export async function plantsForLocation(
+  companyId: string,
+  lat?: number | null,
+  lng?: number | null,
+): Promise<PlantWithDistance[]> {
+  const { data: plants, error } = await supabase
+    .from("plants")
+    .select("id, name, code, city, latitude, longitude, status")
+    .eq("company_id", companyId)
+    .eq("status", "active");
+  if (error || !plants?.length) return [];
+
+  const rows: PlantWithDistance[] = plants;
+  if (lat != null && lng != null) {
+    for (const p of rows) {
+      if (p.latitude != null && p.longitude != null) {
+        p.distanceKm = haversineKm(lat, lng, Number(p.latitude), Number(p.longitude));
+      }
+    }
+    rows.sort((a, b) => {
+      const da = a.distanceKm ?? Infinity;
+      const db = b.distanceKm ?? Infinity;
+      return da - db;
+    });
+  }
+  return rows;
+}
+
 export async function nearestPlantForLocation(
   companyId: string,
   lat?: number | null,
   lng?: number | null,
-): Promise<{ id: string; name: string; distanceKm?: number } | null> {
-  const { data: plants, error } = await supabase
-    .from("plants")
-    .select("id, name, latitude, longitude, status")
-    .eq("company_id", companyId)
-    .eq("status", "active");
-  if (error || !plants?.length) return null;
-
-  if (lat != null && lng != null) {
-    const withCoords = plants.filter((p) => p.latitude != null && p.longitude != null);
-    if (withCoords.length > 0) {
-      let best = withCoords[0];
-      let bestD = haversineKm(lat, lng, Number(best.latitude), Number(best.longitude));
-      for (const p of withCoords) {
-        const d = haversineKm(lat, lng, Number(p.latitude), Number(p.longitude));
-        if (d < bestD) {
-          best = p;
-          bestD = d;
-        }
-      }
-      return { id: best.id, name: best.name, distanceKm: bestD };
-    }
-  }
-
-  // Fallback: primary plant = the one serving the most plant-level employees.
-  const { data: roles } = await supabase
-    .from("user_roles")
-    .select("plant_id")
-    .eq("company_id", companyId)
-    .not("plant_id", "is", null);
-  const counts: Record<string, number> = {};
-  for (const r of roles ?? []) counts[r.plant_id] = (counts[r.plant_id] ?? 0) + 1;
-  const primary =
-    [...plants].sort((a, b) => (counts[b.id] ?? 0) - (counts[a.id] ?? 0))[0] ?? plants[0];
-  return { id: primary.id, name: primary.name };
+): Promise<PlantWithDistance | null> {
+  const rows = await plantsForLocation(companyId, lat, lng);
+  if (!rows.length) return null;
+  return rows[0] ?? null;
 }
