@@ -30,36 +30,65 @@ import {
 } from "@/lib/role-scope";
 import { fmtMoney } from "@/lib/currency";
 import { askGroq, askGroqStream, hasGroqKey } from "@/lib/groq";
-import { askCerebras, askCerebrasStream } from "@/lib/cerebras";/**
+import { askCerebras, askCerebrasStream } from "@/lib/cerebras";
+
+/**
  * Helper that assembles a failing Supabase client for isolated tests of the
- * context-assembly path. Every query through it throws, so we can assert that
- * gatherRoleData reports the failure as a DATA NOTE rather than silently
- * returning empty context.
+ * context-assembly path. Every query through it returns an error row, so we
+ * can assert that gatherRoleData reports the failure as a DATA NOTE rather
+ * than silently returning empty context.
  */
-export function makeFailingSupabaseClient(failWith = "connection refused"): ReturnType<typeof import("@supabase/supabase-js").createClient> {
-  const badFetch: typeof fetch = () => Promise.reject(new DOMException(failWith, "AbortError"));
-  const badClient = {
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          limit: () => ({
-            order: () => ({
-              data: null as never,
-              error: { message: failWith } as import("@supabase/supabase-js").SupabaseClientError,
-            }),
+export function makeFailingSupabaseClient(
+  failWith = "connection refused",
+): {
+  from: (table: string) => {
+    select: (cols?: string) => {
+      eq: (col: string, val: string) => {
+        limit: (n: number) => {
+          order: (col: string, opts: { ascending: boolean }) => {
+            data: null;
+            error: { message: string };
+          };
+        };
+      };
+      limit: (n: number) => { error: { message: string } };
+    };
+  };
+  channel: (name: string) => { subscribe: () => { } };
+} {
+  const failingSelectChain = (): {
+    select: (cols?: string) => {
+      eq: (col: string, val: string) => {
+        limit: (n: number) => {
+          order: (col: string, opts: { ascending: boolean }) => {
+            data: null;
+            error: { message: string };
+          };
+        };
+      };
+      limit: (n: number) => { error: { message: string } };
+    };
+  } => ({
+    select: () => ({
+      eq: () => ({
+        limit: () => ({
+          order: () => ({
+            data: null as never,
+            error: { message: failWith },
           }),
         }),
       }),
-      select: () => ({
-        limit: () => ({
-          error: { message: failWith } as import("@supabase/supabase-js").SupabaseClientError,
-        }),
+      limit: () => ({
+        error: { message: failWith },
       }),
     }),
-    channel: () => ({})
-  } as unknown as ReturnType<typeof import("@supabase/supabase-js").createClient>;
-  return badClient;
+  });
+  return {
+    from: () => failingSelectChain(),
+    channel: () => ({ subscribe: () => ({}) }),
+  };
 }
+
 
 
 export interface CopilotTurn {
