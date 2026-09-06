@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { WorkflowGraph } from "@/components/workflow/workflow-graph";
@@ -27,6 +27,7 @@ export const Route = createFileRoute("/_authenticated/workflow")({
 
 interface WorkflowUser {
   id: string;
+  whitelist_id: string;
   full_name: string | null;
   email: string;
   avatar_url: string | null;
@@ -38,36 +39,42 @@ interface WorkflowUser {
 
 interface WorkflowLink {
   id: string;
-  from_user_id: string;
-  to_user_id: string;
+  parent_id: string;
+  child_id: string;
   from_role: string;
   to_role: string;
+  plant_id: string | null;
+}
+
+interface CanvasPosition {
+  whitelist_id: string;
+  position_x: number;
+  position_y: number;
 }
 
 function WorkflowPage() {
+  const queryClient = useQueryClient();
   const { companyId, plantId, roles } = useAuth();
   const isPlantAdmin = roles.includes("plant_admin");
   const isCompanyAdmin = roles.includes("company_admin");
   const canEdit = isCompanyAdmin || isPlantAdmin;
 
-  const [zoom, setZoom] = useState(1);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Query whitelist as the source of truth for all invited employees.
-  // LEFT JOIN profiles to get avatar/full_name for users who have signed up.
+  // 1) Fetch ALL whitelisted employees — no role exclusions
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ["workflow-users", companyId, plantId, refreshKey],
     queryFn: async () => {
       if (!companyId) return [];
 
-      // 1) Fetch all whitelist rows for this company
       let wlQuery = supabase
         .from("whitelist")
-        .select("id, email, role, company_id, plant_id, status")
+        .select("id, email, role, company_id, plant_id, status, created_at")
         .eq("company_id", companyId)
-        .not("role", "in", "(root_super_admin,customer_portal,supplier_portal)");
+        .not("role", "eq", "root_super_admin");
 
+      // Plant Admin: only their plant's employees + company-wide (no plant)
       if (isPlantAdmin && plantId) {
         wlQuery = wlQuery.or(`plant_id.eq.${plantId},plant_id.is.null`);
       }
@@ -76,7 +83,7 @@ function WorkflowPage() {
       if (wlError) throw wlError;
       if (!whitelistRows?.length) return [];
 
-      // 2) Fetch profiles for users who have signed up (matched by email)
+      // 2) Fetch profiles for users who have signed up
       const emails = whitelistRows.map((w: any) => w.email?.toLowerCase()).filter(Boolean);
       const { data: profileRows } = await supabase
         .from("profiles")
@@ -88,7 +95,7 @@ function WorkflowPage() {
         (profileRows ?? []).map((p: any) => [p.email?.toLowerCase(), p])
       );
 
-      // 3) Fetch user_roles to get the authoritative role + plant_id per user
+      // 3) Fetch user_roles for authoritative role/plant_id
       const profileIds = (profileRows ?? []).map((p: any) => p.id).filter(Boolean);
       const { data: roleRows } = profileIds.length > 0
         ? await supabase
@@ -105,11 +112,7 @@ function WorkflowPage() {
 
       // 4) Fetch plant names
       const plantIds = [
-        ...new Set(
-          whitelistRows
-            .map((w: any) => w.plant_id)
-            .filter(Boolean)
-        ),
+        ...new Set(whitelistRows.map((w: any) => w.plant_id).filter(Boolean)),
       ];
       let plantMap: Record<string, string> = {};
       if (plantIds.length > 0) {
@@ -122,13 +125,14 @@ function WorkflowPage() {
         });
       }
 
-      // 5) Build the unified user list: every whitelist row = one employee
+      // 5) Build unified list — every whitelist row = one employee
       return whitelistRows.map((w: any) => {
         const profile = profileByEmail.get(w.email?.toLowerCase());
         const userRole = profile ? rolesByUserId.get(profile.id) : null;
         const resolvedPlantId = userRole?.plant_id ?? w.plant_id ?? null;
         return {
           id: profile?.id ?? `wl-${w.id}`,
+          whitelist_id: w.id,
           full_name: profile?.full_name ?? w.email?.split("@")[0] ?? "Unknown",
           email: w.email,
           avatar_url: profile?.avatar_url ?? null,
@@ -144,29 +148,65 @@ function WorkflowPage() {
     enabled: !!companyId,
   });
 
-  // Derive links from whitelist hierarchy (role + plant_id) AND workflow_links table.
-  // The default hierarchy is computed client-side so it works even when
-  // workflow_links rows don't exist yet or reference different IDs.
+  // 2) Fetch workflow_links from database
+  const { data: dbLinks = [], isLoading: linksLoading } = useQuery({
+    queryKey: ["workflow-links", companyId, plantId, refreshKey],
+    queryFn: async () => {
+      if (!companyId) return [];
+      let query = supabase
+        .from("workflow_links" as any)
+        .select("id, parent_id, child_id, from_role, to_role, plant_id, status")
+        .eq("company_id", companyId)
+        .eq("status", "active");
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as unknown as WorkflowLink[];
+    },
+    enabled: !!companyId,
+  });
+
+  // 3) Fetch saved canvas positions
+  const { data: savedPositions = [] } = useQuery({
+    queryKey: ["canvas-positions", companyId, plantId, refreshKey],
+    queryFn: async () => {
+      if (!companyId) return [];
+      let query = supabase
+        .from("canvas_positions" as any)
+        .select("whitelist_id, position_x, position_y")
+        .eq("company_id", companyId);
+
+      if (isPlantAdmin && plantId) {
+        query = query.eq("plant_id", plantId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as unknown as CanvasPosition[];
+    },
+    enabled: !!companyId,
+  });
+
+  // 4) Merge DB links with derived hierarchy links
   const links: WorkflowLink[] = (() => {
-    if (!users.length) return [];
+    const merged = new Map<string, WorkflowLink>();
 
-    const derived: WorkflowLink[] = [];
-    let linkId = 0;
-    const makeLink = (
-      fromUser: WorkflowUser,
-      toUser: WorkflowUser,
-    ): WorkflowLink => ({
-      id: `derived-${linkId++}`,
-      from_user_id: fromUser.id,
-      to_user_id: toUser.id,
-      from_role: fromUser.role,
-      to_role: toUser.role,
-    });
+    // Start with DB links
+    for (const link of dbLinks) {
+      merged.set(`${link.parent_id}->${link.child_id}`, link);
+    }
 
+    // Add derived links for any user not already linked
+    const linkedChildren = new Set(dbLinks.map((l) => l.child_id));
     const companyAdmin = users.find((u) => u.role === "company_admin");
-    if (!companyAdmin) return [];
+    if (!companyAdmin) return Array.from(merged.values());
 
-    // Group users by plant
+    const PLANT_ROLES = new Set([
+      "plant_admin", "plant_manager", "production_manager", "warehouse_manager",
+      "procurement_manager", "quality_inspector", "maintenance_engineer",
+      "production_operator", "hr_manager",
+    ]);
+
     const byPlant = new Map<string, WorkflowUser[]>();
     const companyLevel: WorkflowUser[] = [];
     for (const u of users) {
@@ -179,83 +219,112 @@ function WorkflowPage() {
       }
     }
 
-    const PLANT_ROLES = new Set([
-      "plant_admin",
-      "plant_manager",
-      "production_manager",
-      "warehouse_manager",
-      "procurement_manager",
-      "quality_inspector",
-      "maintenance_engineer",
-      "production_operator",
-    ]);
+    let linkId = dbLinks.length;
+    const makeDerived = (
+      parentId: string,
+      childId: string,
+      fromRole: string,
+      toRole: string,
+      plantIdVal: string | null
+    ): WorkflowLink => ({
+      id: `derived-${linkId++}`,
+      parent_id: parentId,
+      child_id: childId,
+      from_role: fromRole,
+      to_role: toRole,
+      plant_id: plantIdVal,
+    });
 
-    // For each plant: company_admin → plant_admin, plant_admin → everyone else in plant
     for (const [, plantUsers] of byPlant) {
       const plantAdmin = plantUsers.find((u) => u.role === "plant_admin");
+      if (plantAdmin && !linkedChildren.has(plantAdmin.whitelist_id)) {
+        const key = `${companyAdmin.whitelist_id}->${plantAdmin.whitelist_id}`;
+        if (!merged.has(key)) {
+          merged.set(key, makeDerived(
+            companyAdmin.whitelist_id, plantAdmin.whitelist_id,
+            "company_admin", "plant_admin", plantAdmin.plant_id
+          ));
+        }
+      }
       if (plantAdmin) {
-        // company_admin → plant_admin
-        derived.push(makeLink(companyAdmin, plantAdmin));
-
-        // plant_admin → all other plant-level roles
         for (const u of plantUsers) {
-          if (u.id !== plantAdmin.id && PLANT_ROLES.has(u.role)) {
-            derived.push(makeLink(plantAdmin, u));
-          }
-        }
-      } else {
-        // No plant_admin — link plant users directly to company_admin
-        for (const u of plantUsers) {
-          if (PLANT_ROLES.has(u.role)) {
-            derived.push(makeLink(companyAdmin, u));
+          if (u.id !== plantAdmin.id && PLANT_ROLES.has(u.role) && !linkedChildren.has(u.whitelist_id)) {
+            const key = `${plantAdmin.whitelist_id}->${u.whitelist_id}`;
+            if (!merged.has(key)) {
+              merged.set(key, makeDerived(
+                plantAdmin.whitelist_id, u.whitelist_id,
+                "plant_admin", u.role, u.plant_id
+              ));
+            }
           }
         }
       }
     }
 
-    // Company-level roles: company_admin → finance_manager, hr_manager, auditor, etc.
-    const COMPANY_LEVEL_ROLES = new Set([
-      "finance_manager",
-      "hr_manager",
-      "auditor",
-      "procurement_manager",
-    ]);
+    const COMPANY_LEVEL_ROLES = new Set(["finance_manager", "auditor", "procurement_manager"]);
     for (const u of companyLevel) {
-      if (COMPANY_LEVEL_ROLES.has(u.role)) {
-        derived.push(makeLink(companyAdmin, u));
+      if (COMPANY_LEVEL_ROLES.has(u.role) && !linkedChildren.has(u.whitelist_id)) {
+        const key = `${companyAdmin.whitelist_id}->${u.whitelist_id}`;
+        if (!merged.has(key)) {
+          merged.set(key, makeDerived(
+            companyAdmin.whitelist_id, u.whitelist_id,
+            "company_admin", u.role, null
+          ));
+        }
       }
     }
 
-    // Portals: link to company_admin
     for (const u of users) {
-      if (
-        (u.role === "customer_portal" || u.role === "supplier_portal") &&
-        u.id !== companyAdmin.id
-      ) {
-        derived.push(makeLink(companyAdmin, u));
+      if ((u.role === "customer_portal" || u.role === "supplier_portal") &&
+          u.id !== companyAdmin.id && !linkedChildren.has(u.whitelist_id)) {
+        const key = `${companyAdmin.whitelist_id}->${u.whitelist_id}`;
+        if (!merged.has(key)) {
+          merged.set(key, makeDerived(
+            companyAdmin.whitelist_id, u.whitelist_id,
+            "company_admin", u.role, u.plant_id
+          ));
+        }
       }
     }
 
-    return derived;
+    return Array.from(merged.values());
   })();
+
+  // 5) Position persistence mutation
+  const positionMutation = useMutation({
+    mutationFn: async ({ whitelistId, x, y }: { whitelistId: string; x: number; y: number }) => {
+      if (!companyId) return;
+      const user = users.find((u) => u.whitelist_id === whitelistId);
+      const { error } = await supabase.from("canvas_positions" as any).upsert(
+        {
+          company_id: companyId,
+          whitelist_id: whitelistId,
+          plant_id: user?.plant_id ?? null,
+          position_x: x,
+          position_y: y,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "company_id,whitelist_id" }
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["canvas-positions"] });
+    },
+  });
 
   const handleRefresh = useCallback(() => {
     setRefreshKey((k) => k + 1);
   }, []);
 
-  const handleZoomIn = useCallback(() => {
-    setZoom((z) => Math.min(z + 0.15, 2));
-  }, []);
+  const handleNodeDragStop = useCallback(
+    (whitelistId: string, x: number, y: number) => {
+      positionMutation.mutate({ whitelistId, x, y });
+    },
+    [positionMutation]
+  );
 
-  const handleZoomOut = useCallback(() => {
-    setZoom((z) => Math.max(z - 0.15, 0.3));
-  }, []);
-
-  const handleFitView = useCallback(() => {
-    setZoom(1);
-  }, []);
-
-  const isLoading = usersLoading;
+  const isLoading = usersLoading || linksLoading;
 
   return (
     <TooltipProvider>
@@ -275,62 +344,16 @@ function WorkflowPage() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={handleRefresh}
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Refresh</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={handleZoomOut}
-                >
-                  <ZoomOut className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Zoom Out</TooltipContent>
-            </Tooltip>
-            <span className="text-[11px] text-muted-foreground w-10 text-center tabular-nums">
-              {Math.round(zoom * 100)}%
-            </span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={handleZoomIn}
-                >
-                  <ZoomIn className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Zoom In</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={handleFitView}
-                >
-                  <Maximize className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Fit View</TooltipContent>
-            </Tooltip>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={handleRefresh}
+            >
+              <RefreshCw className="h-3.5 w-3.5 mr-1" />
+              Refresh
+            </Button>
           </div>
         </div>
 
@@ -351,11 +374,15 @@ function WorkflowPage() {
             <WorkflowGraph
               users={users}
               links={links}
-              zoom={zoom}
+              positions={savedPositions}
               selectedUserId={selectedNode}
               onSelectUser={setSelectedNode}
               onRefresh={handleRefresh}
               canEdit={canEdit}
+              isPlantAdmin={isPlantAdmin}
+              companyId={companyId}
+              plantId={plantId}
+              onNodeDragStop={handleNodeDragStop}
             />
 
             {isLoading && (
