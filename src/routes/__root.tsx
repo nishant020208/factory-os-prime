@@ -315,7 +315,7 @@ function RootComponent() {
           </Suspense>
           {/* Subtle mechanical click feedback on every button/link (muted state
               is shared app-wide via SoundProvider/localStorage) */}
-          <GlobalClickSoundLayer />
+          <GlobalClickSoundLayer onHoverToggle={() => {}} hoverEnabled={false} />
           <Outlet />
           <Toaster position="top-right" richColors closeButton />
         </SoundProvider>
