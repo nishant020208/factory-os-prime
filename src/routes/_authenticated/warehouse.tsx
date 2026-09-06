@@ -108,7 +108,14 @@ function WarehousePage() {
   });
 
   const totalSKUs = inventory?.length ?? 0;
-  const lowStock = inventory?.filter((i: any) => Number(i.quantity ?? 0) <= 10).length ?? 0;
+  const lowStock = inventory?.filter((i: any) => {
+    const onHand = Number(i.quantity ?? 0);
+    const reserved = Number(i.reserved_quantity ?? 0);
+    const quarantined = Number(i.quarantined_quantity ?? 0);
+    const damaged = Number(i.damaged_qty ?? 0);
+    const available = Math.max(0, onHand - reserved - quarantined - damaged);
+    return available <= 10;
+  }).length ?? 0;
 
   return (
     <ResourceView
@@ -158,10 +165,16 @@ function WarehousePage() {
         },
         {
           key: "stock",
-          header: "Usable Stock",
+          header: "Available Stock",
           render: (r) => {
             const whInv = (inventory ?? []).filter((i: any) => i.warehouse_id === r.id);
-            const total = whInv.reduce((sum: number, i: any) => sum + Number(i.quantity ?? 0), 0);
+            const total = whInv.reduce((sum: number, i: any) => {
+              const onHand = Number(i.quantity ?? 0);
+              const reserved = Number(i.reserved_quantity ?? 0);
+              const quarantined = Number(i.quarantined_quantity ?? 0);
+              const damaged = Number(i.damaged_qty ?? 0);
+              return sum + Math.max(0, onHand - reserved - quarantined - damaged);
+            }, 0);
             return <span className="text-xs font-mono font-medium">{total.toLocaleString()} units</span>;
           },
         },
