@@ -61,6 +61,9 @@ import { toast } from "sonner";
 import { safeDate, resolveRelation } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/quality")({
+  validateSearch: (s: Record<string, string | undefined>) => ({
+    tab: typeof s.tab === "string" ? s.tab : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Quality — FactoryOS AI" },
@@ -476,9 +479,14 @@ function QualityPage() {
   const { companyId, user, roles, plantId } = useAuth();
   const isAuditor = roles.includes("auditor");
   const queryClient = useQueryClient();
+  const { tab: tabParam } = Route.useSearch();
 
   const [showNew, setShowNew] = useState(false);
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(
+    tabParam === "incoming" || tabParam === "inspections" || tabParam === "parameters"
+      ? tabParam
+      : "dashboard",
+  );
   const [detailInspection, setDetailInspection] = useState<any>(null);
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({});
 
