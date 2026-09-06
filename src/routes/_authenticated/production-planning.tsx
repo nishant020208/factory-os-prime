@@ -201,14 +201,17 @@ function ProductionPlanningPage() {
     }));
   };
 
-  // Stock on hand for a component (material or finished product) — RLS
-  // scopes inventory to the PM's plant, so this is the correct warehouse.
+  // Available stock for a component — on-hand minus reserved, quarantined, damaged.
   const stockFor = (componentId: string): number =>
     (inventory ?? []).reduce(
-      (sum: number, r: any) =>
-        r.material_id === componentId || r.product_id === componentId
-          ? sum + Number(r.quantity ?? 0)
-          : sum,
+      (sum: number, r: any) => {
+        if (r.material_id !== componentId && r.product_id !== componentId) return sum;
+        const onHand = Number(r.quantity ?? 0);
+        const reserved = Number(r.reserved_quantity ?? 0);
+        const quarantined = Number(r.quarantined_quantity ?? 0);
+        const damaged = Number(r.damaged_qty ?? 0);
+        return sum + Math.max(0, onHand - reserved - quarantined - damaged);
+      },
       0,
     );
 
