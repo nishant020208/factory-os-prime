@@ -61,6 +61,13 @@ const PLANT_LEVEL_ROLES: AppRole[] = [
 /** Roles a Plant Admin may invite. Supplier Portal accounts serve their plant. */
 const PLANT_ADMIN_ROLES: AppRole[] = [...PLANT_LEVEL_ROLES, "supplier_portal"];
 
+/**
+ * The ONLY roles a Company Admin may whitelist directly. Everything else is
+ * plant-scoped and therefore whitelisted by the Plant Admin of the relevant
+ * plant — Company Admin stays the owner of company-level roles only.
+ */
+const COMPANY_ADMIN_ROLES: AppRole[] = ["plant_admin", "finance_manager", "auditor"];
+
 function WhitelistPage() {
   const qc = useQueryClient();
   const { companyId, roles, plantId } = useAuth();
@@ -110,10 +117,14 @@ function WhitelistPage() {
 
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<AppRole>("production_operator");
+  const [role, setRole] = useState<AppRole>(() =>
+    isPlantAdmin ? "production_operator" : "plant_admin",
+  );
   const [invitePlant, setInvitePlant] = useState<string>(plantId ?? "none");
   const [roleFilter, setRoleFilter] = useState<string>("all");
 
+  // A plant is required when inviting any plant-level role. Company Admin's
+  // three company-level roles are the exception (they span the whole tenant).
   const roleNeedsPlant = useMemo(
     () => !isRoot && PLANT_ADMIN_ROLES.includes(role as AppRole),
     [role, isRoot],
@@ -121,7 +132,24 @@ function WhitelistPage() {
 
   const invite = useMutation({
     mutationFn: async () => {
+      // Hierarchy guard: Company Admin may only whitelist the 3 company-level
+      // roles; Plant Admin may only whitelist their plant's roles. Enforced in
+      // the UI and again at RLS — an out-of-scope role is refused server-side.
+      const allowed = isPlantAdmin
+        ? PLANT_ADMIN_ROLES
+        : isRoot
+          ? (ROLES.map((r) => r.id) as AppRole[])
+          : COMPANY_ADMIN_ROLES;
+      if (!allowed.includes(role as AppRole)) {
+        throw new Error(
+          `Role ${role} is out of scope for you — only ${
+            isPlantAdmin ? "plant roles" : "company-level roles"
+          } may be invited.`,
+        ); }
       const plant = roleNeedsPlant && invitePlant !== "none" ? invitePlant : null;
+      if (roleNeedsPlant && !plant) {
+        throw new Error("Select the plant this role belongs to");
+      }
       const { error } = await supabase.from("whitelist").insert({
         email,
         role,
@@ -151,7 +179,7 @@ function WhitelistPage() {
 
   const inviteRoles = isPlantAdmin
     ? ROLES.filter((r) => PLANT_ADMIN_ROLES.includes(r.id))
-    : ROLES.filter((r) => r.id !== "root_super_admin");
+    : ROLES.filter((r) => COMPANY_ADMIN_ROLES.includes(r.id));
 
   const pending = visibleRows.filter((w) => displayStatus(w) === "pending").length;
   const accepted = visibleRows.filter((w) => displayStatus(w) === "accepted").length;
