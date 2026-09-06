@@ -106,9 +106,20 @@ function InvoicesPage() {
   });
 
   // ── Data fetch: admin gets all invoices; customer gets only their own ─────
+  // Finance managers whitelisted for a specific plant (user_roles.plant_id)
+  // see only that plant's invoices — RLS enforces it; the query mirrors it.
   const { data } = useQuery({
     queryKey: ["invoices", companyId, isCustomer, user?.id],
     queryFn: async () => {
+      const { data: roleRows } = await supabase
+        .from("user_roles")
+        .select("plant_id")
+        .eq("user_id", user?.id ?? "")
+        .eq("role", "finance_manager")
+        .not("plant_id", "is", null)
+        .limit(1);
+      const financePlantId = roleRows?.[0]?.plant_id ?? null;
+
       let query = supabase
         .from("invoices")
         .select("*, customers!inner(name, contact_email, user_id)")
@@ -121,6 +132,9 @@ function InvoicesPage() {
           .select("*, customers!inner(name, contact_email, user_id)")
           .eq("customers.user_id", user.id)
           .order("issue_date", { ascending: false });
+      } else if (financePlantId) {
+        // Plant-whitelisted Finance Manager: only this plant's invoices.
+        query = query.eq("plant_id", financePlantId);
       }
 
       const { data } = await query;
