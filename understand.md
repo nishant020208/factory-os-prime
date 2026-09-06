@@ -36,10 +36,27 @@ and the live database — not from intentions.
 | Supplier (portal) | `supplier@abcmfg.demo` | External: receives POs, quotes RFQs, manages own catalog prices, deliveries, invoices. |
 | Auditor | `auditor@abcmfg.demo` | Read-only over everything in the company: audit logs, compliance, access logs, data export. |
 
-Hierarchy: Root → whitelists Company Admin → whitelists Plant Admins and all
-others. Plant Admin whitelists plant-level roles **for their plant only** and
-cannot whitelist Finance Manager, Auditor, Root or another admin. Finance and
-Auditor are deliberately company-wide, never plant-scoped.
+Hierarchy: Root → whitelists Company Admin → whitelists Plant Admins → Plant
+Admin whitelists every plant-level role for their plant.
+
+**Direct whitelist rights (RLS-enforced, verified live):**
+- **Root** may whitelist `company_admin` only.
+- **Company Admin** may whitelist exactly three roles directly:
+  `plant_admin`, `finance_manager`, `auditor`. Attempting any other role is
+  refused at the DB (policy `whitelist_write` WITH CHECK on `public.whitelist`).
+- **Plant Admin** may whitelist every plant-level role
+  (`plant_manager`, `production_manager`, `warehouse_manager`,
+  `procurement_manager`, `quality_inspector`, `maintenance_engineer`,
+  `hr_manager`, `production_operator`, `supplier_portal`) **for their own
+  plant only** — never finance, auditor, another plant admin, or company admin.
+
+Finance and Auditor are company-wide (never plant-scoped). A finance manager
+whitelisted WITH a plant (whitelist row carries `plant_id`) sees only that
+plant's invoices; the demo `finance@abcmfg.demo` has no plant and sees all.
+
+Whitelisted, awaiting-onboarding accounts show in the Employees page under
+"Whitelisted, awaiting onboarding" (invited team members section), so an
+invite is never invisible inside the plant roster.
 
 Whitelisting works by email: the admin whitelists an address + role, the
 person signs up with that email, and the account activates with the assigned
@@ -256,7 +273,52 @@ Current live counts: 8 companies, 6 plants, 25 users, 9 materials,
 
 ---
 
-## 7. Repo map
+## 7a. Plant isolation (HR + employees)
+
+Every operational table filters by company; plant-level roles filter by
+`plant_id` at RLS. HR Manager is plant-scoped exactly like every other plant
+role: `hr@abcmfg.demo` (Detroit) sees ONLY the plant's own employees — Plant
+Manager, Maintenance Engineer, Production Operator and their own HR records —
+and nothing from another plant. Two plant admins see fully disjoint rosters.
+
+Verified live: `hr@abcmfg.demo` and `plantadmin@abcmfg.demo` (both Detroit,
+plant `22222222…`) each see exactly 8 employee rows from their own plant;
+Kochi's plant admin sees 0 because Kochi has no employee rows yet (RLS would
+still restrict them to Kochi's rows only). `admin@abcmfg.demo` (company-level)
+sees all 19. New employees created by plant-scoped users are stamped with the
+signed-in user's `plant_id`; RLS rejects writes to other plants.
+
+## 7b. Quality inspection — who does what
+
+Two inspection gates exist, both owned by **Quality Inspector** (with
+Company Admin as override and Auditor read-only):
+
+| Gate | What is checked | Trigger | Where in UI |
+|---|---|---|---|
+| **Incoming QC (raw materials)** | Materials on a PO at goods receipt | Warehouse confirms GRN → `incoming_material_inspections` rows created pending → auto-notification `🔬 Incoming QC Required` to `quality_inspector` | Quality → Incoming Materials (approve = stock, reject = quarantined) |
+| **Final QC (finished goods)** | Batch before the SO ships to the customer | Work order reaches 100% → batch lands in Final Inspection | Final Inspection → PASS releases the SO to `dispatch_ready` + customer notified; FAIL holds it at `quality_failed` |
+
+Route access: `/incoming-inspection`, `/in-process-inspection`,
+`/final-inspection` are `company_admin | quality_inspector | auditor` only.
+The approve/reject RPC `process_incoming_inspection` re-checks the caller's
+role inside the DB. Both gates were verified live (notification fired, stock
+credited/quarantined, SO flipped to `dispatch_ready` on pass).
+
+## 7c. Advance payment → invoice
+
+When a customer order's advance payment is confirmed (status becomes
+`advance_paid`), a trigger (`trg_create_advance_invoice` on
+`customer_orders`) immediately creates an `INV-ADV-…` invoice row (status
+`sent`, linked via `customer_id`, `plant_id` copied from the customer) and
+notifies `finance_manager`. The invoice appears in the Finance Manager's
+Invoices tab in real time, and a plant-whitelisted finance manager sees only
+their plant's invoices (RLS `invoices_all` + client query filter).
+`resume_orders_when_stocked(uuid, uuid)` overload resumes
+`procurement_pending` sales orders once the inspected material is stocked.
+
+---
+
+## 8. Repo map
 
 | Path | Owns |
 |---|---|
