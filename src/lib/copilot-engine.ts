@@ -30,7 +30,37 @@ import {
 } from "@/lib/role-scope";
 import { fmtMoney } from "@/lib/currency";
 import { askGroq, askGroqStream, hasGroqKey } from "@/lib/groq";
-import { askCerebras, askCerebrasStream } from "@/lib/cerebras";
+import { askCerebras, askCerebrasStream } from "@/lib/cerebras";/**
+ * Helper that assembles a failing Supabase client for isolated tests of the
+ * context-assembly path. Every query through it throws, so we can assert that
+ * gatherRoleData reports the failure as a DATA NOTE rather than silently
+ * returning empty context.
+ */
+export function makeFailingSupabaseClient(failWith = "connection refused"): ReturnType<typeof import("@supabase/supabase-js").createClient> {
+  const badFetch: typeof fetch = () => Promise.reject(new DOMException(failWith, "AbortError"));
+  const badClient = {
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          limit: () => ({
+            order: () => ({
+              data: null as never,
+              error: { message: failWith } as import("@supabase/supabase-js").SupabaseClientError,
+            }),
+          }),
+        }),
+      }),
+      select: () => ({
+        limit: () => ({
+          error: { message: failWith } as import("@supabase/supabase-js").SupabaseClientError,
+        }),
+      }),
+    }),
+    channel: () => ({})
+  } as unknown as ReturnType<typeof import("@supabase/supabase-js").createClient>;
+  return badClient;
+}
+
 
 export interface CopilotTurn {
   role: "user" | "ai";
@@ -449,13 +479,26 @@ async function materialStockAnswer(question: string): Promise<string | null> {
 
     // 2. Sum real quantities from inventory — either via inventory.material_id
     //    or via the product row that shares the material's name (legacy seeds).
+    //    Use available stock (on-hand minus reserved, quarantined, damaged).
     let qty = 0;
+    let reservedQty = 0;
+    let quarantinedQty = 0;
+    let damagedQty = 0;
     const { data: byMaterial } = await scoped(
-      supabase.from("inventory").select("quantity, material_id").eq("material_id", mat.id),
+      supabase.from("inventory").select("quantity, reserved_quantity, quarantined_quantity, damaged_qty, material_id").eq("material_id", mat.id),
     );
     const rows = (byMaterial as any[] | null) ?? [];
     if (rows.length) {
-      qty = rows.reduce((s: number, r: any) => s + Number(r.quantity ?? 0), 0);
+      for (const r of rows) {
+        const onHand = Number(r.quantity ?? 0);
+        const res = Number(r.reserved_quantity ?? 0);
+        const q = Number(r.quarantined_quantity ?? 0);
+        const d = Number(r.damaged_qty ?? 0);
+        reservedQty += res;
+        quarantinedQty += q;
+        damagedQty += d;
+        qty += Math.max(0, onHand - res - q - d);
+      }
     } else {
       const { data: prods } = await scoped(
         supabase
@@ -467,32 +510,44 @@ async function materialStockAnswer(question: string): Promise<string | null> {
       const prod = (prods as any[] | null)?.[0];
       if (prod) {
         const { data: invs } = await scoped(
-          supabase.from("inventory").select("quantity").eq("product_id", prod.id),
+          supabase.from("inventory").select("quantity, reserved_quantity, quarantined_quantity, damaged_qty").eq("product_id", prod.id),
         );
-        qty = ((invs as any[] | null) ?? []).reduce(
-          (s: number, r: any) => s + Number(r.quantity ?? 0),
-          0,
-        );
+        for (const r of (invs as any[] | null) ?? []) {
+          const onHand = Number(r.quantity ?? 0);
+          const res = Number(r.reserved_quantity ?? 0);
+          const q = Number(r.quarantined_quantity ?? 0);
+          const d = Number(r.damaged_qty ?? 0);
+          reservedQty += res;
+          quarantinedQty += q;
+          damagedQty += d;
+          qty += Math.max(0, onHand - res - q - d);
+        }
         const reorder = Number(prod.reorder_level ?? 0);
         const flag = qty <= reorder ? "⚠️ Low" : "✅ Healthy";
         return `📦 **${mat.name}**\n\n${toMarkdownTable(
           ["Field", "Value"],
           [
             ["Material", mat.name],
-            ["Live Stock", `${qty} ${prod.unit ?? mat.unit ?? "units"}`],
+            ["Available Stock", `${qty} ${prod.unit ?? mat.unit ?? "units"}`],
+            ["Reserved", String(reservedQty)],
+            ["Quarantined", String(quarantinedQty)],
+            ["Damaged", String(damagedQty)],
             ["Reorder Level", String(reorder)],
             ["Status", flag],
           ],
-        )}\n\nThis is read from the live inventory table — the same number Warehouse sees on the Raw Material Stock screen.`;
+        )}\n\nThis is the AVAILABLE stock (on-hand minus reserved/quarantined/damaged) — the same number used for production planning.`;
       }
     }
     return `📦 **${mat.name}**\n\n${toMarkdownTable(
       ["Field", "Value"],
       [
         ["Material", mat.name],
-        ["Live Stock", `${qty} ${mat.unit ?? "units"}`],
+        ["Available Stock", `${qty} ${mat.unit ?? "units"}`],
+        ["Reserved", String(reservedQty)],
+        ["Quarantined", String(quarantinedQty)],
+        ["Damaged", String(damagedQty)],
       ],
-    )}\n\nThis is read live from the inventory table.`;
+    )}\n\nThis is the AVAILABLE stock (on-hand minus reserved/quarantined/damaged).`;
   } catch {
     return null;
   }
@@ -519,10 +574,11 @@ function detectFollowupDomain(q: string): string | null {
 }
 
 /** Resolve the current customer's own customer_id (customers.user_id is the link) */
-async function resolveCustomerId(userId: string | null): Promise<string | null> {
+async function resolveCustomerId(userId: string | null, client?: ReturnType<typeof import("@supabase/supabase-js").createClient>): Promise<string | null> {
   if (!userId) return null;
+  const c = client ?? supabase;
   try {
-    const { data: byUser } = (await supabase
+    const { data: byUser } = (await c
       .from("customers")
       .select("id")
       .eq("user_id", userId)
@@ -530,13 +586,13 @@ async function resolveCustomerId(userId: string | null): Promise<string | null> 
     if (byUser?.id) return byUser.id;
 
     // Fallback: match on the profile email (legacy rows created before linking)
-    const { data: profile } = (await supabase
+    const { data: profile } = (await c
       .from("profiles")
       .select("email")
       .eq("id", userId)
       .maybeSingle()) as any;
     if (!profile?.email) return null;
-    const { data: cust } = (await supabase
+    const { data: cust } = (await c
       .from("customers")
       .select("id")
       .or(`email.eq.${profile.email},contact_email.eq.${profile.email}`)
@@ -548,23 +604,24 @@ async function resolveCustomerId(userId: string | null): Promise<string | null> 
 }
 
 /** Resolve the current supplier's own id (suppliers.user_id is the link) */
-async function resolveSupplierId(userId: string | null): Promise<string | null> {
+async function resolveSupplierId(userId: string | null, client?: ReturnType<typeof import("@supabase/supabase-js").createClient>): Promise<string | null> {
   if (!userId) return null;
+  const c = client ?? supabase;
   try {
-    const { data: byUser } = (await supabase
+    const { data: byUser } = (await c
       .from("suppliers")
       .select("id")
       .eq("user_id", userId)
       .maybeSingle()) as any;
     if (byUser?.id) return byUser.id;
 
-    const { data: profile } = (await supabase
+    const { data: profile } = (await c
       .from("profiles")
       .select("email")
       .eq("id", userId)
       .maybeSingle()) as any;
     if (!profile?.email) return null;
-    const { data: sup } = (await supabase
+    const { data: sup } = (await c
       .from("suppliers")
       .select("id")
       .eq("contact_email", profile.email)
@@ -617,19 +674,31 @@ async function focusedDomainAnswer(
       }
       case "inventory": {
         const rows = await listRows("inventory", 6);
-        const low = rows.filter(
-          (i: any) => Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0),
-        );
+        const low = rows.filter((i: any) => {
+          const onHand = Number(i.quantity ?? 0);
+          const reserved = Number(i.reserved_quantity ?? 0);
+          const quarantined = Number(i.quarantined_quantity ?? 0);
+          const damaged = Number(i.damaged_qty ?? 0);
+          const available = Math.max(0, onHand - reserved - quarantined - damaged);
+          return available <= Number(i.reorder_level ?? 0);
+        });
         const tableRows = rows
           .slice(0, 6)
-          .map((i: any) => [
-            i.sku ?? i.product_name ?? i.id?.slice(0, 8),
-            `${i.quantity ?? 0}`,
-            `${i.reorder_level ?? 0}`,
-            Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0) ? "⚠️ Low" : "OK",
-          ]);
+          .map((i: any) => {
+            const onHand = Number(i.quantity ?? 0);
+            const reserved = Number(i.reserved_quantity ?? 0);
+            const quarantined = Number(i.quarantined_quantity ?? 0);
+            const damaged = Number(i.damaged_qty ?? 0);
+            const available = Math.max(0, onHand - reserved - quarantined - damaged);
+            return [
+              i.sku ?? i.product_name ?? i.id?.slice(0, 8),
+              `${available}`,
+              `${i.reorder_level ?? 0}`,
+              available <= Number(i.reorder_level ?? 0) ? "⚠️ Low" : "OK",
+            ];
+          });
         return `📦 **Inventory** — ${rows.length} SKU(s), ${low.length} at/below reorder level.\n\n${toMarkdownTable(
-          ["SKU / Product", "Qty", "Reorder", "Status"],
+          ["SKU / Product", "Available", "Reorder", "Status"],
           tableRows,
         )}`;
       }
@@ -912,18 +981,30 @@ async function roleDataAnswer(
 
     case "warehouse_manager": {
       const inv = await listRows("inventory", 8);
-      const low = inv.filter(
-        (i: any) => Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0),
-      ).length;
+      const low = inv.filter((i: any) => {
+        const onHand = Number(i.quantity ?? 0);
+        const reserved = Number(i.reserved_quantity ?? 0);
+        const quarantined = Number(i.quarantined_quantity ?? 0);
+        const damaged = Number(i.damaged_qty ?? 0);
+        const available = Math.max(0, onHand - reserved - quarantined - damaged);
+        return available <= Number(i.reorder_level ?? 0);
+      }).length;
       const shipments = await listRows("shipments", 5);
       const invRows = inv
         .slice(0, 6)
-        .map((i: any) => [
-          i.sku ?? i.product_name ?? i.id?.slice(0, 8),
-          `${i.quantity ?? 0}`,
-          `${i.reorder_level ?? 0}`,
-          Number(i.quantity ?? 0) <= Number(i.reorder_level ?? 0) ? "⚠️ Low" : "OK",
-        ]);
+        .map((i: any) => {
+          const onHand = Number(i.quantity ?? 0);
+          const reserved = Number(i.reserved_quantity ?? 0);
+          const quarantined = Number(i.quarantined_quantity ?? 0);
+          const damaged = Number(i.damaged_qty ?? 0);
+          const available = Math.max(0, onHand - reserved - quarantined - damaged);
+          return [
+            i.sku ?? i.product_name ?? i.id?.slice(0, 8),
+            `${available}`,
+            `${i.reorder_level ?? 0}`,
+            available <= Number(i.reorder_level ?? 0) ? "⚠️ Low" : "OK",
+          ];
+        });
       const shipRows = shipments
         .slice(0, 5)
         .map((s: any) => [
@@ -932,7 +1013,7 @@ async function roleDataAnswer(
           label(s.status),
         ]);
       return {
-        text: `📦 **Warehouse**\n\nInventory SKUs: **${inv.length}** (${low} at/below reorder level). Shipments: **${shipments.length}**.\n\n${inv.length ? `**Inventory**\n\n${toMarkdownTable(["SKU / Product", "Qty", "Reorder", "Status"], invRows)}\n\n` : ""}${shipments.length ? `**Shipments**\n\n${toMarkdownTable(["Shipment", "Carrier", "Status"], shipRows)}` : ""}\n\nManage stock in **Inventory**, dispatch in **Dispatch**.`,
+        text: `📦 **Warehouse**\n\nInventory SKUs: **${inv.length}** (${low} at/below reorder level). Shipments: **${shipments.length}**.\n\n${inv.length ? `**Inventory**\n\n${toMarkdownTable(["SKU / Product", "Available", "Reorder", "Status"], invRows)}\n\n` : ""}${shipments.length ? `**Shipments**\n\n${toMarkdownTable(["Shipment", "Carrier", "Status"], shipRows)}` : ""}\n\nManage stock in **Inventory**, dispatch in **Dispatch**.`,
         conf: 94,
       };
     }
@@ -1149,35 +1230,73 @@ async function roleDataAnswer(
  * Returns a structured text context string that Cerebras uses to ground its answer.
  * Only fetches data from tables the role is allowed to access.
  */
-async function gatherRoleData(
+export interface RoleDataContext {
+  text: string;
+  /** Per-shape query outcomes: empty means the shape was not attempted or the
+  * table genuinely had no rows. A non-empty entry means the query ran and
+  * reported what happened, so the LLM can distinguish "no data" from "failed".
+  */
+  shapes: RoleDataShape[];
+}
+
+export interface RoleDataShape {
+  table: string;
+  label: string;
+  /** Falsy means the shape had rows and was included in the context text.
+  * A string means the shape was attempted but the data did not make it into
+  * the context (true absence, or a query failure that was reported).
+  */
+  note?: string;
+}
+
+export async function gatherRoleData(
   role: string | null,
   companyId: string | null,
   userId: string | null,
   question: string,
+  client?: ReturnType<typeof import("@supabase/supabase-js").createClient>,
 ): Promise<string> {
   const allowed = new Set(ROLE_DOMAIN_MAP[role ?? ""] ?? []);
   const parts: string[] = [];
+  const shapes: RoleDataShape[] = [];
   const q = question.toLowerCase();
+  const clientFor = client ?? supabase;
 
   // Helper to safely query a table. Some tables (e.g. inventory) have no
   // created_at column, so ordering is best-effort with an unordered retry.
-  async function safeQuery(table: string, cols = "*", filters?: (q: any) => any): Promise<any[]> {
+  // The shape registry below records what each attempted query returned, so
+  // the LLM can tell "no stock data" from "stock query failed".
+  async function safeQuery(
+    table: string,
+    label: string,
+    cols = "*",
+    filters?: (q: any) => any,
+  ): Promise<{ rows: any[]; note?: string }> {
     const run = async (ordered: boolean) => {
-      let base = supabase.from(table as never).select(cols);
+      let base = clientFor.from(table as never).select(cols);
       if (ordered) base = base.order("created_at", { ascending: false });
       let query = scoped(base.limit(8));
       if (filters) query = filters(query);
-      const { data, error } = await query;
-      if (error) throw new Error(error.message);
-      return (data as any[]) ?? [];
+      const res = await query as { data: any; error?: { message: string } };
+      if (res.error) throw new Error(res.error.message);
+      return (res.data as any[]) ?? [];
     };
     try {
-      return await run(true);
-    } catch {
+      const rows = await run(true);
+      shapes.push({ table, label });
+      return { rows };
+    } catch (cause) {
       try {
-        return await run(false);
-      } catch {
-        return [];
+        const rows = await run(false);
+        shapes.push({ table, label });
+        return { rows };
+      } catch (cause2) {
+        const msg =
+          typeof cause2 === "object" && cause2 != null && "message" in cause2
+            ? String((cause2 as any).message)
+            : String(cause2);
+        shapes.push({ table, label, note: `query error: ${msg}` });
+        return { rows: [] };
       }
     }
   }
@@ -1224,16 +1343,22 @@ async function gatherRoleData(
   if (role === "customer_portal") {
     const customerId = await resolveCustomerId(userId);
     if (customerId) {
-      const orders = await safeQuery("customer_orders", "*", (query) =>
-        query.eq("customer_id", customerId),
+      const { rows: orders } = await safeQuery(
+        "customer_orders",
+        "Customer Orders",
+        "*",
+        (query) => query.eq("customer_id", customerId),
       );
       if (orders.length) {
         parts.push(
           `YOUR ORDERS (${orders.length}):\n${orders.map((o: any) => `  ${o.order_number} | ${o.product} | Qty: ${o.quantity} | Status: ${o.status} | Total: ${fmtMoney(Number(o.order_total ?? 0))} | Delivery: ${o.delivery_date ?? "—"}`).join("\n")}`,
         );
       }
-      const shipments = await safeQuery("shipments", "*", (query) =>
-        query.eq("customer_id", customerId),
+      const { rows: shipments } = await safeQuery(
+        "shipments",
+        "Shipments",
+        "*",
+        (query) => query.eq("customer_id", customerId),
       );
       if (shipments.length) {
         parts.push(
@@ -1246,8 +1371,11 @@ async function gatherRoleData(
   else if (role === "supplier_portal") {
     const supplierId = await resolveSupplierId(userId);
     if (supplierId) {
-      const pos = await safeQuery("purchase_orders", "*", (query) =>
-        query.eq("supplier_id", supplierId),
+      const { rows: pos } = await safeQuery(
+        "purchase_orders",
+        "Purchase Orders",
+        "*",
+        (query) => query.eq("supplier_id", supplierId),
       );
       if (pos.length) {
         parts.push(
@@ -1259,7 +1387,7 @@ async function gatherRoleData(
   // Internal roles — gather from allowed domains
   else {
     if (allowed.has("orders") || mentions(["order", "customer order", "sales"])) {
-      const orders = await safeQuery("customer_orders");
+      const { rows: orders } = await safeQuery("customer_orders", "Customer Orders");
       if (orders.length) {
         const pending = orders.filter((o: any) => o.status === "pending_approval").length;
         const inProd = orders.filter((o: any) => o.status === "in_production").length;
@@ -1275,8 +1403,8 @@ async function gatherRoleData(
       }
     }
     if (allowed.has("production") || mentions(["production", "work order", "manufacturing"])) {
-      const prodOrders = await safeQuery("production_orders");
-      const workOrders = await safeQuery("work_orders");
+      const { rows: prodOrders } = await safeQuery("production_orders", "Production Orders");
+      const { rows: workOrders } = await safeQuery("work_orders", "Work Orders");
       if (prodOrders.length) {
         parts.push(
           `PRODUCTION ORDERS (${prodOrders.length}):\n${prodOrders
@@ -1301,12 +1429,19 @@ async function gatherRoleData(
       }
     }
     if (allowed.has("inventory") || mentions(["inventory", "stock", "warehouse"])) {
-      const inv = await safeQuery("inventory");
+      const { rows: inv } = await safeQuery("inventory", "Inventory");
       if (inv.length) {
         parts.push(
           `INVENTORY (${inv.length} items):\n${inv
             .slice(0, 5)
-            .map((i: any) => `  ${i.product_id?.slice(0, 8)} | Qty: ${i.quantity}`)
+            .map((i: any) => {
+              const onHand = Number(i.quantity ?? 0);
+              const reserved = Number(i.reserved_quantity ?? 0);
+              const quarantined = Number(i.quarantined_quantity ?? 0);
+              const damaged = Number(i.damaged_qty ?? 0);
+              const available = Math.max(0, onHand - reserved - quarantined - damaged);
+              return `  ${i.product_id?.slice(0, 8)} | Available: ${available} | On-hand: ${onHand}`;
+            })
             .join("\n")}`,
         );
       }
@@ -1316,7 +1451,7 @@ async function gatherRoleData(
       allowed.has("maintenance") ||
       mentions(["machine", "maintenance"])
     ) {
-      const machines = await safeQuery("machines");
+      const { rows: machines } = await safeQuery("machines", "Machines");
       if (machines.length) {
         const down = machines.filter((m: any) => ["down", "maintenance"].includes(m.status));
         parts.push(
@@ -1328,7 +1463,7 @@ async function gatherRoleData(
       }
     }
     if (allowed.has("quality") || mentions(["quality", "inspection", "defect"])) {
-      const insp = await safeQuery("quality_inspections");
+      const { rows: insp } = await safeQuery("quality_inspections", "Quality Inspections");
       if (insp.length) {
         parts.push(
           `QUALITY INSPECTIONS (${insp.length}):\n${insp
@@ -1342,7 +1477,7 @@ async function gatherRoleData(
       }
     }
     if (allowed.has("finance") || mentions(["invoice", "payment", "finance"])) {
-      const invoices = await safeQuery("invoices");
+      const { rows: invoices } = await safeQuery("invoices", "Invoices");
       if (invoices.length) {
         parts.push(
           `INVOICES (${invoices.length}):\n${invoices
@@ -1356,8 +1491,8 @@ async function gatherRoleData(
       }
     }
     if (allowed.has("suppliers") || mentions(["supplier", "purchase order", "procurement"])) {
-      const pos = await safeQuery("purchase_orders");
-      const suppliers = await safeQuery("suppliers");
+      const { rows: pos } = await safeQuery("purchase_orders", "Purchase Orders");
+      const { rows: suppliers } = await safeQuery("suppliers", "Suppliers");
       if (pos.length) {
         parts.push(
           `PURCHASE ORDERS (${pos.length}):\n${pos
@@ -1383,7 +1518,7 @@ async function gatherRoleData(
       allowed.has("attendance") ||
       mentions(["employee", "hr", "attendance"])
     ) {
-      const employees = await safeQuery("employees");
+      const { rows: employees } = await safeQuery("employees", "Employees");
       if (employees.length) {
         parts.push(
           `EMPLOYEES (${employees.length}):\n${employees
@@ -1396,7 +1531,7 @@ async function gatherRoleData(
       }
     }
     if (allowed.has("dispatch") || mentions(["shipment", "dispatch", "delivery"])) {
-      const shipments = await safeQuery("shipments");
+      const { rows: shipments } = await safeQuery("shipments", "Shipments");
       if (shipments.length) {
         parts.push(
           `SHIPMENTS (${shipments.length}):\n${shipments
@@ -1410,7 +1545,7 @@ async function gatherRoleData(
       }
     }
     if (allowed.has("products") || mentions(["product", "catalog"])) {
-      const products = await safeQuery("products");
+      const { rows: products } = await safeQuery("products", "Products");
       if (products.length) {
         parts.push(
           `PRODUCTS (${products.length}):\n${products
@@ -1424,8 +1559,8 @@ async function gatherRoleData(
       }
     }
     if (role === "root_super_admin") {
-      const companies = await safeQuery("companies");
-      const registrations = await safeQuery("company_registrations");
+      const { rows: companies } = await safeQuery("companies", "Companies");
+      const { rows: registrations } = await safeQuery("company_registrations", "Registrations");
       if (companies.length) {
         parts.push(
           `COMPANIES (${companies.length}):\n${companies.map((c: any) => `  ${c.name} | Status: ${c.status}`).join("\n")}`,
@@ -1439,11 +1574,19 @@ async function gatherRoleData(
     }
     if (role === "company_admin") {
       // Company admin gets a broader picture
-      const employees = await safeQuery("employees");
-      const customers = await safeQuery("customers");
+      const { rows: employees } = await safeQuery("employees", "Employees");
+      const { rows: customers } = await safeQuery("customers", "Customers");
       if (employees.length) parts.push(`EMPLOYEES: ${employees.length} total`);
       if (customers.length) parts.push(`CUSTOMERS: ${customers.length} total`);
     }
+  }
+
+  // If we attempted shapes but every one reported a problem, tell the LLM
+  // explicitly so it can distinguish "no data" from "query failed".
+  if (shapes.length && shapes.every((s) => s.note)) {
+    parts.unshift(
+      `DATA NOTE: I tried to load the following but the queries did not return data: ${shapes.map((s) => `${s.label} (${s.note})`).join(", ")}.`,
+    );
   }
 
   if (parts.length === 0) {
