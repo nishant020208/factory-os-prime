@@ -274,15 +274,13 @@ function SettingsPage() {
   const queryClient = useQueryClient();
   const { profile, user, roles, companyId } = useAuth();
   const { locale, setLocale, t } = useI18n();
-  const { prefs, update: updatePrefs } = usePreferences();
-  const {
+  const { prefs, update: updatePrefs } = usePreferences();  const {
     enabled: clickSoundEnabled,
     setEnabled: setClickSoundEnabled,
     play: playClickSound,
-    hoverEnabled,
-    setHoverEnabled,
-    playHover,
+    toggle,
   } = useClickSound();
+
   // Allow deep-linking to a tab (e.g. /settings?tab=change-requests from nav)
   const search = useSearch({ from: "/_authenticated/settings" });
   const [tab, setTab] = useState<string>(
@@ -1004,12 +1002,12 @@ function SettingsPage() {
                 </div>
               </div>
               <Switch
-                checked={hoverEnabled}
+                checked={clickSoundEnabled}
                 onCheckedChange={(v) => {
-                  setHoverEnabled(v);
-                  if (v) playHover();
+                  setClickSoundEnabled(v);
+                  if (v) playClickSound();
                 }}
-                aria-label="Toggle hover sounds"
+                aria-label="Toggle click sounds"
               />
             </div>
           </Panel>
