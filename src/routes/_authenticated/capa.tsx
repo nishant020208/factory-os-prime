@@ -23,6 +23,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
+import { notifyNcrCreated } from "@/lib/notifications";
 import { toast } from "sonner";
 import { useState } from "react";
 import { safeDate } from "@/lib/utils";
@@ -114,7 +115,7 @@ function CAPAPage() {
     mutationFn: async () => {
       if (!companyId || !user) throw new Error("Not authenticated");
       if (!ncrForm.batch_number.trim()) throw new Error("Batch / work order reference required");
-      const { error } = await supabase.from("ncr").insert({
+      const { data: ncrData, error } = await supabase.from("ncr").insert({
         company_id: companyId,
         ncr_number: `NCR-${new Date().getFullYear()}-${String(Date.now() % 100000).padStart(5, "0")}`,
         batch_number: ncrForm.batch_number,
@@ -123,8 +124,15 @@ function CAPAPage() {
         description: ncrForm.description || null,
         status: "open",
         created_by: user.id,
-      });
+      }).select("ncr_number").single();
       if (error) throw error;
+      await notifyNcrCreated(
+        companyId,
+        ncrData.ncr_number,
+        ncrForm.defect_category,
+        ncrForm.severity,
+        ncrForm.batch_number || null,
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["capa-ncrs"] });
