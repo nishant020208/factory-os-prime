@@ -117,15 +117,23 @@ function InventoryPage() {
 
   // Map inventory data to display rows
   const rows =
-    inventory.data?.map((inv: any) => ({
-      ...inv,
-      sku: inv.products?.sku ?? "—",
-      product_name: inv.products?.name ?? "—",
-      reorder_level: inv.products?.reorder_level ?? 0,
-      unit_cost: inv.products?.unit_cost ?? 0,
-      warehouse_name: inv.warehouses?.name ?? "—",
-      low: Number(inv.quantity ?? 0) <= Number(inv.products?.reorder_level ?? 0),
-    })) ?? [];
+    inventory.data?.map((inv: any) => {
+      const onHand = Number(inv.quantity ?? 0);
+      const reserved = Number(inv.reserved_quantity ?? 0);
+      const quarantined = Number(inv.quarantined_quantity ?? 0);
+      const damaged = Number(inv.damaged_qty ?? 0);
+      const available = Math.max(0, onHand - reserved - quarantined - damaged);
+      return {
+        ...inv,
+        sku: inv.products?.sku ?? "—",
+        product_name: inv.products?.name ?? "—",
+        reorder_level: inv.products?.reorder_level ?? 0,
+        unit_cost: inv.products?.unit_cost ?? 0,
+        warehouse_name: inv.warehouses?.name ?? "—",
+        available,
+        low: available <= Number(inv.products?.reorder_level ?? 0),
+      };
+    }) ?? [];
 
   const adjustMutation = useMutation({
     mutationFn: async () => {
@@ -161,8 +169,12 @@ function InventoryPage() {
 
   const lowStock = rows.filter((r: any) => r.low).length;
   const totalOnHand = rows.reduce((s: number, r: any) => s + Number(r.quantity ?? 0), 0);
+  const totalAvailable = rows.reduce((s: number, r: any) => s + r.available, 0);
+  const totalReserved = rows.reduce((s: number, r: any) => s + Number(r.reserved_quantity ?? 0), 0);
+  const totalQuarantined = rows.reduce((s: number, r: any) => s + Number(r.quarantined_quantity ?? 0), 0);
+  const totalDamaged = rows.reduce((s: number, r: any) => s + Number(r.damaged_qty ?? 0), 0);
   const value = rows.reduce(
-    (s: number, r: any) => s + Number(r.quantity ?? 0) * Number(r.unit_cost ?? 0),
+    (s: number, r: any) => s + r.available * Number(r.unit_cost ?? 0),
     0,
   );
 
@@ -170,8 +182,9 @@ function InventoryPage() {
     .slice(0, 8)
     .map((r: any) => ({
       sku: r.sku,
-      onHand: Number(r.quantity ?? 0),
-      reserved: Math.round(Number(r.quantity ?? 0) * 0.15),
+      available: r.available,
+      reserved: Number(r.reserved_quantity ?? 0),
+      quarantined: Number(r.quarantined_quantity ?? 0),
     }));
 
   return (
@@ -202,12 +215,12 @@ function InventoryPage() {
       />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Kpi
-          label="Total on-hand"
-          value={fmtNumberShort(totalOnHand)}
+          label="Available stock"
+          value={fmtNumberShort(totalAvailable)}
           delta="+2.3%"
           icon={Boxes}
           tone="primary"
-          title={totalOnHand.toLocaleString()}
+          title={`Available: ${totalAvailable.toLocaleString()}`}
         />
         <Kpi
           label="Inventory value"
@@ -224,7 +237,13 @@ function InventoryPage() {
           icon={AlertTriangle}
           tone="warning"
         />
-        <Kpi label="Aging > 90 days" value="14" delta="-3" icon={TrendingDown} tone="info" />
+        <Kpi
+          label="Quarantined / Damaged"
+          value={`${fmtNumberShort(totalQuarantined)} / ${fmtNumberShort(totalDamaged)}`}
+          icon={TrendingDown}
+          tone="info"
+          title={`Quarantined: ${totalQuarantined.toLocaleString()}, Damaged: ${totalDamaged.toLocaleString()}`}
+        />
       </div>
 
       <div className="mt-4">
@@ -243,8 +262,9 @@ function InventoryPage() {
                     fontSize: 12,
                   }}
                 />
-                <Bar dataKey="onHand" fill="oklch(0.58 0.22 259)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="available" fill="oklch(0.58 0.22 259)" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="reserved" fill="oklch(0.62 0.19 300)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="quarantined" fill="oklch(0.75 0.15 70)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -257,7 +277,7 @@ function InventoryPage() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent border-white/5">
-                  {["SKU", "Product", "Warehouse", "On-hand", "Reserved", "Reorder", "Status"].map(
+                  {["SKU", "Product", "Warehouse", "On-hand", "Available", "Reserved", "Quarantined", "Damaged", "Reorder", "Status"].map(
                     (h) => (
                       <TableHead
                         key={h}
@@ -278,8 +298,25 @@ function InventoryPage() {
                     <TableCell className="tabular-nums">
                       {fmtNumberShort(r.quantity ?? 0)}
                     </TableCell>
+                    <TableCell className="tabular-nums font-medium">
+                      {fmtNumberShort(r.available)}
+                    </TableCell>
                     <TableCell className="tabular-nums">
-                      {fmtNumberShort(Math.round(Number(r.quantity ?? 0) * 0.15))}
+                      {fmtNumberShort(r.reserved_quantity ?? 0)}
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      {(r.quarantined_quantity ?? 0) > 0 ? (
+                        <span className="text-amber-400">{fmtNumberShort(r.quarantined_quantity)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">0</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      {(r.damaged_qty ?? 0) > 0 ? (
+                        <span className="text-red-400">{fmtNumberShort(r.damaged_qty)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">0</span>
+                      )}
                     </TableCell>
                     <TableCell className="tabular-nums">
                       {fmtNumberShort(r.reorder_level)}
