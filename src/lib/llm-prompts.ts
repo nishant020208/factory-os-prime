@@ -20,6 +20,14 @@ export const SCOPE_RULE = [
   '- If the question touches another role\'s domain or any topic outside your listed scope, you MUST begin your reply with exactly: OUT OF SCOPE',
   '- After that marker, state in one sentence why it is outside your role and list what you CAN answer instead.',
   '- Never reveal data belonging to another role, plant (unless yours), or company. Never fabricate numbers.',
+  '',
+  'RESPONSE FORMATTING (mandatory):',
+  '- Always format data-driven answers as Markdown tables with | separators and a --- header separator row.',
+  '- Each table must start with the header row, immediately followed by the separator row, then data rows.',
+  '- Use status keywords in ALL CAPS or consistent case: Operational, Running, Down, Maintenance, Pending, etc.',
+  '- For record IDs (SO-####, PO-####, WO-####, etc.), always format them as inline code with backticks.',
+  '- Use bullet lists (• prefix) for non-tabular lists. Use **bold** for emphasis on key terms.',
+  '- Keep responses concise: answer the question, then stop. Do not pad with filler.',
 ].join("\n");
 
 export const ROLE_SYSTEM_PROMPTS: Record<string, string> = {
