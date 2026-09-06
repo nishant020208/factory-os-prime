@@ -30,7 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
-import { notifyBatchFailed, notifyQualityPassed } from "@/lib/notifications";
+import { notifyBatchFailed, notifyQualityPassed, notifyNcrCreated } from "@/lib/notifications";
 import { toast } from "sonner";
 import { useState } from "react";
 import { safeDate } from "@/lib/utils";
@@ -161,7 +161,7 @@ function FinalInspectionPage() {
             created_by: user.id,
             failed_parameters: failedParams,
           })
-          .select("id")
+          .select("id, ncr_number")
           .single();
         if (ncrErr) throw ncrErr;
         const { error: capaErr } = await supabase.from("capa").insert({
@@ -177,6 +177,13 @@ function FinalInspectionPage() {
         });
         if (capaErr) throw capaErr;
         await notifyBatchFailed(companyId, inspectWo.wo_number ?? "Batch", notes || defectCategory, inspectWo.id);
+        await notifyNcrCreated(
+          companyId,
+          ncr.ncr_number,
+          defectCategory,
+          failCount >= 3 ? "high" : "medium",
+          inspectWo.wo_number ?? null,
+        );
       }
     },
     onSuccess: () => {
