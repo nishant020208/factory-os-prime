@@ -22,6 +22,7 @@ import { ROLE_MAP, type AppRole } from "@/lib/roles";
 
 interface WorkflowUser {
   id: string;
+  whitelist_id: string;
   full_name: string | null;
   email: string;
   avatar_url: string | null;
@@ -33,10 +34,11 @@ interface WorkflowUser {
 
 interface WorkflowLink {
   id: string;
-  from_user_id: string;
-  to_user_id: string;
+  parent_id: string;
+  child_id: string;
   from_role: string;
   to_role: string;
+  plant_id: string | null;
 }
 
 interface Props {
@@ -149,9 +151,9 @@ export function EmployeeListPanel({
     });
   };
 
-  const getLinkedCount = (userId: string) =>
+  const getLinkedCount = (whitelistId: string) =>
     links.filter(
-      (l) => l.from_user_id === userId || l.to_user_id === userId
+      (l) => l.parent_id === whitelistId || l.child_id === whitelistId
     ).length;
 
   const handleDragStart = (
@@ -233,7 +235,7 @@ export function EmployeeListPanel({
               {!isCollapsed && (
                 <div className="px-2 pb-2 space-y-1">
                   {group.users.map((user) => {
-                    const linkedCount = getLinkedCount(user.id);
+                    const linkedCount = getLinkedCount(user.whitelist_id);
                     const isSelected = selectedUserId === user.id;
                     return (
                       <div
