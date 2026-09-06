@@ -2,7 +2,7 @@
   "buildCommand": "vite build",
   "outputDirectory": ".output/public",
   "installCommand": "npm install",
-  "framework": null,
+  "framework": "tanstack-start",
   "regions": ["iad1"],
   "headers": [
     {
@@ -17,7 +17,7 @@
           "value": "DENY"
         },
         {
-          "key": "X-XSS-Protection",
+          "key": "X-X-XSS-Protection",
           "value": "1; mode=block"
         },
         {
