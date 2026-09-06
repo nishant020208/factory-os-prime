@@ -224,12 +224,17 @@ export async function autoCheckInventory(
 ): Promise<{ sufficient: boolean; currentStock: number }> {
   const { data } = await supabase
     .from("inventory")
-    .select("quantity")
+    .select("quantity, reserved_quantity, quarantined_quantity, damaged_qty")
     .eq("company_id", companyId)
     .eq("product_id", productId)
     .maybeSingle();
 
-  const currentStock = data ? Number(data.quantity) : 0;
+  if (!data) return { sufficient: false, currentStock: 0 };
+  const onHand = Number(data.quantity ?? 0);
+  const reserved = Number(data.reserved_quantity ?? 0);
+  const quarantined = Number(data.quarantined_quantity ?? 0);
+  const damaged = Number(data.damaged_qty ?? 0);
+  const currentStock = Math.max(0, onHand - reserved - quarantined - damaged);
   return { sufficient: currentStock >= requiredQty, currentStock };
 }
 
