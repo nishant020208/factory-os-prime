@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -62,9 +62,8 @@ interface Props {
 
 const NODE_W = 220;
 const NODE_H = 72;
-const H_GAP = 60;
-const V_GAP = 120;
-const PLANT_SECTION_GAP = 200;
+const H_GAP = 80;
+const V_GAP = 140;
 
 // ─── Dark-theme employee node ────────────────────────────────────
 function EmployeeNode({ data }: { data: any }) {
@@ -167,98 +166,86 @@ function getNodeColor(role: string): string {
 }
 
 // ─── Tree layout engine ─────────────────────────────────────────
-
-/**
- * Builds an adjacency map from links and computes a proper tree layout.
- * Each subtree width is calculated bottom-up so sibling subtrees never overlap.
- */
 function computeTreeLayout(
   users: WorkflowUser[],
   links: WorkflowLink[],
-  isPlantAdmin: boolean,
-  positionMap: Map<string, { x: number; y: number }>
-) {
-  const posMap = new Map(positionMap);
-  if (users.length === 0) return posMap;
+  isPlantAdmin: boolean
+): Map<string, { x: number; y: number }> {
+  const positions = new Map<string, { x: number; y: number }>();
+  if (users.length === 0) return positions;
 
-  // Build adjacency: parentId → childIds
+  // Build adjacency: parentId → childIds (only IDs that exist in users)
+  const userIdSet = new Set(users.map((u) => u.id));
   const childrenOf = new Map<string, string[]>();
   for (const link of links) {
+    if (!userIdSet.has(link.parent_id) || !userIdSet.has(link.child_id)) continue;
     if (!childrenOf.has(link.parent_id)) childrenOf.set(link.parent_id, []);
     childrenOf.get(link.parent_id)!.push(link.child_id);
   }
 
   // Find root
   const root = users.find((u) => u.role === "company_admin") ?? users.find((u) => u.role === "plant_admin");
-  if (!root) return posMap;
+  if (!root) return positions;
 
-  // Compute subtree widths bottom-up (cached)
+  // ── Phase 1: compute subtree widths bottom-up ──
   const widthCache = new Map<string, number>();
   function subtreeWidth(nodeId: string): number {
     if (widthCache.has(nodeId)) return widthCache.get(nodeId)!;
-    const kids = (childrenOf.get(nodeId) ?? []).filter((cid) => users.some((u) => u.id === cid));
+    const kids = (childrenOf.get(nodeId) ?? []).filter((id) => userIdSet.has(id));
     if (kids.length === 0) {
       widthCache.set(nodeId, NODE_W);
       return NODE_W;
     }
-    const totalKidsWidth = kids.reduce((sum, cid) => sum + subtreeWidth(cid), 0) + (kids.length - 1) * H_GAP;
+    const totalKidsWidth =
+      kids.reduce((sum, cid) => sum + subtreeWidth(cid), 0) +
+      (kids.length - 1) * H_GAP;
     const w = Math.max(NODE_W, totalKidsWidth);
     widthCache.set(nodeId, w);
     return w;
   }
+  subtreeWidth(root.id);
 
-  // Assign positions top-down
-  function positionSubtree(nodeId: string, x: number, y: number) {
-    // Already saved by user? Use saved position
-    const user = users.find((u) => u.id === nodeId);
-    if (user && posMap.has(user.whitelist_id)) return;
+  // ── Phase 2: position all nodes top-down ──
+  function positionNode(nodeId: string, left: number, top: number) {
+    const kids = (childrenOf.get(nodeId) ?? []).filter((id) => userIdSet.has(id));
 
-    // Center this node above its children
-    const kids = (childrenOf.get(nodeId) ?? []).filter((cid) => users.some((u) => u.id === cid));
     if (kids.length === 0) {
-      if (user) posMap.set(user.whitelist_id, { x, y });
+      // Leaf node — just place it
+      positions.set(nodeId, { x: left + (widthCache.get(nodeId)! - NODE_W) / 2, y: top });
       return;
     }
 
-    // Position children in a row centered under this node
-    const totalWidth = kids.reduce((sum, cid) => sum + subtreeWidth(cid), 0) + (kids.length - 1) * H_GAP;
-    let childX = x + (subtreeWidth(nodeId) / 2) - (totalWidth / 2);
+    // Position children left-to-right
+    let childLeft = left;
     for (const cid of kids) {
-      const cw = subtreeWidth(cid);
-      positionSubtree(cid, childX, y + V_GAP);
-      childX += cw + H_GAP;
+      const cw = widthCache.get(cid)!;
+      positionNode(cid, childLeft, top + V_GAP);
+      childLeft += cw + H_GAP;
     }
 
-    // Center parent above children
-    const firstChild = kids[0];
-    const lastChild = kids[kids.length - 1];
-    const fp = posMap.get(users.find((u) => u.id === firstChild)?.whitelist_id ?? "");
-    const lp = posMap.get(users.find((u) => u.id === lastChild)?.whitelist_id ?? "");
-    if (fp && lp) {
-      const centerX = (fp.x + lp.x + NODE_W) / 2;
-      if (user) posMap.set(user.whitelist_id, { x: centerX - NODE_W / 2, y });
+    // Center parent above its children
+    const firstKidPos = positions.get(kids[0]);
+    const lastKidPos = positions.get(kids[kids.length - 1]);
+    if (firstKidPos && lastKidPos) {
+      const centerX = (firstKidPos.x + lastKidPos.x + NODE_W) / 2;
+      positions.set(nodeId, { x: centerX - NODE_W / 2, y: top });
     } else {
-      if (user) posMap.set(user.whitelist_id, { x, y });
+      positions.set(nodeId, { x: left + (widthCache.get(nodeId)! - NODE_W) / 2, y: top });
     }
   }
 
-  subtreeWidth(root.id);
+  // Center the whole tree in a reasonable viewport
+  const treeWidth = widthCache.get(root.id)!;
+  const startX = Math.max(40, 600 - treeWidth / 2);
+  positionNode(root.id, startX, 40);
 
-  if (isPlantAdmin) {
-    // Plant Admin: root at top center, all users as direct children
-    const totalWidth = subtreeWidth(root.id);
-    positionSubtree(root.id, 600 - totalWidth / 2, 40);
-  } else {
-    // Company Admin: hierarchical tree
-    positionSubtree(root.id, 600, 40);
-  }
-
-  // Assign fallback positions for any user not yet positioned
+  // ── Phase 3: position any orphaned users (not reachable from root) ──
   let fallbackX = 100;
-  let fallbackY = 800;
+  let fallbackY = 40;
+  const positioned = new Set(positions.keys());
   for (const u of users) {
-    if (!posMap.has(u.whitelist_id)) {
-      posMap.set(u.whitelist_id, { x: fallbackX, y: fallbackY });
+    if (!positioned.has(u.id)) {
+      positions.set(u.id, { x: fallbackX, y: fallbackY });
       fallbackX += NODE_W + H_GAP;
       if (fallbackX > 1800) {
         fallbackX = 100;
@@ -267,7 +254,7 @@ function computeTreeLayout(
     }
   }
 
-  return posMap;
+  return positions;
 }
 
 // ─── Main graph component ────────────────────────────────────────
@@ -287,69 +274,82 @@ export function WorkflowGraph({
   const [draggedOver, setDraggedOver] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
-  // Position map from saved positions
-  const positionMap = useMemo(() => {
-    const map = new Map<string, { x: number; y: number }>();
-    positions.forEach((p) => map.set(p.whitelist_id, { x: p.position_x, y: p.position_y }));
-    return map;
-  }, [positions]);
-
-  // Compute tree layout
+  // Compute tree layout (ignores saved positions for clean initial layout)
   const layoutPositions = useMemo(
-    () => computeTreeLayout(users, links, isPlantAdmin, positionMap),
-    [users, links, isPlantAdmin, positionMap]
-  );
-
-  const getDefaultPosition = useCallback(
-    (user: WorkflowUser) => {
-      return layoutPositions.get(user.whitelist_id) ?? { x: 400, y: 400 };
-    },
-    [layoutPositions]
+    () => computeTreeLayout(users, links, isPlantAdmin),
+    [users, links, isPlantAdmin]
   );
 
   // Build React Flow nodes
-  const initialNodes: Node[] = useMemo(() => {
-    return users.map((user) => {
-      const pos = getDefaultPosition(user);
-      return {
-        id: user.id,
-        type: "employee",
-        position: pos,
-        data: { user, isSelected: selectedUserId === user.id },
-      };
-    });
-  }, [users, selectedUserId, getDefaultPosition]);
+  const [nodes, setNodes, onNodesChange] = useNodesState(
+    users.map((user) => ({
+      id: user.id,
+      type: "employee" as const,
+      position: layoutPositions.get(user.id) ?? { x: 400, y: 400 },
+      data: { user, isSelected: selectedUserId === user.id },
+    }))
+  );
 
   // Build React Flow edges
-  const initialEdges: Edge[] = useMemo(() => {
-    return links
+  const [edges, setEdges, onEdgesChange] = useEdgesState(
+    links
       .map((link) => {
         const parent = users.find((u) => u.whitelist_id === link.parent_id);
         const child = users.find((u) => u.whitelist_id === link.child_id);
         if (!parent || !child) return null;
-        const isHighlighted = selectedUserId === parent.id || selectedUserId === child.id;
+        const isHighlighted =
+          selectedUserId === parent.id || selectedUserId === child.id;
         return {
           id: link.id,
           source: parent.id,
           target: child.id,
-          type: "smoothstep",
+          type: "smoothstep" as const,
           animated: false,
           style: {
             stroke: isHighlighted ? "#818cf8" : "rgba(148,163,184,0.6)",
             strokeWidth: isHighlighted ? 3 : 2,
           },
-          labelStyle: { fill: "rgba(148,163,184,0.5)", fontSize: 10 },
         };
       })
-      .filter(Boolean) as Edge[];
-  }, [links, users, selectedUserId]);
+      .filter(Boolean) as Edge[]
+  );
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  // Sync nodes/edges when data changes (useEffect, not useMemo)
+  useEffect(() => {
+    setNodes(
+      users.map((user) => ({
+        id: user.id,
+        type: "employee" as const,
+        position: layoutPositions.get(user.id) ?? { x: 400, y: 400 },
+        data: { user, isSelected: selectedUserId === user.id },
+      }))
+    );
+  }, [users, selectedUserId, layoutPositions, setNodes]);
 
-  // Sync when data changes
-  useMemo(() => { setNodes(initialNodes); }, [initialNodes]);
-  useMemo(() => { setEdges(initialEdges); }, [initialEdges]);
+  useEffect(() => {
+    setEdges(
+      links
+        .map((link) => {
+          const parent = users.find((u) => u.whitelist_id === link.parent_id);
+          const child = users.find((u) => u.whitelist_id === link.child_id);
+          if (!parent || !child) return null;
+          const isHighlighted =
+            selectedUserId === parent.id || selectedUserId === child.id;
+          return {
+            id: link.id,
+            source: parent.id,
+            target: child.id,
+            type: "smoothstep" as const,
+            animated: false,
+            style: {
+              stroke: isHighlighted ? "#818cf8" : "rgba(148,163,184,0.6)",
+              strokeWidth: isHighlighted ? 3 : 2,
+            },
+          };
+        })
+        .filter(Boolean) as Edge[]
+    );
+  }, [links, users, selectedUserId, setEdges]);
 
   // Node drag stop → persist
   const handleNodeDragStop: any = useCallback(
@@ -440,12 +440,14 @@ export function WorkflowGraph({
         onNodesChange={onNodesChange as OnNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeDragStop={handleNodeDragStop}
-        onNodeClick={(_, node) => onSelectUser(selectedUserId === node.id ? null : node.id)}
+        onNodeClick={(_, node) =>
+          onSelectUser(selectedUserId === node.id ? null : node.id)
+        }
         onPaneClick={() => onSelectUser(null)}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.1}
+        fitViewOptions={{ padding: 0.15 }}
+        minZoom={0.08}
         maxZoom={2}
         defaultEdgeOptions={{
           type: "smoothstep",
