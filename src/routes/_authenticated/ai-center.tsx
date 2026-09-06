@@ -29,90 +29,7 @@ import {
 } from "@/lib/role-scope";
 import { answerCopilot, answerCopilotStream } from "@/lib/copilot-engine";
 import { checkCopilotProviderHealth } from "@/lib/copilot-llm.server";
-
-/** Simple markdown-to-HTML renderer for copilot responses */
-function renderMarkdown(text: string): React.ReactNode {
-  const paragraphs = text.split(/\n\n+/);
-  return (
-    <>
-      {paragraphs.map((para, i) => {
-        // Check for markdown table
-        const tableMatch = para.match(/^(\|.+\|)\n\|[-| :]+\|(\n\|.+\|)+$/);
-        if (tableMatch) {
-          const rows = para.split("\n");
-          const headers = rows[0]
-            .split("|")
-            .map((c) => c.trim())
-            .filter(Boolean);
-          const bodyRows = rows.slice(2).map((r) =>
-            r
-              .split("|")
-              .map((c) => c.trim())
-              .filter(Boolean),
-          );
-          return (
-            <table key={i} className="w-full border-collapse mb-2 text-xs">
-              <thead>
-                <tr className="border-b-2 border-primary">
-                  {headers.map((h, j) => (
-                    <th
-                      key={j}
-                      className="border border-white/20 px-2 py-1 text-left font-medium text-primary"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {bodyRows.map((row, ri) => (
-                  <tr key={ri} className={ri % 2 === 0 ? "bg-white/5" : ""}>
-                    {row.map((cell, ci) => (
-                      <td
-                        key={ci}
-                        className="border border-white/10 px-2 py-1"
-                        dangerouslySetInnerHTML={{ __html: formatInline(cell) }}
-                      />
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          );
-        }
-        // Check if it's a list (lines starting with • or -)
-        const lines = para.split("\n");
-        const isList = lines.every((l) => /^[•-]\s/.test(l.trim()));
-        if (isList) {
-          return (
-            <ul key={i} className="list-none space-y-1 my-2">
-              {lines.map((line, j) => (
-                <li key={j} className="flex items-start gap-2">
-                  <span className="text-primary mt-0.5">•</span>
-                  <span
-                    dangerouslySetInnerHTML={{ __html: formatInline(line.replace(/^[•-]\s/, "")) }}
-                  />
-                </li>
-              ))}
-            </ul>
-          );
-        }
-        // Regular paragraph
-        return (
-          <p key={i} className="my-2" dangerouslySetInnerHTML={{ __html: formatInline(para) }} />
-        );
-      })}
-    </>
-  );
-}
-
-/** Format inline markdown: **bold**, `code`, newlines */
-function formatInline(text: string): string {
-  return text
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/`(.+?)`/g, '<code class="bg-muted px-1 rounded text-xs">$1</code>')
-    .replace(/\n/g, "<br />");
-}
+import { CopilotMarkdown } from "@/components/copilot-markdown";
 
 const copilotPlaceholder: Record<string, string> = {
   root_super_admin: "Ask about companies, registrations, platform health…",
@@ -334,7 +251,7 @@ function AICenter() {
                     {m.role === "user" ? "You" : `Copilot${m.conf ? ` · ${m.conf}% conf.` : ""}`}
                   </div>
                   <div className="leading-relaxed">
-                    {renderMarkdown(m.text)}
+                    {m.role === "ai" ? <CopilotMarkdown text={m.text} /> : <span>{m.text}</span>}
                     {streaming && i === msgs.length - 1 && m.role === "ai" && (
                       <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5" />
                     )}
