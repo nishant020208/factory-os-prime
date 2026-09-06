@@ -130,6 +130,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
         { to: "/employees", label: "Employees", icon: Users },
         { to: "/users", label: "Users & Roles", icon: Shield, badge: "New" },
         { to: "/whitelist", label: "Whitelist", icon: FileCheck2 },
+        { to: "/workflow", label: "Org Workflow", icon: RouteIcon, badge: "New" },
         {
           to: "/settings?tab=change-requests",
           label: "Pending Profile Requests",
@@ -186,6 +187,7 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
         { to: "/departments", label: "Departments", icon: TreePine },
         { to: "/employees", label: "Employees", icon: Users },
         { to: "/whitelist", label: "Whitelist", icon: UserPlus },
+        { to: "/workflow", label: "Org Workflow", icon: RouteIcon, badge: "New" },
       ],
     },
     {
@@ -224,6 +226,13 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
       ],
     },
     { label: "Reports", items: [{ to: "/reports", label: "Reports", icon: ClipboardList }] },
+    {
+      label: "People",
+      items: [
+        { to: "/leaves", label: "Leaves", icon: Calendar },
+        { to: "/payroll", label: "Payroll", icon: Wallet },
+      ],
+    },
   ],
 
   production_manager: [
@@ -246,6 +255,13 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
       label: "Reports",
       items: [{ to: "/production-reports", label: "Production Reports", icon: ClipboardList }],
     },
+    {
+      label: "People",
+      items: [
+        { to: "/leaves", label: "Leaves", icon: Calendar },
+        { to: "/payroll", label: "Payroll", icon: Wallet },
+      ],
+    },
   ],
 
   warehouse_manager: [
@@ -265,6 +281,13 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
       ],
     },
     { label: "Reports", items: [{ to: "/reports", label: "Reports", icon: ClipboardList }] },
+    {
+      label: "People",
+      items: [
+        { to: "/leaves", label: "Leaves", icon: Calendar },
+        { to: "/payroll", label: "Payroll", icon: Wallet },
+      ],
+    },
   ],
 
   procurement_manager: [
@@ -302,6 +325,13 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
       label: "Reports",
       items: [{ to: "/quality-reports", label: "Quality Reports", icon: ClipboardList }],
     },
+    {
+      label: "People",
+      items: [
+        { to: "/leaves", label: "Leaves", icon: Calendar },
+        { to: "/payroll", label: "Payroll", icon: Wallet },
+      ],
+    },
   ],
 
   maintenance_engineer: [
@@ -321,6 +351,13 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
     {
       label: "Reports",
       items: [{ to: "/maintenance-reports", label: "Reports", icon: ClipboardList }],
+    },
+    {
+      label: "People",
+      items: [
+        { to: "/leaves", label: "Leaves", icon: Calendar },
+        { to: "/payroll", label: "Payroll", icon: Wallet },
+      ],
     },
   ],
 
@@ -381,6 +418,13 @@ export const NAV_BY_ROLE: Record<AppRole, NavSection[]> = {
     {
       label: "Reports",
       items: [{ to: "/reports", label: "My Reports", icon: ClipboardList }],
+    },
+    {
+      label: "People",
+      items: [
+        { to: "/leaves", label: "Leaves", icon: Calendar },
+        { to: "/payroll", label: "My Payslip", icon: Wallet },
+      ],
     },
   ],
 
