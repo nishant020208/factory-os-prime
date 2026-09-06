@@ -41,6 +41,8 @@ function LeavesPage() {
   const queryClient = useQueryClient();
   const { companyId, user, roles } = useAuth();
   const isAuditor = roles.includes("auditor");
+  const isHrOrAdmin = roles.includes("hr_manager") || roles.includes("company_admin") || roles.includes("plant_admin");
+  const canApprove = isHrOrAdmin && !isAuditor;
   const [showNew, setShowNew] = useState(false);
   const [rejectDialog, setRejectDialog] = useState<{ open: boolean; leave: any | null; reason: string }>({
     open: false,
@@ -69,6 +71,11 @@ function LeavesPage() {
     enabled: !!companyId,
   });
 
+  // For non-HR/Admin users, only show their own leave requests
+  const visibleLeaves = isHrOrAdmin
+    ? (leaves ?? [])
+    : (leaves ?? []).filter((l: any) => l.employee_id === user?.id);
+
   const { data: profiles } = useQuery({
     queryKey: ["leave-profiles", companyId],
     queryFn: async () =>
@@ -83,15 +90,15 @@ function LeavesPage() {
   });
 
   const today = new Date().toISOString().slice(0, 10);
-  const pending = (leaves ?? []).filter((l: any) => l.status === "pending").length;
-  const approved = (leaves ?? []).filter((l: any) => l.status === "approved").length;
-  const onLeaveToday = (leaves ?? []).filter(
+  const pending = visibleLeaves.filter((l: any) => l.status === "pending").length;
+  const approved = visibleLeaves.filter((l: any) => l.status === "approved").length;
+  const onLeaveToday = visibleLeaves.filter(
     (l: any) =>
       l.status === "approved" &&
       l.start_date <= today &&
       l.end_date >= today,
   ).length;
-  const totalDays = (leaves ?? [])
+  const totalDays = visibleLeaves
     .filter((l: any) => l.status === "approved")
     .reduce((s: number, l: any) => {
       const days =
@@ -192,9 +199,15 @@ function LeavesPage() {
         sub="Leave requests, approvals and balance management."
         actions={
           !isAuditor ? (
-            <Button className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={() => setShowNew(true)}>
+            <Button className="bg-[image:var(--gradient-primary)] shadow-glow" onClick={() => {
+              // For self-service users, auto-select themselves
+              if (!isHrOrAdmin && user?.id) {
+                setForm((f) => ({ ...f, employee_id: user.id }));
+              }
+              setShowNew(true);
+            }}>
               <Plus className="h-4 w-4 mr-1.5" />
-              New Leave Request
+              {isHrOrAdmin ? "New Leave Request" : "Request Leave"}
             </Button>
           ) : null
         }
@@ -207,8 +220,8 @@ function LeavesPage() {
       </div>
 
       <div className="mt-4">
-        <Panel title={`${(leaves ?? []).length} Leave Requests`}>
-          {(leaves ?? []).length === 0 ? (
+        <Panel title={`${visibleLeaves.length} Leave Requests`}>
+          {visibleLeaves.length === 0 ? (
             <EmptyState title="No leave requests yet" sub="New requests appear here." />
           ) : (
             <div className="overflow-x-auto">
@@ -226,7 +239,7 @@ function LeavesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(leaves ?? []).map((l: any) => {
+                  {visibleLeaves.map((l: any) => {
                     const days =
                       (new Date(l.end_date).getTime() - new Date(l.start_date).getTime()) /
                         86400000 +
@@ -242,7 +255,7 @@ function LeavesPage() {
                           <StatusBadge status={l.status} />
                         </td>
                         <td className="py-2.5 px-2">
-                          {!isAuditor && l.status === "pending" && (
+                          {canApprove && l.status === "pending" && (
                             <div className="flex items-center gap-1.5">
                               <Button
                                 size="sm"
@@ -290,18 +303,25 @@ function LeavesPage() {
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Employee *</Label>
-              <Select value={form.employee_id} onValueChange={(v) => setForm((f) => ({ ...f, employee_id: v }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(profiles ?? []).map((p: any) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.full_name ?? p.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isHrOrAdmin ? (
+                <Select value={form.employee_id} onValueChange={(v) => setForm((f) => ({ ...f, employee_id: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select employee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(profiles ?? []).map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.full_name ?? p.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md text-sm">
+                  <span className="font-medium">{user?.email ?? "You"}</span>
+                  <span className="text-muted-foreground text-xs">(self-service)</span>
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Leave Type</Label>
