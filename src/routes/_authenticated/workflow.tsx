@@ -144,30 +144,100 @@ function WorkflowPage() {
     enabled: !!companyId,
   });
 
-  const { data: links = [], isLoading: linksLoading } = useQuery({
-    queryKey: ["workflow-links", companyId, plantId, refreshKey],
-    queryFn: async () => {
-      if (!companyId) return [];
-      let query = supabase
-        .from("workflow_links" as any)
-        .select("id, from_user_id, to_user_id, from_role, to_role")
-        .eq("company_id", companyId);
+  // Derive links from whitelist hierarchy (role + plant_id) AND workflow_links table.
+  // The default hierarchy is computed client-side so it works even when
+  // workflow_links rows don't exist yet or reference different IDs.
+  const links: WorkflowLink[] = (() => {
+    if (!users.length) return [];
 
-      if (isPlantAdmin && plantId) {
-        const plantUserIds = users.map((u) => u.id).filter((id) => !id.startsWith("wl-"));
-        if (plantUserIds.length > 0) {
-          query = query.or(
-            `from_user_id.in.(${plantUserIds.join(",")}),to_user_id.in.(${plantUserIds.join(",")})`
-          );
+    const derived: WorkflowLink[] = [];
+    let linkId = 0;
+    const makeLink = (
+      fromUser: WorkflowUser,
+      toUser: WorkflowUser,
+    ): WorkflowLink => ({
+      id: `derived-${linkId++}`,
+      from_user_id: fromUser.id,
+      to_user_id: toUser.id,
+      from_role: fromUser.role,
+      to_role: toUser.role,
+    });
+
+    const companyAdmin = users.find((u) => u.role === "company_admin");
+    if (!companyAdmin) return [];
+
+    // Group users by plant
+    const byPlant = new Map<string, WorkflowUser[]>();
+    const companyLevel: WorkflowUser[] = [];
+    for (const u of users) {
+      if (u.id === companyAdmin.id) continue;
+      if (u.plant_id) {
+        if (!byPlant.has(u.plant_id)) byPlant.set(u.plant_id, []);
+        byPlant.get(u.plant_id)!.push(u);
+      } else {
+        companyLevel.push(u);
+      }
+    }
+
+    const PLANT_ROLES = new Set([
+      "plant_admin",
+      "plant_manager",
+      "production_manager",
+      "warehouse_manager",
+      "procurement_manager",
+      "quality_inspector",
+      "maintenance_engineer",
+      "production_operator",
+    ]);
+
+    // For each plant: company_admin → plant_admin, plant_admin → everyone else in plant
+    for (const [, plantUsers] of byPlant) {
+      const plantAdmin = plantUsers.find((u) => u.role === "plant_admin");
+      if (plantAdmin) {
+        // company_admin → plant_admin
+        derived.push(makeLink(companyAdmin, plantAdmin));
+
+        // plant_admin → all other plant-level roles
+        for (const u of plantUsers) {
+          if (u.id !== plantAdmin.id && PLANT_ROLES.has(u.role)) {
+            derived.push(makeLink(plantAdmin, u));
+          }
+        }
+      } else {
+        // No plant_admin — link plant users directly to company_admin
+        for (const u of plantUsers) {
+          if (PLANT_ROLES.has(u.role)) {
+            derived.push(makeLink(companyAdmin, u));
+          }
         }
       }
+    }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []) as unknown as WorkflowLink[];
-    },
-    enabled: !!companyId,
-  });
+    // Company-level roles: company_admin → finance_manager, hr_manager, auditor, etc.
+    const COMPANY_LEVEL_ROLES = new Set([
+      "finance_manager",
+      "hr_manager",
+      "auditor",
+      "procurement_manager",
+    ]);
+    for (const u of companyLevel) {
+      if (COMPANY_LEVEL_ROLES.has(u.role)) {
+        derived.push(makeLink(companyAdmin, u));
+      }
+    }
+
+    // Portals: link to company_admin
+    for (const u of users) {
+      if (
+        (u.role === "customer_portal" || u.role === "supplier_portal") &&
+        u.id !== companyAdmin.id
+      ) {
+        derived.push(makeLink(companyAdmin, u));
+      }
+    }
+
+    return derived;
+  })();
 
   const handleRefresh = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -185,7 +255,7 @@ function WorkflowPage() {
     setZoom(1);
   }, []);
 
-  const isLoading = usersLoading || linksLoading;
+  const isLoading = usersLoading;
 
   return (
     <TooltipProvider>
