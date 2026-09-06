@@ -62,6 +62,9 @@ interface Props {
 
 const NODE_W = 220;
 const NODE_H = 72;
+const H_GAP = 60;
+const V_GAP = 120;
+const PLANT_SECTION_GAP = 200;
 
 // ─── Dark-theme employee node ────────────────────────────────────
 function EmployeeNode({ data }: { data: any }) {
@@ -163,6 +166,110 @@ function getNodeColor(role: string): string {
   return ROLE_COLORS[role]?.solid ?? ROLE_COLORS.default.solid;
 }
 
+// ─── Tree layout engine ─────────────────────────────────────────
+
+/**
+ * Builds an adjacency map from links and computes a proper tree layout.
+ * Each subtree width is calculated bottom-up so sibling subtrees never overlap.
+ */
+function computeTreeLayout(
+  users: WorkflowUser[],
+  links: WorkflowLink[],
+  isPlantAdmin: boolean,
+  positionMap: Map<string, { x: number; y: number }>
+) {
+  const posMap = new Map(positionMap);
+  if (users.length === 0) return posMap;
+
+  // Build adjacency: parentId → childIds
+  const childrenOf = new Map<string, string[]>();
+  for (const link of links) {
+    if (!childrenOf.has(link.parent_id)) childrenOf.set(link.parent_id, []);
+    childrenOf.get(link.parent_id)!.push(link.child_id);
+  }
+
+  // Find root
+  const root = users.find((u) => u.role === "company_admin") ?? users.find((u) => u.role === "plant_admin");
+  if (!root) return posMap;
+
+  // Compute subtree widths bottom-up (cached)
+  const widthCache = new Map<string, number>();
+  function subtreeWidth(nodeId: string): number {
+    if (widthCache.has(nodeId)) return widthCache.get(nodeId)!;
+    const kids = (childrenOf.get(nodeId) ?? []).filter((cid) => users.some((u) => u.id === cid));
+    if (kids.length === 0) {
+      widthCache.set(nodeId, NODE_W);
+      return NODE_W;
+    }
+    const totalKidsWidth = kids.reduce((sum, cid) => sum + subtreeWidth(cid), 0) + (kids.length - 1) * H_GAP;
+    const w = Math.max(NODE_W, totalKidsWidth);
+    widthCache.set(nodeId, w);
+    return w;
+  }
+
+  // Assign positions top-down
+  function positionSubtree(nodeId: string, x: number, y: number) {
+    // Already saved by user? Use saved position
+    const user = users.find((u) => u.id === nodeId);
+    if (user && posMap.has(user.whitelist_id)) return;
+
+    // Center this node above its children
+    const kids = (childrenOf.get(nodeId) ?? []).filter((cid) => users.some((u) => u.id === cid));
+    if (kids.length === 0) {
+      if (user) posMap.set(user.whitelist_id, { x, y });
+      return;
+    }
+
+    // Position children in a row centered under this node
+    const totalWidth = kids.reduce((sum, cid) => sum + subtreeWidth(cid), 0) + (kids.length - 1) * H_GAP;
+    let childX = x + (subtreeWidth(nodeId) / 2) - (totalWidth / 2);
+    for (const cid of kids) {
+      const cw = subtreeWidth(cid);
+      positionSubtree(cid, childX, y + V_GAP);
+      childX += cw + H_GAP;
+    }
+
+    // Center parent above children
+    const firstChild = kids[0];
+    const lastChild = kids[kids.length - 1];
+    const fp = posMap.get(users.find((u) => u.id === firstChild)?.whitelist_id ?? "");
+    const lp = posMap.get(users.find((u) => u.id === lastChild)?.whitelist_id ?? "");
+    if (fp && lp) {
+      const centerX = (fp.x + lp.x + NODE_W) / 2;
+      if (user) posMap.set(user.whitelist_id, { x: centerX - NODE_W / 2, y });
+    } else {
+      if (user) posMap.set(user.whitelist_id, { x, y });
+    }
+  }
+
+  subtreeWidth(root.id);
+
+  if (isPlantAdmin) {
+    // Plant Admin: root at top center, all users as direct children
+    const totalWidth = subtreeWidth(root.id);
+    positionSubtree(root.id, 600 - totalWidth / 2, 40);
+  } else {
+    // Company Admin: hierarchical tree
+    positionSubtree(root.id, 600, 40);
+  }
+
+  // Assign fallback positions for any user not yet positioned
+  let fallbackX = 100;
+  let fallbackY = 800;
+  for (const u of users) {
+    if (!posMap.has(u.whitelist_id)) {
+      posMap.set(u.whitelist_id, { x: fallbackX, y: fallbackY });
+      fallbackX += NODE_W + H_GAP;
+      if (fallbackX > 1800) {
+        fallbackX = 100;
+        fallbackY += NODE_H + V_GAP;
+      }
+    }
+  }
+
+  return posMap;
+}
+
 // ─── Main graph component ────────────────────────────────────────
 export function WorkflowGraph({
   users,
@@ -187,78 +294,23 @@ export function WorkflowGraph({
     return map;
   }, [positions]);
 
-  // Hierarchical default layout: group by plant, tree structure
+  // Compute tree layout
+  const layoutPositions = useMemo(
+    () => computeTreeLayout(users, links, isPlantAdmin, positionMap),
+    [users, links, isPlantAdmin, positionMap]
+  );
+
   const getDefaultPosition = useCallback(
-    (user: WorkflowUser, allUsers: WorkflowUser[]) => {
-      const saved = positionMap.get(user.whitelist_id);
-      if (saved) return saved;
-
-      const companyAdmin = allUsers.find((u) => u.role === "company_admin");
-      if (!companyAdmin) return { x: 400, y: 300 };
-
-      // Group users by plant
-      const byPlant = new Map<string, WorkflowUser[]>();
-      const companyLevel: WorkflowUser[] = [];
-      for (const u of allUsers) {
-        if (u.id === companyAdmin.id) continue;
-        if (u.plant_id) {
-          if (!byPlant.has(u.plant_id)) byPlant.set(u.plant_id, []);
-          byPlant.get(u.plant_id)!.push(u);
-        } else {
-          companyLevel.push(u);
-        }
-      }
-
-      const PLANT_ROLES = ["plant_admin", "plant_manager", "production_manager", "warehouse_manager",
-        "procurement_manager", "quality_inspector", "maintenance_engineer", "production_operator", "hr_manager"];
-      const COMPANY_ROLES = ["finance_manager", "auditor"];
-
-      const COLS = 3;
-      const GAP_X = NODE_W + 50;
-      const GAP_Y = NODE_H + 35;
-      const PLANT_GAP = 80;
-      const PLANT_HEADER = 30;
-
-      // Company admin at top center
-      if (user.id === companyAdmin.id) return { x: 500, y: 40 };
-
-      // Company-level roles: right side
-      const compIdx = COMPANY_ROLES.indexOf(user.role);
-      if (compIdx >= 0 && !user.plant_id) {
-        return { x: 900, y: 160 + compIdx * GAP_Y };
-      }
-
-      // Plant-grouped users
-      const plantEntries = Array.from(byPlant.entries());
-      for (let pi = 0; pi < plantEntries.length; pi++) {
-        const [plantIdKey, plantUsers] = plantEntries[pi];
-        const plantX = 100 + pi * (COLS * GAP_X + PLANT_GAP);
-
-        const roleInPlant = plantUsers.filter((u) => PLANT_ROLES.includes(u.role));
-        const portalsInPlant = plantUsers.filter((u) =>
-          u.role === "customer_portal" || u.role === "supplier_portal"
-        );
-
-        const allInPlant = [...roleInPlant, ...portalsInPlant];
-        const idx = allInPlant.findIndex((u) => u.id === user.id);
-        if (idx >= 0) {
-          return {
-            x: plantX + (idx % COLS) * GAP_X,
-            y: 140 + PLANT_HEADER + Math.floor(idx / COLS) * GAP_Y,
-          };
-        }
-      }
-
-      // Fallback: bottom
-      return { x: 400, y: 600 };
+    (user: WorkflowUser) => {
+      return layoutPositions.get(user.whitelist_id) ?? { x: 400, y: 400 };
     },
-    [positionMap]
+    [layoutPositions]
   );
 
   // Build React Flow nodes
   const initialNodes: Node[] = useMemo(() => {
     return users.map((user) => {
-      const pos = getDefaultPosition(user, users);
+      const pos = getDefaultPosition(user);
       return {
         id: user.id,
         type: "employee",
@@ -283,9 +335,10 @@ export function WorkflowGraph({
           type: "smoothstep",
           animated: false,
           style: {
-            stroke: isHighlighted ? "#818cf8" : "rgba(148,163,184,0.4)",
-            strokeWidth: isHighlighted ? 2.5 : 1.5,
+            stroke: isHighlighted ? "#818cf8" : "rgba(148,163,184,0.6)",
+            strokeWidth: isHighlighted ? 3 : 2,
           },
+          labelStyle: { fill: "rgba(148,163,184,0.5)", fontSize: 10 },
         };
       })
       .filter(Boolean) as Edge[];
@@ -391,12 +444,12 @@ export function WorkflowGraph({
         onPaneClick={() => onSelectUser(null)}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.3 }}
-        minZoom={0.15}
+        fitViewOptions={{ padding: 0.2 }}
+        minZoom={0.1}
         maxZoom={2}
         defaultEdgeOptions={{
           type: "smoothstep",
-          style: { stroke: "rgba(148,163,184,0.4)", strokeWidth: 1.5 },
+          style: { stroke: "rgba(148,163,184,0.6)", strokeWidth: 2 },
         }}
         proOptions={{ hideAttribution: true }}
         className="!bg-transparent"
@@ -405,7 +458,7 @@ export function WorkflowGraph({
           variant={BackgroundVariant.Dots}
           gap={24}
           size={1}
-          color="rgba(148,163,184,0.06)"
+          color="rgba(148,163,184,0.08)"
         />
         <Controls
           showInteractive={false}
