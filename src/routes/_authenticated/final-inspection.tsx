@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
 import { notifyBatchFailed, notifyQualityPassed, notifyNcrCreated } from "@/lib/notifications";
+import { releaseOrderAfterQcPass } from "@/lib/quality-gate";
 import { toast } from "sonner";
 import { useState } from "react";
 import { safeDate } from "@/lib/utils";
@@ -130,12 +131,30 @@ function FinalInspectionPage() {
           quantity_checked: inspectWo.quantity ?? 1,
           notes: notes || null,
         })
-        .select("id")
+        .select("id, inspection_number")
         .single();
       if (inspErr) throw inspErr;
 
       if (result === "pass") {
         await notifyQualityPassed(companyId, inspectWo.wo_number ?? "Batch", inspectWo.id);
+
+        // Stage 2 gate: release the linked sales order for dispatch.
+        let soId = inspectWo.sales_order_id ?? null;
+        if (!soId && inspectWo.production_order_id) {
+          const { data: poRow } = await supabase
+            .from("production_orders")
+            .select("sales_order_id")
+            .eq("id", inspectWo.production_order_id)
+            .maybeSingle();
+          soId = poRow?.sales_order_id ?? null;
+        }
+        if (soId) {
+          await releaseOrderAfterQcPass({
+            companyId,
+            salesOrderId: soId,
+            inspectionNumber: insp.inspection_number,
+          });
+        }
       } else {
         // 2) Fail → create NCR + CAPA, notify Production Manager + Operator
         // Collect specific failed parameters for the NCR
