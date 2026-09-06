@@ -146,10 +146,10 @@ const copilotCommands: Record<string, CopilotCmd[]> = {
     { label: "Inventory levels", value: "inventory stock material levels", to: "/inventory" },
   ],
   quality_inspector: [
-    { label: "Run quality inspection", value: "quality inspection check defects", to: "/quality" },
+    { label: "Run quality inspection", value: "quality inspection check defects", to: "/quality?tab=inspections" },
     { label: "Defect tracking", value: "defects ncr tracking", to: "/defects" },
     { label: "CAPA actions", value: "capa corrective preventive action", to: "/capa" },
-    { label: "Incoming inspection", value: "incoming inspection material", to: "/incoming-inspection" },
+    { label: "Incoming inspection", value: "incoming inspection material", to: "/quality?tab=incoming" },
     { label: "Final inspection", value: "final inspection batch pass fail", to: "/final-inspection" },
     { label: "Quality certificates", value: "quality certificates issued", to: "/quality-certificates" },
   ],
