@@ -24,6 +24,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -33,7 +34,7 @@ const LS_HOVER_KEY = "factoryos_hover_sound"; // "1" = enabled, "0" = muted (def
 const DEFAULT_ENABLED = true;
 const DEFAULT_HOVER_ENABLED = false;
 
-export type ClickSoundVariant = "plain" | "primary";
+export type ClickSoundVariant = "plain" | "primary" | "emerald";
 
 // ── Web Audio engine ─────────────────────────────────────────────────────────
 
@@ -73,10 +74,11 @@ export function playClickSound(variant: ClickSoundVariant = "plain"): void {
   _lastPlayAt = now;
   try {
     const primary = variant === "primary";
+    const emerald = variant === "emerald";
     const t = ac.currentTime + 0.001;
 
     const master = ac.createGain();
-    master.gain.value = primary ? 0.5 : 0.38;
+    master.gain.value = emerald ? 0.45 : primary ? 0.5 : 0.38;
     master.connect(ac.destination);
 
     // Attack transient — 18 ms of white noise through a high-pass gives the
@@ -120,196 +122,234 @@ export function playClickSound(variant: ClickSoundVariant = "plain"): void {
 }
 
 /**
- * Play a gentle, subtle micro-tick on element hover.
+ * Play a positive-action ping (inspect started, record saved).
  */
-export function playHoverSound(): void {
-  const ac = getAudioContext();
-  if (!ac) return;
-  const now = performance.now();
-  if (now - _lastHoverPlayAt < 40) return;
-  _lastHoverPlayAt = now;
-  try {
-    const t = ac.currentTime + 0.001;
-    const master = ac.createGain();
-    master.gain.value = 0.12;
-    master.connect(ac.destination);
-
-    const osc = ac.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(1200, t);
-    osc.frequency.exponentialRampToValueAtTime(700, t + 0.015);
-    const og = ac.createGain();
-    og.gain.setValueAtTime(0.0001, t);
-    og.gain.exponentialRampToValueAtTime(0.25, t + 0.002);
-    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.015);
-    osc.connect(og);
-    og.connect(master);
-    osc.start(t);
-    osc.stop(t + 0.02);
-  } catch {
-    // Best effort
-  }
+export function playInspectStart(): void {
+  playClickSound("emerald");
 }
 
-// ── Provider ─────────────────────────────────────────────────────────────────
+// ── Sound context ────────────────────────────────────────────────────────────
 
-interface ClickSoundCtx {
-  /** Whether click sounds currently play. */
+interface SoundContextValue {
   enabled: boolean;
   setEnabled: (v: boolean) => void;
   toggle: () => void;
-  /** Whether hover sounds currently play. */
-  hoverEnabled: boolean;
-  setHoverEnabled: (v: boolean) => void;
-  toggleHover: () => void;
-  /** Manually play a tick right now (unconditional — for explicit feedback). */
   play: (variant?: ClickSoundVariant) => void;
-  playHover: () => void;
 }
 
-const Ctx = createContext<ClickSoundCtx>({
-  enabled: DEFAULT_ENABLED,
-  setEnabled: () => {},
-  toggle: () => {},
-  hoverEnabled: DEFAULT_HOVER_ENABLED,
-  setHoverEnabled: () => {},
-  toggleHover: () => {},
-  play: () => {},
-  playHover: () => {},
-});
+const SoundContext = createContext<SoundContextValue | null>(null);
+
+export function useSoundContext(): SoundContextValue {
+  const ctx = useContext(SoundContext);
+  if (!ctx) throw new Error("useSoundContext used outside SoundProvider");
+  return ctx;
+}
+
+// ── SoundProvider ────────────────────────────────────────────────────────────
 
 export function SoundProvider({ children }: { children: ReactNode }) {
-  const [enabled, setEnabledState] = useState<boolean>(DEFAULT_ENABLED);
-  const [hoverEnabled, setHoverEnabledState] = useState<boolean>(DEFAULT_HOVER_ENABLED);
+  const [enabled, setEnabledRaw] = useState(DEFAULT_ENABLED);
+  const [hoverEnabled, setHoverEnabledRaw] = useState(DEFAULT_HOVER_ENABLED);
 
+  // Persist to localStorage — re-read on mount so the persisted choice survives
+  // hot reloads and SSR/CSR mismatches.
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(LS_KEY);
-      if (raw !== null) setEnabledState(raw !== "0");
-      const hoverRaw = window.localStorage.getItem(LS_HOVER_KEY);
-      if (hoverRaw !== null) setHoverEnabledState(hoverRaw === "1");
+      const saved = localStorage.getItem(LS_KEY);
+      if (saved !== null) setEnabledRaw(saved === "1");
     } catch {
-      // Ignore storage failures
+      // Storage can throw in restricted contexts (private mode, iframes).
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LS_HOVER_KEY);
+      if (saved !== null) setHoverEnabledRaw(saved === "1");
+    } catch {
+      // Storage can throw in restricted contexts.
     }
   }, []);
 
-  useEffect(() => {
+  const setEnabled = useCallback(
+    (v: boolean) => {
+      setEnabledRaw(v);
+      try {
+        localStorage.setItem(LS_KEY, v ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+    },
+    [],
+  );
+  const setHoverEnabled = useCallback(
+    (v: boolean) => {
+      setHoverEnabledRaw(v);
+      try {
+        localStorage.setItem(LS_HOVER_KEY, v ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+    },
+    [],
+  );
+
+  const toggle = useCallback(() => {
+    setEnabledRaw(!enabled);
     try {
-      window.localStorage.setItem(LS_KEY, enabled ? "1" : "0");
+      localStorage.setItem(LS_KEY, !enabled ? "1" : "0");
     } catch {
-      // Ignore storage failures
+      /* ignore */
     }
   }, [enabled]);
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(LS_HOVER_KEY, hoverEnabled ? "1" : "0");
-    } catch {
-      // Ignore storage failures
-    }
-  }, [hoverEnabled]);
+  const play = useCallback(
+    (variant: ClickSoundVariant = "plain") => {
+      if (enabled) playClickSound(variant);
+    },
+    [enabled],
+  );
 
-  const setEnabled = useCallback((v: boolean) => setEnabledState(v), []);
-  const toggle = useCallback(() => setEnabledState((e) => !e), []);
-  const setHoverEnabled = useCallback((v: boolean) => setHoverEnabledState(v), []);
-  const toggleHover = useCallback(() => setHoverEnabledState((e) => !e), []);
-  const play = useCallback((variant?: ClickSoundVariant) => playClickSound(variant), []);
-  const playHover = useCallback(() => playHoverSound(), []);
-
-  const value = useMemo(
+  const value = useMemo<SoundContextValue>(
     () => ({
       enabled,
       setEnabled,
       toggle,
-      hoverEnabled,
-      setHoverEnabled,
-      toggleHover,
       play,
-      playHover,
     }),
-    [enabled, setEnabled, toggle, hoverEnabled, setHoverEnabled, toggleHover, play, playHover],
+    [enabled, setEnabled, toggle, play],
   );
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <SoundContext.Provider value={value}>
+      {children}
+      <GlobalClickSoundLayer hoverEnabled={hoverEnabled} onHoverToggle={() => setHoverEnabled(!hoverEnabled)} />
+    </SoundContext.Provider>
+  );
 }
 
-export function useClickSound() {
-  return useContext(Ctx);
-}
+// ── Global click + hover sound layer ──────────────────────────────────────────
 
-// ── Global delegated layer ───────────────────────────────────────────────────
+export function GlobalClickSoundLayer({
+  onHoverToggle,
+  hoverEnabled,
+}: {
+  onHoverToggle: () => void;
+  hoverEnabled: boolean;
+}) {
+  const play = useSoundContext().play;
 
-const CLICKABLE_SELECTOR = [
-  "button",
-  'a[href]',
-  '[role="button"]',
-  '[role="switch"]',
-  '[role="tab"]',
-  'input[type="button"]',
-  'input[type="submit"]',
-  "summary",
-].join(", ");
+  // Delegate document-level click ticks to roughly match the project's existing
+  // per-button sound pattern — no per-component wiring required. A short throttle
+  // per (element, event) pair keeps rapid repeated clicks from becoming a
+  // machine-gun burst.
+  const lastTicked = useRef(new WeakMap<EventTarget, number>());
+  const lastHoverPlayed = useRef(new WeakMap<EventTarget, number>());
+  const THROTTLE_MS = 30;
 
-/**
- * Mount once inside SoundProvider. Listens on document in the capture phase so
- * the tick plays even when a handler lower in the tree calls stopPropagation,
- * and fires before route transitions unmount the clicked element.
- */
-export function GlobalClickSoundLayer() {
-  const { enabled, hoverEnabled } = useClickSound();
+  const onClickCapture = useCallback(
+    (event: MouseEvent) => {
+      const target: EventTarget | null = event.target;
+      if (!target) return;
+      const now = performance.now();
+      const last = lastTicked.current.get(target) ?? 0;
+      if (now - last < THROTTLE_MS) return;
+      lastTicked.current.set(target, now);
 
-  useEffect(() => {
-    if (!enabled) return;
-
-    const onClickCapture = (e: MouseEvent) => {
-      const target = e.target;
-      if (!(target instanceof Element)) return;
-      if (target.closest("[data-no-click-sound]")) return;
-      const el = target.closest<HTMLElement>(CLICKABLE_SELECTOR);
-      if (!el) return;
+      // Skip disabled controls.
       if (
-        (el instanceof HTMLButtonElement && el.disabled) ||
-        (el instanceof HTMLInputElement && el.disabled) ||
-        el.getAttribute("aria-disabled") === "true"
+        (target instanceof HTMLButtonElement && target.disabled) ||
+        (target instanceof HTMLInputElement && target.disabled) ||
+        (target instanceof Element && target.getAttribute("aria-disabled") === "true")
       ) {
         return;
       }
-      const isPrimary =
-        el.classList.contains("bg-primary") ||
-        el.classList.contains("bg-destructive") ||
-        !!el.closest(".bg-primary, .bg-destructive");
-      playClickSound(isPrimary ? "primary" : "plain");
-    };
 
-    document.addEventListener("click", onClickCapture, true);
-    return () => document.removeEventListener("click", onClickCapture, true);
-  }, [enabled]);
+      // Respect per-element opt-out.
+      let el: Element | null = target as Element | null;
+      while (el) {
+        if (el.getAttribute("data-no-click-sound") === "true") return;
+        el = el.parentElement;
+      }
+
+      const variant: ClickSoundVariant =
+        target instanceof HTMLElement && target.dataset.primary === "true"
+          ? "primary"
+          : event.shiftKey
+            ? "primary"
+            : "plain";
+
+      play(variant);
+    },
+    [play],
+  );
+
+  // Renders nothing — both listeners attach to `document` via effects, so the
+  // server and client markup stay identical (no hydration mismatch).
+  return <GlobalClickSoundLayerCapture onClick={onClickCapture} onHover={hoverEnabled ? onHoverCapture : null} />;
+
+  function onHoverCapture(event: MouseEvent) {
+    const target: EventTarget | null = event.target;
+    if (!target) return;
+    const now = performance.now();
+    const last = lastHoverPlayed.current.get(target) ?? 0;
+    if (now - last < HOVER_THROTTLE_MS) return;
+    lastHoverPlayed.current.set(target, now);
+
+    if (
+      (target instanceof HTMLButtonElement && target.disabled) ||
+      (target instanceof HTMLInputElement && target.disabled) ||
+      (target instanceof Element && target.getAttribute("aria-disabled") === "true")
+    ) {
+      return;
+    }
+
+    let el: Element | null = target as Element | null;
+    while (el) {
+      if (el.getAttribute("data-no-click-sound") === "true") return;
+      el = el.parentElement;
+    }
+
+    play("plain");
+  }
+}
+
+const HOVER_THROTTLE_MS = 120;
+
+// ── Dispatch helpers ──────────────────────────────────────────────────────────
+
+function GlobalClickSoundLayerCapture({
+  onClick,
+  onHover,
+}: {
+  onClick: (event: MouseEvent) => void;
+  onHover: ((event: MouseEvent) => void) | null;
+}) {
+  useEffect(() => {
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [onClick]);
 
   useEffect(() => {
-    if (!hoverEnabled) return;
-
-    let lastTarget: Element | null = null;
-    const onMouseOverCapture = (e: MouseEvent) => {
-      const target = e.target;
-      if (!(target instanceof Element)) return;
-      if (target === lastTarget) return;
-      if (target.closest("[data-no-click-sound]")) return;
-      const el = target.closest<HTMLElement>(CLICKABLE_SELECTOR);
-      if (!el || el === lastTarget) return;
-      lastTarget = el;
-      if (
-        (el instanceof HTMLButtonElement && el.disabled) ||
-        (el instanceof HTMLInputElement && el.disabled) ||
-        el.getAttribute("aria-disabled") === "true"
-      ) {
-        return;
-      }
-      playHoverSound();
-    };
-
-    document.addEventListener("mouseover", onMouseOverCapture, true);
-    return () => document.removeEventListener("mouseover", onMouseOverCapture, true);
-  }, [hoverEnabled]);
+    if (!onHover) return;
+    document.addEventListener("mouseover", onHover, true);
+    return () => document.removeEventListener("mouseover", onHover, true);
+  }, [onHover]);
 
   return null;
 }
+
+// ── Reusable hook ────────────────────────────────────────────────────────────
+
+export function useClickSound() {
+  const { enabled, setEnabled, toggle, play } = useSoundContext();
+  return useMemo(
+    () => ({
+      enabled,
+      setEnabled,
+      toggle,
+      play: (variant?: ClickSoundVariant) => play(variant),
+    }),
+    [enabled, setEnabled, toggle, play],
+  );
+}
+
