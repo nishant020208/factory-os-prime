@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
 import { fmtMoney } from "@/lib/currency";
-import { notifyGRNConfirmed, notifyGRNToSupplier, notifyMaterialsReceivedForOrder } from "@/lib/notifications";
+import { notifyGRNConfirmed, notifyGRNToSupplier, notifyMaterialsReceivedForOrder, notifyIncomingInspectionPending } from "@/lib/notifications";
 import { toast } from "sonner";
 import { useState } from "react";
 import { QrCameraScanner } from "@/components/qr-camera-scanner";
@@ -62,7 +62,7 @@ function GoodsReceiptPage() {
   const { data: allWarehouses } = useQuery({
     queryKey: ["warehouses", companyId],
     queryFn: async () =>
-      (await supabase.from("warehouses").select("id, name, code").eq("company_id", companyId ?? "").order("name"))
+      (await supabase.from("warehouses").select("id, name, code, plant_id").eq("company_id", companyId ?? "").order("name"))
         .data ?? [],
     enabled: !!companyId,
   });
@@ -125,6 +125,10 @@ function GoodsReceiptPage() {
         whId = (rawWh as any)?.id ?? (allWarehouses as any[])?.[0]?.id ?? null;
       }
 
+      // Resolve plant_id from the warehouse for plant-scoped inspections
+      const whObj = (allWarehouses ?? []).find((w: any) => w.id === whId);
+      const plantId: string | null = whObj?.plant_id ?? null;
+
       // 5) Fetch PO items
       const { data: items } = await supabase
         .from("purchase_order_items")
@@ -159,6 +163,7 @@ function GoodsReceiptPage() {
         try {
           await (supabase.from("incoming_material_inspections" as any) as any).insert({
             company_id: companyId,
+            plant_id: plantId,
             goods_receipt_id: grId,
             purchase_order_id: poId,
             material_id: it.material_id,
@@ -168,6 +173,13 @@ function GoodsReceiptPage() {
           });
         } catch (_) {/* non-fatal */}
       }
+
+      // Notify Quality Inspector that incoming materials need QC inspection
+      try {
+        const matNames = items?.map((it: any) => it.material_id).join(", ") ?? "materials";
+        const whName = (whObj as any)?.name ?? "warehouse";
+        await notifyIncomingInspectionPending(companyId, (po as any).po_number ?? "PO", matNames, whName);
+      } catch (_) { /* non-fatal */ }
 
       // 8) Resume waiting production orders (stock check will pass post-inspection,
       //    but run it anyway so approved backlog auto-resumes)
