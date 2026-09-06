@@ -184,10 +184,11 @@ function TransfersPage() {
       (s: any) => s.warehouse_id === form.from_warehouse_id && s.product_id === form.product_id,
     );
     if (!row) return 0;
-    const onHand = Number(row.quantity ?? 0);
-    const reserved = Number(row.reserved_quantity ?? 0);
-    const quarantined = Number(row.quarantined_quantity ?? 0);
-    const damaged = Number(row.damaged_qty ?? 0);
+    const r = row as any;
+    const onHand = Number(r.quantity ?? 0);
+    const reserved = Number(r.reserved_quantity ?? 0);
+    const quarantined = Number(r.quarantined_quantity ?? 0);
+    const damaged = Number(r.damaged_qty ?? 0);
     return Math.max(0, onHand - reserved - quarantined - damaged);
   }, [stock.data, form.from_warehouse_id, form.product_id]);
 

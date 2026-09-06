@@ -230,10 +230,11 @@ export async function autoCheckInventory(
     .maybeSingle();
 
   if (!data) return { sufficient: false, currentStock: 0 };
-  const onHand = Number(data.quantity ?? 0);
-  const reserved = Number(data.reserved_quantity ?? 0);
-  const quarantined = Number(data.quarantined_quantity ?? 0);
-  const damaged = Number(data.damaged_qty ?? 0);
+  const d = data as any;
+  const onHand = Number(d.quantity ?? 0);
+  const reserved = Number(d.reserved_quantity ?? 0);
+  const quarantined = Number(d.quarantined_quantity ?? 0);
+  const damaged = Number(d.damaged_qty ?? 0);
   const currentStock = Math.max(0, onHand - reserved - quarantined - damaged);
   return { sufficient: currentStock >= requiredQty, currentStock };
 }
