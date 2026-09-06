@@ -55,23 +55,22 @@ const EMPTY_FORM = {
 
 function EmployeesPage() {
   const queryClient = useQueryClient();
-  const { companyId, roles } = useAuth();
+  const { companyId, roles, plantId } = useAuth();
   const isAuditor = roles.includes("auditor");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
 
   // REAL employee records — the same table that links to profiles via email.
+  // Plant-scoped users (HR, Plant Admin, managers) see only their plant's
+  // roster — RLS enforces it and the query filters the same way.
   const { data: employees } = useQuery({
-    queryKey: ["employees", companyId],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("employees")
-          .select("*")
-          .eq("company_id", companyId!)
-          .order("full_name")
-      ).data ?? [],
+    queryKey: ["employees", companyId, plantId],
+    queryFn: async () => {
+      let q = supabase.from("employees").select("*").eq("company_id", companyId!);
+      if (plantId) q = q.eq("plant_id", plantId);
+      return (await q.order("full_name")).data ?? [];
+    },
     enabled: !!companyId,
   });
 
@@ -140,6 +139,10 @@ function EmployeesPage() {
       if (!form.full_name.trim()) throw new Error("Full name is required");
       const payload: any = {
         company_id: companyId,
+        // New employees belong to the signed-in user's plant when they have
+        // one — RLS enforces that plant-scoped users can only write their own
+        // plant's rows, so this keeps the create path valid for HR/Plant Admin.
+        plant_id: plantId ?? null,
         full_name: form.full_name.trim(),
         email: form.email.trim() || null,
         phone: form.phone.trim() || null,
