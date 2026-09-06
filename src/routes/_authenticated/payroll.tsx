@@ -209,6 +209,20 @@ function PayrollPage() {
       paid_at: r.paid_at,
     }));
 
+  // Coverage audit: which active employees are missing payroll for current period
+  const periodEmployeeIds = new Set(
+    (payrollRows ?? []).filter((r: any) => r.period === period).map((r: any) => r.employee_id)
+  );
+  const missingPayroll = (employees ?? []).filter((e: any) => {
+    const pid = profileByEmail.get((e.email ?? "").toLowerCase());
+    return pid && !periodEmployeeIds.has(pid);
+  });
+  const employeeCount = (employees ?? []).length;
+  const coveragePct =
+    employeeCount > 0
+      ? Math.round(((employeeCount - missingPayroll.length) / employeeCount) * 100)
+      : 100;
+
   return (
     <div className="max-w-[1600px] mx-auto">
       <PageHeader
@@ -246,6 +260,42 @@ function PayrollPage() {
         <Kpi label="Paid" value={`${processed}/${totalRecords}`} icon={CheckCircle2} tone="info" />
         <Kpi label="Pending" value={String(totalRecords - processed)} icon={Clock} tone="warning" />
       </div>
+
+      {/* Coverage Audit */}
+      {missingPayroll.length > 0 && !isAuditor && (
+        <div className="mt-4">
+          <Panel title={`Coverage Audit — ${coveragePct}% covered for ${period}`}>
+            <p className="text-xs text-muted-foreground mb-3">
+              {missingPayroll.length} employee{missingPayroll.length !== 1 ? "s" : ""} missing payroll record{missingPayroll.length !== 1 ? "s" : ""} for this period.
+              Generate a payroll run to include them.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/5">
+                    {["Employee", "Email", "Status"].map((h) => (
+                      <th key={h} className="text-left text-[11px] uppercase tracking-wider text-muted-foreground py-2 px-2">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {missingPayroll.map((e: any) => (
+                    <tr key={e.id} className="border-b border-white/5 hover:bg-white/[0.02]">
+                      <td className="py-2 px-2 font-medium text-xs">{e.full_name ?? "—"}</td>
+                      <td className="py-2 px-2 text-xs text-muted-foreground">{e.email ?? "—"}</td>
+                      <td className="py-2 px-2">
+                        <StatusBadge status="missing" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        </div>
+      )}
 
       <div className="mt-4">
         <Panel
