@@ -79,7 +79,13 @@ function AnalyticsPage() {
   const totalPOValue =
     purchaseOrders?.reduce((s: number, p: any) => s + Number(p.total_amount ?? 0), 0) ?? 0;
   const totalInventory =
-    inventory?.reduce((s: number, i: any) => s + Number(i.quantity ?? 0), 0) ?? 0;
+    inventory?.reduce((s: number, i: any) => {
+      const onHand = Number(i.quantity ?? 0);
+      const reserved = Number(i.reserved_quantity ?? 0);
+      const quarantined = Number(i.quarantined_quantity ?? 0);
+      const damaged = Number(i.damaged_qty ?? 0);
+      return s + Math.max(0, onHand - reserved - quarantined - damaged);
+    }, 0) ?? 0;
 
   // Production trend (synthetic from real data)
   const prodTrend = Array.from({ length: 12 }, (_, i) => ({
