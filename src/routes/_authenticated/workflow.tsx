@@ -74,9 +74,9 @@ function WorkflowPage() {
         .eq("company_id", companyId)
         .not("role", "eq", "root_super_admin");
 
-      // Plant Admin: only their plant's employees + company-wide (no plant)
+      // Plant Admin: ONLY their plant's employees — no company-level roles
       if (isPlantAdmin && plantId) {
-        wlQuery = wlQuery.or(`plant_id.eq.${plantId},plant_id.is.null`);
+        wlQuery = wlQuery.eq("plant_id", plantId);
       }
 
       const { data: whitelistRows, error: wlError } = await wlQuery;
@@ -191,33 +191,21 @@ function WorkflowPage() {
   const links: WorkflowLink[] = (() => {
     const merged = new Map<string, WorkflowLink>();
 
-    // Start with DB links
+    // Start with DB links — only include those whose parent/child are in our user list
+    const userIds = new Set(users.map((u) => u.whitelist_id));
     for (const link of dbLinks) {
-      merged.set(`${link.parent_id}->${link.child_id}`, link);
+      if (userIds.has(link.parent_id) && userIds.has(link.child_id)) {
+        merged.set(`${link.parent_id}->${link.child_id}`, link);
+      }
     }
 
-    // Add derived links for any user not already linked
-    const linkedChildren = new Set(dbLinks.map((l) => l.child_id));
-    const companyAdmin = users.find((u) => u.role === "company_admin");
-    if (!companyAdmin) return Array.from(merged.values());
+    const linkedChildren = new Set(dbLinks.filter((l) => userIds.has(l.parent_id) && userIds.has(l.child_id)).map((l) => l.child_id));
 
     const PLANT_ROLES = new Set([
       "plant_admin", "plant_manager", "production_manager", "warehouse_manager",
       "procurement_manager", "quality_inspector", "maintenance_engineer",
       "production_operator", "hr_manager",
     ]);
-
-    const byPlant = new Map<string, WorkflowUser[]>();
-    const companyLevel: WorkflowUser[] = [];
-    for (const u of users) {
-      if (u.id === companyAdmin.id) continue;
-      if (u.plant_id) {
-        if (!byPlant.has(u.plant_id)) byPlant.set(u.plant_id, []);
-        byPlant.get(u.plant_id)!.push(u);
-      } else {
-        companyLevel.push(u);
-      }
-    }
 
     let linkId = dbLinks.length;
     const makeDerived = (
@@ -235,54 +223,75 @@ function WorkflowPage() {
       plant_id: plantIdVal,
     });
 
-    for (const [, plantUsers] of byPlant) {
-      const plantAdmin = plantUsers.find((u) => u.role === "plant_admin");
-      if (plantAdmin && !linkedChildren.has(plantAdmin.whitelist_id)) {
-        const key = `${companyAdmin.whitelist_id}->${plantAdmin.whitelist_id}`;
-        if (!merged.has(key)) {
-          merged.set(key, makeDerived(
-            companyAdmin.whitelist_id, plantAdmin.whitelist_id,
-            "company_admin", "plant_admin", plantAdmin.plant_id
-          ));
+    // Find root: company_admin (Company view) or plant_admin (Plant view)
+    const companyAdmin = users.find((u) => u.role === "company_admin");
+    const plantAdmin = users.find((u) => u.role === "plant_admin");
+    const root = companyAdmin ?? plantAdmin;
+    if (!root) return Array.from(merged.values());
+
+    // Group users by plant
+    const byPlant = new Map<string, WorkflowUser[]>();
+    const companyLevel: WorkflowUser[] = [];
+    for (const u of users) {
+      if (u.id === root.id) continue;
+      if (u.plant_id) {
+        if (!byPlant.has(u.plant_id)) byPlant.set(u.plant_id, []);
+        byPlant.get(u.plant_id)!.push(u);
+      } else {
+        companyLevel.push(u);
+      }
+    }
+
+    // Plant Admin view: link root → all plant users
+    if (isPlantAdmin) {
+      for (const u of users) {
+        if (u.id !== root.id && PLANT_ROLES.has(u.role) && !linkedChildren.has(u.whitelist_id)) {
+          const key = `${root.whitelist_id}->${u.whitelist_id}`;
+          if (!merged.has(key)) {
+            merged.set(key, makeDerived(root.whitelist_id, u.whitelist_id, root.role, u.role, u.plant_id));
+          }
         }
       }
-      if (plantAdmin) {
-        for (const u of plantUsers) {
-          if (u.id !== plantAdmin.id && PLANT_ROLES.has(u.role) && !linkedChildren.has(u.whitelist_id)) {
-            const key = `${plantAdmin.whitelist_id}->${u.whitelist_id}`;
-            if (!merged.has(key)) {
-              merged.set(key, makeDerived(
-                plantAdmin.whitelist_id, u.whitelist_id,
-                "plant_admin", u.role, u.plant_id
-              ));
+    } else {
+      // Company Admin view: hierarchical by plant
+      for (const [, plantUsers] of byPlant) {
+        const pa = plantUsers.find((u) => u.role === "plant_admin");
+        if (pa && !linkedChildren.has(pa.whitelist_id)) {
+          const key = `${root.whitelist_id}->${pa.whitelist_id}`;
+          if (!merged.has(key)) {
+            merged.set(key, makeDerived(root.whitelist_id, pa.whitelist_id, "company_admin", "plant_admin", pa.plant_id));
+          }
+        }
+        if (pa) {
+          for (const u of plantUsers) {
+            if (u.id !== pa.id && PLANT_ROLES.has(u.role) && !linkedChildren.has(u.whitelist_id)) {
+              const key = `${pa.whitelist_id}->${u.whitelist_id}`;
+              if (!merged.has(key)) {
+                merged.set(key, makeDerived(pa.whitelist_id, u.whitelist_id, "plant_admin", u.role, u.plant_id));
+              }
             }
+          }
+        }
+      }
+
+      const COMPANY_LEVEL_ROLES = new Set(["finance_manager", "auditor", "procurement_manager"]);
+      for (const u of companyLevel) {
+        if (COMPANY_LEVEL_ROLES.has(u.role) && !linkedChildren.has(u.whitelist_id)) {
+          const key = `${root.whitelist_id}->${u.whitelist_id}`;
+          if (!merged.has(key)) {
+            merged.set(key, makeDerived(root.whitelist_id, u.whitelist_id, "company_admin", u.role, null));
           }
         }
       }
     }
 
-    const COMPANY_LEVEL_ROLES = new Set(["finance_manager", "auditor", "procurement_manager"]);
-    for (const u of companyLevel) {
-      if (COMPANY_LEVEL_ROLES.has(u.role) && !linkedChildren.has(u.whitelist_id)) {
-        const key = `${companyAdmin.whitelist_id}->${u.whitelist_id}`;
-        if (!merged.has(key)) {
-          merged.set(key, makeDerived(
-            companyAdmin.whitelist_id, u.whitelist_id,
-            "company_admin", u.role, null
-          ));
-        }
-      }
-    }
-
+    // Portals
     for (const u of users) {
       if ((u.role === "customer_portal" || u.role === "supplier_portal") &&
-          u.id !== companyAdmin.id && !linkedChildren.has(u.whitelist_id)) {
-        const key = `${companyAdmin.whitelist_id}->${u.whitelist_id}`;
+          u.id !== root.id && !linkedChildren.has(u.whitelist_id)) {
+        const key = `${root.whitelist_id}->${u.whitelist_id}`;
         if (!merged.has(key)) {
-          merged.set(key, makeDerived(
-            companyAdmin.whitelist_id, u.whitelist_id,
-            "company_admin", u.role, u.plant_id
-          ));
+          merged.set(key, makeDerived(root.whitelist_id, u.whitelist_id, root.role, u.role, u.plant_id));
         }
       }
     }

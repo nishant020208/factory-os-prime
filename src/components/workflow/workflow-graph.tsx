@@ -9,11 +9,8 @@ import {
   type Node,
   type Edge,
   type OnNodesChange,
-  type OnConnect,
   type NodeTypes,
-  type EdgeTypes,
   BackgroundVariant,
-  Panel,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,87 +60,110 @@ interface Props {
   onNodeDragStop?: (userId: string, x: number, y: number) => void;
 }
 
-const NODE_W = 200;
-const NODE_H = 80;
+const NODE_W = 220;
+const NODE_H = 72;
 
-// Custom node component
+// ─── Dark-theme employee node ────────────────────────────────────
 function EmployeeNode({ data }: { data: any }) {
   const user: WorkflowUser = data.user;
   const isSelected: boolean = data.isSelected;
-  const roleColor = getRoleColor(user.role);
+  const colors = ROLE_COLORS[user.role] ?? ROLE_COLORS.default;
 
   return (
     <div
       className={cn(
-        "rounded-xl border bg-card shadow-sm transition-all duration-150 cursor-grab active:cursor-grabbing",
-        "hover:shadow-md hover:border-primary/30",
-        isSelected && "ring-2 ring-primary border-primary shadow-md",
-        !isSelected && "border-border/60"
+        "drag-handle rounded-xl transition-all duration-150 cursor-grab active:cursor-grabbing",
+        "border shadow-lg",
+        isSelected
+          ? "ring-2 ring-offset-1 ring-offset-background"
+          : "hover:shadow-xl hover:scale-[1.02]"
       )}
-      style={{ width: NODE_W, height: NODE_H }}
+      style={{
+        width: NODE_W,
+        height: NODE_H,
+        background: "hsl(220, 15%, 12%)",
+        borderColor: isSelected ? colors.solid : "hsl(220, 10%, 22%)",
+      }}
     >
-      <div className="flex items-center gap-2 p-2.5 h-full">
+      <div className="flex items-center gap-2.5 px-3 h-full">
+        {/* Avatar with colored ring */}
         <div className="relative shrink-0">
-          <UserAvatar
-            name={user.full_name ?? user.email}
-            url={user.avatar_url}
-            className="h-9 w-9"
-          />
+          <div
+            className="rounded-full p-[2px]"
+            style={{ background: colors.gradient }}
+          >
+            <div className="rounded-full bg-[hsl(220,15%,12%)] p-[1px]">
+              <UserAvatar
+                name={user.full_name ?? user.email}
+                url={user.avatar_url}
+                className="h-8 w-8"
+              />
+            </div>
+          </div>
           <div
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card",
-              user.status === "active" ? "bg-emerald-500" : "bg-muted"
+              "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[hsl(220,15%,12%)]",
+              user.status === "active" ? "bg-emerald-400" : "bg-zinc-500"
             )}
           />
         </div>
+
+        {/* Text content */}
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium truncate leading-tight">
+          <p className="text-[11px] font-semibold text-zinc-100 truncate leading-tight">
             {user.full_name ?? user.email.split("@")[0]}
           </p>
-          <p className="text-[10px] text-muted-foreground truncate leading-tight mt-0.5">
+          <p className="text-[9px] text-zinc-400 truncate leading-tight mt-0.5">
             {user.email}
           </p>
-          <div className="flex items-center gap-1 mt-1">
-            <Badge
-              variant="secondary"
-              className={cn(
-                "text-[9px] px-1.5 py-0 h-4 leading-none font-medium",
-                roleColor
-              )}
-            >
-              {ROLE_MAP[user.role as AppRole]?.label ?? user.role}
-            </Badge>
-          </div>
+          <Badge
+            className="mt-1.5 text-[8px] px-1.5 py-0 h-3.5 leading-none font-semibold border"
+            style={{
+              background: colors.bg,
+              color: colors.text,
+              borderColor: colors.border,
+            }}
+          >
+            {ROLE_MAP[user.role as AppRole]?.label ?? user.role}
+          </Badge>
         </div>
       </div>
+
+      {/* Left accent strip */}
       <div
-        className={cn(
-          "absolute top-0 left-0 w-1 h-full rounded-l-xl",
-          roleColor.replace("text-", "bg-")
-        )}
+        className="absolute top-1 bottom-1 left-0 w-[3px] rounded-r-full"
+        style={{ background: colors.gradient }}
       />
     </div>
   );
 }
 
-const nodeTypes: NodeTypes = {
-  employee: EmployeeNode,
+const nodeTypes: NodeTypes = { employee: EmployeeNode };
+
+// ─── Role color definitions (dark-theme optimized) ──────────────
+const ROLE_COLORS: Record<string, { solid: string; gradient: string; bg: string; text: string; border: string }> = {
+  company_admin:       { solid: "#818cf8", gradient: "linear-gradient(135deg, #6366f1, #818cf8)", bg: "rgba(99,102,241,0.15)", text: "#a5b4fc", border: "rgba(99,102,241,0.3)" },
+  plant_admin:         { solid: "#a78bfa", gradient: "linear-gradient(135deg, #8b5cf6, #a78bfa)", bg: "rgba(139,92,246,0.15)", text: "#c4b5fd", border: "rgba(139,92,246,0.3)" },
+  plant_manager:       { solid: "#60a5fa", gradient: "linear-gradient(135deg, #3b82f6, #60a5fa)", bg: "rgba(59,130,246,0.15)", text: "#93c5fd", border: "rgba(59,130,246,0.3)" },
+  production_manager:  { solid: "#38bdf8", gradient: "linear-gradient(135deg, #0ea5e9, #38bdf8)", bg: "rgba(14,165,233,0.15)", text: "#7dd3fc", border: "rgba(14,165,233,0.3)" },
+  warehouse_manager:   { solid: "#fbbf24", gradient: "linear-gradient(135deg, #f59e0b, #fbbf24)", bg: "rgba(245,158,11,0.15)", text: "#fcd34d", border: "rgba(245,158,11,0.3)" },
+  procurement_manager: { solid: "#fb923c", gradient: "linear-gradient(135deg, #f97316, #fb923c)", bg: "rgba(249,115,22,0.15)", text: "#fdba74", border: "rgba(249,115,22,0.3)" },
+  quality_inspector:   { solid: "#34d399", gradient: "linear-gradient(135deg, #10b981, #34d399)", bg: "rgba(16,185,129,0.15)", text: "#6ee7b7", border: "rgba(16,185,129,0.3)" },
+  maintenance_engineer:{ solid: "#fb7185", gradient: "linear-gradient(135deg, #f43f5e, #fb7185)", bg: "rgba(244,63,94,0.15)", text: "#fda4af", border: "rgba(244,63,94,0.3)" },
+  finance_manager:     { solid: "#4ade80", gradient: "linear-gradient(135deg, #22c55e, #4ade80)", bg: "rgba(34,197,94,0.15)", text: "#86efac", border: "rgba(34,197,94,0.3)" },
+  hr_manager:          { solid: "#f472b6", gradient: "linear-gradient(135deg, #ec4899, #f472b6)", bg: "rgba(236,72,153,0.15)", text: "#f9a8d4", border: "rgba(236,72,153,0.3)" },
+  production_operator: { solid: "#2dd4bf", gradient: "linear-gradient(135deg, #14b8a6, #2dd4bf)", bg: "rgba(20,184,166,0.15)", text: "#5eead4", border: "rgba(20,184,166,0.3)" },
+  customer_portal:     { solid: "#22d3ee", gradient: "linear-gradient(135deg, #06b6d4, #22d3ee)", bg: "rgba(6,182,212,0.15)", text: "#67e8f9", border: "rgba(6,182,212,0.3)" },
+  supplier_portal:     { solid: "#a3e635", gradient: "linear-gradient(135deg, #84cc16, #a3e635)", bg: "rgba(132,204,22,0.15)", text: "#bef264", border: "rgba(132,204,22,0.3)" },
+  auditor:             { solid: "#94a3b8", gradient: "linear-gradient(135deg, #64748b, #94a3b8)", bg: "rgba(100,116,139,0.15)", text: "#cbd5e1", border: "rgba(100,116,139,0.3)" },
+  default:             { solid: "#71717a", gradient: "linear-gradient(135deg, #52525b, #71717a)", bg: "rgba(113,113,122,0.15)", text: "#a1a1aa", border: "rgba(113,113,122,0.3)" },
 };
 
-// Group label component for plant regions
-function PlantGroupLabel({ label, x, y, width }: { label: string; x: number; y: number; width: number }) {
-  return (
-    <div
-      className="absolute pointer-events-none"
-      style={{ left: x, top: y - 28 }}
-    >
-      <span className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider bg-background/80 px-2 py-0.5 rounded">
-        {label}
-      </span>
-    </div>
-  );
+function getNodeColor(role: string): string {
+  return ROLE_COLORS[role]?.solid ?? ROLE_COLORS.default.solid;
 }
 
+// ─── Main graph component ────────────────────────────────────────
 export function WorkflowGraph({
   users,
   links,
@@ -157,112 +177,145 @@ export function WorkflowGraph({
   plantId,
   onNodeDragStop,
 }: Props) {
-  const [ draggedOver, setDraggedOver ] = useState(false);
+  const [draggedOver, setDraggedOver] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
-  // Build position map from saved positions
+  // Position map from saved positions
   const positionMap = useMemo(() => {
     const map = new Map<string, { x: number; y: number }>();
-    positions.forEach((p) => {
-      map.set(p.whitelist_id, { x: p.position_x, y: p.position_y });
-    });
+    positions.forEach((p) => map.set(p.whitelist_id, { x: p.position_x, y: p.position_y }));
     return map;
   }, [positions]);
 
-  // Compute default positions for users without saved positions
+  // Hierarchical default layout: group by plant, tree structure
   const getDefaultPosition = useCallback(
-    (user: WorkflowUser, index: number) => {
+    (user: WorkflowUser, allUsers: WorkflowUser[]) => {
       const saved = positionMap.get(user.whitelist_id);
       if (saved) return saved;
 
-      // Group by plant for default layout
-      const plantUsers = users.filter(
-        (u) => u.plant_id === user.plant_id && u.role !== "company_admin"
-      );
-      const idx = plantUsers.findIndex((u) => u.id === user.id);
-      const plantOffset = user.plant_id
-        ? users.findIndex((u) => u.plant_id === user.plant_id && u.role === "plant_admin") * 300
-        : 0;
+      const companyAdmin = allUsers.find((u) => u.role === "company_admin");
+      if (!companyAdmin) return { x: 400, y: 300 };
 
-      return {
-        x: 400 + plantOffset + (idx % 4) * (NODE_W + 60),
-        y: 100 + Math.floor(index / 4) * (NODE_H + 40),
-      };
+      // Group users by plant
+      const byPlant = new Map<string, WorkflowUser[]>();
+      const companyLevel: WorkflowUser[] = [];
+      for (const u of allUsers) {
+        if (u.id === companyAdmin.id) continue;
+        if (u.plant_id) {
+          if (!byPlant.has(u.plant_id)) byPlant.set(u.plant_id, []);
+          byPlant.get(u.plant_id)!.push(u);
+        } else {
+          companyLevel.push(u);
+        }
+      }
+
+      const PLANT_ROLES = ["plant_admin", "plant_manager", "production_manager", "warehouse_manager",
+        "procurement_manager", "quality_inspector", "maintenance_engineer", "production_operator", "hr_manager"];
+      const COMPANY_ROLES = ["finance_manager", "auditor"];
+
+      const COLS = 3;
+      const GAP_X = NODE_W + 50;
+      const GAP_Y = NODE_H + 35;
+      const PLANT_GAP = 80;
+      const PLANT_HEADER = 30;
+
+      // Company admin at top center
+      if (user.id === companyAdmin.id) return { x: 500, y: 40 };
+
+      // Company-level roles: right side
+      const compIdx = COMPANY_ROLES.indexOf(user.role);
+      if (compIdx >= 0 && !user.plant_id) {
+        return { x: 900, y: 160 + compIdx * GAP_Y };
+      }
+
+      // Plant-grouped users
+      const plantEntries = Array.from(byPlant.entries());
+      for (let pi = 0; pi < plantEntries.length; pi++) {
+        const [plantIdKey, plantUsers] = plantEntries[pi];
+        const plantX = 100 + pi * (COLS * GAP_X + PLANT_GAP);
+
+        const roleInPlant = plantUsers.filter((u) => PLANT_ROLES.includes(u.role));
+        const portalsInPlant = plantUsers.filter((u) =>
+          u.role === "customer_portal" || u.role === "supplier_portal"
+        );
+
+        const allInPlant = [...roleInPlant, ...portalsInPlant];
+        const idx = allInPlant.findIndex((u) => u.id === user.id);
+        if (idx >= 0) {
+          return {
+            x: plantX + (idx % COLS) * GAP_X,
+            y: 140 + PLANT_HEADER + Math.floor(idx / COLS) * GAP_Y,
+          };
+        }
+      }
+
+      // Fallback: bottom
+      return { x: 400, y: 600 };
     },
-    [positionMap, users]
+    [positionMap]
   );
 
   // Build React Flow nodes
   const initialNodes: Node[] = useMemo(() => {
-    return users.map((user, i) => {
-      const pos = getDefaultPosition(user, i);
+    return users.map((user) => {
+      const pos = getDefaultPosition(user, users);
       return {
         id: user.id,
         type: "employee",
         position: pos,
-        data: {
-          user,
-          isSelected: selectedUserId === user.id,
-        },
-        dragHandle: ".drag-handle",
+        data: { user, isSelected: selectedUserId === user.id },
       };
     });
   }, [users, selectedUserId, getDefaultPosition]);
 
-  // Build React Flow edges from links
+  // Build React Flow edges
   const initialEdges: Edge[] = useMemo(() => {
     return links
       .map((link) => {
-        // Find user IDs matching parent/child whitelist IDs
         const parent = users.find((u) => u.whitelist_id === link.parent_id);
         const child = users.find((u) => u.whitelist_id === link.child_id);
         if (!parent || !child) return null;
+        const isHighlighted = selectedUserId === parent.id || selectedUserId === child.id;
         return {
           id: link.id,
           source: parent.id,
           target: child.id,
           type: "smoothstep",
           animated: false,
-          style: { stroke: "hsl(var(--muted-foreground) / 0.3)", strokeWidth: 1.5 },
+          style: {
+            stroke: isHighlighted ? "#818cf8" : "rgba(148,163,184,0.4)",
+            strokeWidth: isHighlighted ? 2.5 : 1.5,
+          },
         };
       })
       .filter(Boolean) as Edge[];
-  }, [links, users]);
+  }, [links, users, selectedUserId]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Sync nodes when users change
-  useMemo(() => {
-    setNodes(initialNodes);
-  }, [initialNodes]);
+  // Sync when data changes
+  useMemo(() => { setNodes(initialNodes); }, [initialNodes]);
+  useMemo(() => { setEdges(initialEdges); }, [initialEdges]);
 
-  useMemo(() => {
-    setEdges(initialEdges);
-  }, [initialEdges]);
-
-  // Handle node drag stop — persist position
+  // Node drag stop → persist
   const handleNodeDragStop: any = useCallback(
     (_: any, node: Node) => {
       if (!canEdit || !onNodeDragStop) return;
       const user = users.find((u) => u.id === node.id);
-      if (user) {
-        onNodeDragStop(user.whitelist_id, node.position.x, node.position.y);
-      }
+      if (user) onNodeDragStop(user.whitelist_id, node.position.x, node.position.y);
     },
     [canEdit, onNodeDragStop, users]
   );
 
-  // Handle drop from employee list panel
+  // Drop from panel
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "link";
     setDraggedOver(true);
   }, []);
 
-  const onDragLeave = useCallback(() => {
-    setDraggedOver(false);
-  }, []);
+  const onDragLeave = useCallback(() => setDraggedOver(false), []);
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -271,18 +324,16 @@ export function WorkflowGraph({
       const data = e.dataTransfer.getData("application/workflow-drag");
       if (!data || !companyId) return;
 
-      const { userId: fromUserId, fromRole } = JSON.parse(data);
+      const { userId: fromUserId } = JSON.parse(data);
       const fromUser = users.find((u) => u.id === fromUserId);
       if (!fromUser) return;
 
-      // Find the React Flow instance to convert screen coords to flow coords
       const wrapper = reactFlowWrapper.current;
       if (!wrapper) return;
       const bounds = wrapper.getBoundingClientRect();
-      const flowX = (e.clientX - bounds.left) / 1; // simplified — React Flow handles zoom
-      const flowY = (e.clientY - bounds.top) / 1;
+      const flowX = e.clientX - bounds.left;
+      const flowY = e.clientY - bounds.top;
 
-      // Find nearest existing node
       let nearestId: string | null = null;
       let nearestDist = Infinity;
       for (const n of nodes) {
@@ -300,7 +351,6 @@ export function WorkflowGraph({
       const toUser = users.find((u) => u.id === nearestId);
       if (!toUser) return;
 
-      // Create the link in the database
       const { error } = await supabase.from("workflow_links" as any).upsert(
         {
           company_id: companyId,
@@ -310,14 +360,11 @@ export function WorkflowGraph({
           to_role: toUser.role,
           plant_id: toUser.plant_id ?? fromUser.plant_id ?? null,
           status: "active",
-          linked_by: null,
         },
         { onConflict: "company_id,parent_id,child_id" }
       );
 
-      if (!error) {
-        onRefresh();
-      }
+      if (!error) onRefresh();
     },
     [companyId, users, nodes, onRefresh]
   );
@@ -326,9 +373,10 @@ export function WorkflowGraph({
     <div
       ref={reactFlowWrapper}
       className={cn(
-        "w-full h-full",
-        draggedOver && "ring-2 ring-primary/40 ring-inset rounded-lg"
+        "w-full h-full rounded-lg",
+        draggedOver && "ring-2 ring-primary/40 ring-inset"
       )}
+      style={{ background: "hsl(220, 15%, 8%)" }}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -339,81 +387,37 @@ export function WorkflowGraph({
         onNodesChange={onNodesChange as OnNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeDragStop={handleNodeDragStop}
-        onNodeClick={(_, node) => {
-          onSelectUser(selectedUserId === node.id ? null : node.id);
-        }}
+        onNodeClick={(_, node) => onSelectUser(selectedUserId === node.id ? null : node.id)}
         onPaneClick={() => onSelectUser(null)}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.2}
+        fitViewOptions={{ padding: 0.3 }}
+        minZoom={0.15}
         maxZoom={2}
         defaultEdgeOptions={{
           type: "smoothstep",
-          style: { stroke: "hsl(var(--muted-foreground) / 0.3)", strokeWidth: 1.5 },
+          style: { stroke: "rgba(148,163,184,0.4)", strokeWidth: 1.5 },
         }}
         proOptions={{ hideAttribution: true }}
-        className="bg-transparent"
+        className="!bg-transparent"
       >
         <Background
           variant={BackgroundVariant.Dots}
-          gap={20}
+          gap={24}
           size={1}
-          color="hsl(var(--muted-foreground) / 0.08)"
+          color="rgba(148,163,184,0.06)"
         />
         <Controls
           showInteractive={false}
-          className="!bg-card !border-border !shadow-sm"
+          className="!bg-[hsl(220,15%,14%)] !border-[hsl(220,10%,22%)] !shadow-lg !rounded-lg [&>button]:!bg-[hsl(220,15%,18%)] [&>button]:!border-[hsl(220,10%,26%)] [&>button]:!text-zinc-300 [&>button:hover]:!bg-[hsl(220,15%,22%)]"
         />
         <MiniMap
-          nodeColor={(node) => {
-            const user = (node.data as any)?.user as WorkflowUser;
-            return user ? getNodeColor(user.role) : "#666";
-          }}
-          maskColor="hsl(var(--background) / 0.8)"
-          className="!bg-card !border-border"
+          nodeColor={(node) => getNodeColor((node.data as any)?.user?.role)}
+          maskColor="hsl(220, 15%, 8%, 0.85)"
+          className="!bg-[hsl(220,15%,12%)] !border-[hsl(220,10%,22%)] !rounded-lg"
+          nodeStrokeWidth={0}
         />
       </ReactFlow>
     </div>
   );
-}
-
-function getRoleColor(role: string): string {
-  const colors: Record<string, string> = {
-    company_admin: "bg-indigo-500/10 text-indigo-600 border-indigo-200",
-    plant_admin: "bg-violet-500/10 text-violet-600 border-violet-200",
-    plant_manager: "bg-blue-500/10 text-blue-600 border-blue-200",
-    production_manager: "bg-sky-500/10 text-sky-600 border-sky-200",
-    warehouse_manager: "bg-amber-500/10 text-amber-600 border-amber-200",
-    procurement_manager: "bg-orange-500/10 text-orange-600 border-orange-200",
-    quality_inspector: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
-    maintenance_engineer: "bg-rose-500/10 text-rose-600 border-rose-200",
-    finance_manager: "bg-green-500/10 text-green-600 border-green-200",
-    hr_manager: "bg-pink-500/10 text-pink-600 border-pink-200",
-    production_operator: "bg-teal-500/10 text-teal-600 border-teal-200",
-    customer_portal: "bg-cyan-500/10 text-cyan-600 border-cyan-200",
-    supplier_portal: "bg-lime-500/10 text-lime-600 border-lime-200",
-    auditor: "bg-slate-500/10 text-slate-600 border-slate-200",
-  };
-  return colors[role] ?? "bg-muted text-muted-foreground border-border";
-}
-
-function getNodeColor(role: string): string {
-  const colors: Record<string, string> = {
-    company_admin: "#6366f1",
-    plant_admin: "#8b5cf6",
-    plant_manager: "#3b82f6",
-    production_manager: "#0ea5e9",
-    warehouse_manager: "#f59e0b",
-    procurement_manager: "#f97316",
-    quality_inspector: "#10b981",
-    maintenance_engineer: "#f43f5e",
-    finance_manager: "#22c55e",
-    hr_manager: "#ec4899",
-    production_operator: "#14b8a6",
-    customer_portal: "#06b6d4",
-    supplier_portal: "#84cc16",
-    auditor: "#64748b",
-  };
-  return colors[role] ?? "#666";
 }
