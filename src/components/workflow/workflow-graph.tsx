@@ -90,7 +90,7 @@ function computeLayout(
   const companyAdmin = users.find((u) => u.role === "company_admin");
   if (!companyAdmin) return pos;
 
-  // BFS to assign levels
+  // BFS to assign levels — use links when available, fall back to role-based hierarchy
   const visited = new Set<string>();
   const levelUsers: WorkflowUser[][] = [];
 
@@ -98,8 +98,8 @@ function computeLayout(
   visited.add(companyAdmin.id);
   levelUsers.push([companyAdmin]);
 
-  // Level 1: Plant Admins (direct reports of company_admin)
-  const plantAdmins = users.filter(
+  // Level 1: Plant Admins — via links OR by role (fallback)
+  const plantAdminsViaLinks = users.filter(
     (u) =>
       u.role === "plant_admin" &&
       !visited.has(u.id) &&
@@ -107,6 +107,13 @@ function computeLayout(
         (l) => l.from_user_id === companyAdmin.id && l.to_user_id === u.id
       )
   );
+  const plantAdminsViaRole = users.filter(
+    (u) =>
+      u.role === "plant_admin" && !visited.has(u.id)
+  );
+  const plantAdmins = plantAdminsViaLinks.length > 0
+    ? plantAdminsViaLinks
+    : plantAdminsViaRole;
   plantAdmins.forEach((u) => visited.add(u.id));
   if (plantAdmins.length) levelUsers.push(plantAdmins);
 
@@ -133,6 +140,15 @@ function computeLayout(
   );
   operators.forEach((u) => visited.add(u.id));
   if (operators.length) levelUsers.push(operators);
+
+  // Level 4: External portals (customer/supplier)
+  const portals = users.filter(
+    (u) =>
+      (u.role === "customer_portal" || u.role === "supplier_portal") &&
+      !visited.has(u.id)
+  );
+  portals.forEach((u) => visited.add(u.id));
+  if (portals.length) levelUsers.push(portals);
 
   // Remaining unvisited
   const remaining = users.filter((u) => !visited.has(u.id));
