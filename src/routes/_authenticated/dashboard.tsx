@@ -284,7 +284,7 @@ function useLiveStats(companyId: string | null) {
         safe(() =>
           supabase
             .from("inventory")
-            .select("quantity,products(reorder_level)")
+            .select("quantity,reserved_quantity,quarantined_quantity,damaged_qty,products(reorder_level)")
             .eq("company_id", companyId),
         ),
         safe(() =>
@@ -304,9 +304,14 @@ function useLiveStats(companyId: string | null) {
       const tkt = supportTickets?.data ?? [];
       const mach = machines?.data ?? [];
       const invRows = inventory?.data ?? [];
-      const low = invRows.filter(
-        (i: any) => Number(i.quantity ?? 0) <= Number(i.products?.reorder_level ?? 0),
-      ).length;
+      const low = invRows.filter((i: any) => {
+        const onHand = Number(i.quantity ?? 0);
+        const reserved = Number(i.reserved_quantity ?? 0);
+        const quarantined = Number(i.quarantined_quantity ?? 0);
+        const damaged = Number(i.damaged_qty ?? 0);
+        const available = Math.max(0, onHand - reserved - quarantined - damaged);
+        return available <= Number(i.products?.reorder_level ?? 0);
+      }).length;
       const openStatuses = [
         "pending_approval",
         "approved",
