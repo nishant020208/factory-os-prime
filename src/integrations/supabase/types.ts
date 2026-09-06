@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       access_logs: {
@@ -1404,6 +1379,9 @@ export type Database = {
           created_at: string
           grn_number: string | null
           id: string
+          inspected_at: string | null
+          inspection_status: string
+          inspector_id: string | null
           material_id: string | null
           purchase_order_id: string | null
           quantity_received: number
@@ -1416,6 +1394,9 @@ export type Database = {
           created_at?: string
           grn_number?: string | null
           id?: string
+          inspected_at?: string | null
+          inspection_status?: string
+          inspector_id?: string | null
           material_id?: string | null
           purchase_order_id?: string | null
           quantity_received?: number
@@ -1428,6 +1409,9 @@ export type Database = {
           created_at?: string
           grn_number?: string | null
           id?: string
+          inspected_at?: string | null
+          inspection_status?: string
+          inspector_id?: string | null
           material_id?: string | null
           purchase_order_id?: string | null
           quantity_received?: number
@@ -1465,31 +1449,140 @@ export type Database = {
           },
         ]
       }
+      incoming_material_inspections: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          goods_receipt_id: string | null
+          id: string
+          inspected_at: string | null
+          inspection_notes: string | null
+          inspector_id: string | null
+          material_id: string
+          plant_id: string | null
+          purchase_order_id: string | null
+          quantity: number
+          rejection_reason: string | null
+          result: string | null
+          status: string
+          warehouse_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          goods_receipt_id?: string | null
+          id?: string
+          inspected_at?: string | null
+          inspection_notes?: string | null
+          inspector_id?: string | null
+          material_id: string
+          plant_id?: string | null
+          purchase_order_id?: string | null
+          quantity?: number
+          rejection_reason?: string | null
+          result?: string | null
+          status?: string
+          warehouse_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          goods_receipt_id?: string | null
+          id?: string
+          inspected_at?: string | null
+          inspection_notes?: string | null
+          inspector_id?: string | null
+          material_id?: string
+          plant_id?: string | null
+          purchase_order_id?: string | null
+          quantity?: number
+          rejection_reason?: string | null
+          result?: string | null
+          status?: string
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incoming_material_inspections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incoming_material_inspections_goods_receipt_id_fkey"
+            columns: ["goods_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "goods_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incoming_material_inspections_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incoming_material_inspections_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incoming_material_inspections_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incoming_material_inspections_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           company_id: string
+          damaged_qty: number
           id: string
           material_id: string | null
           product_id: string | null
           quantity: number
+          quarantined_quantity: number
+          reserved_quantity: number
+          status: string
           updated_at: string
           warehouse_id: string
         }
         Insert: {
           company_id: string
+          damaged_qty?: number
           id?: string
           material_id?: string | null
           product_id?: string | null
           quantity?: number
+          quarantined_quantity?: number
+          reserved_quantity?: number
+          status?: string
           updated_at?: string
           warehouse_id: string
         }
         Update: {
           company_id?: string
+          damaged_qty?: number
           id?: string
           material_id?: string | null
           product_id?: string | null
           quantity?: number
+          quarantined_quantity?: number
+          reserved_quantity?: number
+          status?: string
           updated_at?: string
           warehouse_id?: string
         }
@@ -1589,6 +1682,7 @@ export type Database = {
           invoice_number: string
           issue_date: string
           paid_date: string | null
+          plant_id: string | null
           qr_code_data: string | null
           qr_code_url: string | null
           sales_order_id: string | null
@@ -1606,6 +1700,7 @@ export type Database = {
           invoice_number: string
           issue_date?: string
           paid_date?: string | null
+          plant_id?: string | null
           qr_code_data?: string | null
           qr_code_url?: string | null
           sales_order_id?: string | null
@@ -1623,6 +1718,7 @@ export type Database = {
           invoice_number?: string
           issue_date?: string
           paid_date?: string | null
+          plant_id?: string | null
           qr_code_data?: string | null
           qr_code_url?: string | null
           sales_order_id?: string | null
@@ -1636,6 +1732,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
             referencedColumns: ["id"]
           },
           {
@@ -3092,6 +3195,7 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          delivery_warehouse_id: string | null
           expected_date: string | null
           id: string
           po_number: string
@@ -3107,6 +3211,7 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
+          delivery_warehouse_id?: string | null
           expected_date?: string | null
           id?: string
           po_number: string
@@ -3122,6 +3227,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          delivery_warehouse_id?: string | null
           expected_date?: string | null
           id?: string
           po_number?: string
@@ -3138,6 +3244,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_delivery_warehouse_id_fkey"
+            columns: ["delivery_warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
             referencedColumns: ["id"]
           },
           {
@@ -3743,6 +3856,13 @@ export type Database = {
             columns: ["material_id"]
             isOneToOne: false
             referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfqs_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -4806,28 +4926,34 @@ export type Database = {
       }
       warehouses: {
         Row: {
+          address: string | null
           code: string
           company_id: string
           created_at: string
           id: string
           name: string
           plant_id: string | null
+          status: string
         }
         Insert: {
+          address?: string | null
           code: string
           company_id: string
           created_at?: string
           id?: string
           name: string
           plant_id?: string | null
+          status?: string
         }
         Update: {
+          address?: string | null
           code?: string
           company_id?: string
           created_at?: string
           id?: string
           name?: string
           plant_id?: string | null
+          status?: string
         }
         Relationships: [
           {
@@ -5022,6 +5148,80 @@ export type Database = {
       }
     }
     Views: {
+      inventory_available: {
+        Row: {
+          available_qty: number | null
+          company_id: string | null
+          damaged_qty: number | null
+          id: string | null
+          material_id: string | null
+          product_id: string | null
+          quantity: number | null
+          quarantined_quantity: number | null
+          reserved_quantity: number | null
+          status: string | null
+          updated_at: string | null
+          warehouse_id: string | null
+        }
+        Insert: {
+          available_qty?: never
+          company_id?: string | null
+          damaged_qty?: number | null
+          id?: string | null
+          material_id?: string | null
+          product_id?: string | null
+          quantity?: number | null
+          quarantined_quantity?: number | null
+          reserved_quantity?: number | null
+          status?: string | null
+          updated_at?: string | null
+          warehouse_id?: string | null
+        }
+        Update: {
+          available_qty?: never
+          company_id?: string | null
+          damaged_qty?: number | null
+          id?: string | null
+          material_id?: string | null
+          product_id?: string | null
+          quantity?: number | null
+          quarantined_quantity?: number | null
+          reserved_quantity?: number | null
+          status?: string | null
+          updated_at?: string | null
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rfq_quote_comparison: {
         Row: {
           currency: string | null
@@ -5111,6 +5311,25 @@ export type Database = {
       is_root_admin: { Args: { _user_id?: string }; Returns: boolean }
       is_supplier_portal: { Args: never; Returns: boolean }
       is_tenant_admin: { Args: never; Returns: boolean }
+      mark_damaged: {
+        Args: {
+          p_company_id: string
+          p_material_id: string
+          p_quantity: number
+          p_reason?: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
+      process_incoming_inspection: {
+        Args: {
+          p_decision: string
+          p_inspection_id: string
+          p_notes?: string
+          p_rejection_reason?: string
+        }
+        Returns: Json
+      }
       public_scan_qr: {
         Args: { p_token: string }
         Returns: {
@@ -5148,6 +5367,27 @@ export type Database = {
         }
         Returns: undefined
       }
+      release_reservation: {
+        Args: {
+          p_company_id: string
+          p_material_id: string
+          p_notes?: string
+          p_quantity: number
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
+      reserve_stock: {
+        Args: {
+          p_company_id: string
+          p_material_id: string
+          p_notes?: string
+          p_production_order_id?: string
+          p_quantity: number
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
       resume_orders_when_stocked: {
         Args: { p_company_id: string }
         Returns: Json
@@ -5158,6 +5398,17 @@ export type Database = {
           p_from_warehouse_id: string
           p_notes?: string
           p_product_id: string
+          p_quantity: number
+          p_to_warehouse_id: string
+        }
+        Returns: Json
+      }
+      transfer_stock_between_warehouses: {
+        Args: {
+          p_company_id: string
+          p_from_warehouse_id: string
+          p_material_id: string
+          p_notes?: string
           p_quantity: number
           p_to_warehouse_id: string
         }
@@ -5307,9 +5558,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: [
