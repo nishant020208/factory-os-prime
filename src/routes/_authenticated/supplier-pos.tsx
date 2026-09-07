@@ -76,6 +76,7 @@ function SupplierPosPage() {
     vehicle_number: "",
     expected_arrival: "",
     tracking_number: "",
+    warehouse_id: "",
   });
   const [dispatching, setDispatching] = useState(false);
   const [qrDialog, setQrDialog] = useState<{
@@ -127,6 +128,19 @@ function SupplierPosPage() {
     enabled: !!supplierId,
   });
 
+  const { data: allWarehouses } = useQuery({
+    queryKey: ["warehouses", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("warehouses")
+          .select("id, name, code, address, city")
+          .eq("company_id", companyId ?? "")
+          .order("name")
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+
   const { data: deliveries } = useQuery({
     queryKey: ["supplier-deliveries", companyId],
     queryFn: async () =>
@@ -139,6 +153,24 @@ function SupplierPosPage() {
       ).data ?? [],
     enabled: !!supplierId,
   });
+
+  const handleOpenDispatch = (po: any) => {
+    const existingWhId =
+      po.delivery_warehouse_id || (po.warehouses as any)?.id || (allWarehouses?.[0] as any)?.id || "";
+    setDispatchForm({
+      dispatch_date: new Date().toISOString().split("T")[0],
+      carrier: po.carrier || "",
+      vehicle_number: "",
+      expected_arrival: "",
+      tracking_number: po.tracking_number || `TRK-${po.po_number || Date.now().toString().slice(-6)}`,
+      warehouse_id: existingWhId,
+    });
+    setDispatchDialog({
+      open: true,
+      poId: po.id,
+      poNumber: po.po_number ?? po.id.slice(0, 8),
+    });
+  };
 
   const respondMutation = useMutation({
     mutationFn: async ({
@@ -195,7 +227,23 @@ function SupplierPosPage() {
       const po = data?.find((p) => p.id === poId);
       if (!po) throw new Error("PO not found");
 
-      // 1) Insert inbound delivery record
+      // 1) Update PO with selected warehouse and carrier details
+      const updatePayload: any = {
+        status: "dispatched",
+        carrier: form.carrier || null,
+        tracking_number: form.tracking_number || null,
+      };
+      if (form.warehouse_id) {
+        updatePayload.delivery_warehouse_id = form.warehouse_id;
+      }
+      const { error: poErr } = await supabase
+        .from("purchase_orders")
+        .update(updatePayload)
+        .eq("id", poId)
+        .eq("supplier_id", supplierId ?? "");
+      if (poErr) throw poErr;
+
+      // 2) Insert inbound delivery record
       const { error: delErr } = await supabase.from("supplier_deliveries").insert({
         company_id: companyId!,
         po_id: poId,
@@ -208,18 +256,6 @@ function SupplierPosPage() {
         status: "dispatched",
       });
       if (delErr) throw delErr;
-
-      // 2) Mark PO as dispatched
-      const { error: poErr } = await supabase
-        .from("purchase_orders")
-        .update({
-          status: "dispatched",
-          carrier: form.carrier || null,
-          tracking_number: form.tracking_number || null,
-        })
-        .eq("id", poId)
-        .eq("supplier_id", supplierId ?? "");
-      if (poErr) throw poErr;
 
       // 3) Auto-generate the Shipment-Inbound QR (token → URL)
       const { data: qr, error: qrErr } = await supabase
@@ -262,6 +298,7 @@ function SupplierPosPage() {
         vehicle_number: "",
         expected_arrival: "",
         tracking_number: "",
+        warehouse_id: "",
       });
       setDispatching(false);
     },
@@ -386,13 +423,7 @@ function SupplierPosPage() {
                             size="sm"
                             variant="ghost"
                             className="h-7 text-xs text-info"
-                            onClick={() =>
-                              setDispatchDialog({
-                                open: true,
-                                poId: po.id,
-                                poNumber: po.po_number ?? po.id.slice(0, 8),
-                              })
-                            }
+                            onClick={() => handleOpenDispatch(po)}
                           >
                             <Truck className="h-3 w-3 mr-1" />
                             Shipment Details
@@ -513,44 +544,30 @@ function SupplierPosPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            {/* Destination warehouse — Procurement's choice, shown read-only so
-                the supplier knows exactly where to physically ship. */}
-            {(() => {
-              const po = (data ?? []).find((p) => p.id === dispatchDialog.poId);
-              const wh = (po as any)?.warehouses as {
-                name?: string;
-                code?: string;
-                address?: string | null;
-              } | null;
-              return (
-                <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    <Warehouse className="h-3 w-3" />
-                    Deliver To (set by Procurement)
-                  </div>
-                  {wh?.name ? (
-                    <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
-                      <span className="font-semibold">{wh.name}</span>
-                      {wh.code && (
-                        <span className="font-mono text-[10px] text-muted-foreground">
-                          {wh.code}
-                        </span>
-                      )}
-                      {wh.address && (
-                        <span className="w-full text-[11px] text-muted-foreground">
-                          {wh.address}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Warehouse not specified on this PO — the buyer's warehouse will assign the
-                      receiving location.
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            {/* Delivery Destination Warehouse Selection */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Warehouse className="h-3.5 w-3.5 text-primary" />
+                Delivery Destination Warehouse *
+              </Label>
+              <select
+                value={dispatchForm.warehouse_id}
+                onChange={(e) =>
+                  setDispatchForm((f) => ({ ...f, warehouse_id: e.target.value }))
+                }
+                className="flex w-full rounded-md border border-input bg-background/50 px-3 py-2 text-xs h-9 focus:border-primary focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Select destination warehouse…</option>
+                {(allWarehouses ?? []).map((w: any) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name} {w.code ? `(${w.code})` : ""} {w.city ? `· ${w.city}` : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground">
+                Confirm or select the warehouse destination where this material delivery is physically heading.
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Dispatch Date *</Label>
