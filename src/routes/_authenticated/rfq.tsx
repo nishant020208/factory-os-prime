@@ -340,7 +340,7 @@ function RfqPage() {
           company_id: companyId!,
           to_user: rfq.created_by,
           title: "RFQ Quote Received",
-          body: `${mySupplier.name} has submitted a quote for ${rfq.rfq_number ?? "RFQ"} (${rfq.title}).`,
+          body: `${mySupplier.name} quoted ${fmtMoney(Number(respForm.unit_price) || 0)} for ${rfq.rfq_number ?? "RFQ"} (${rfq.title}).`,
           severity: "info",
           related_entity_type: "rfq",
           related_entity_id: rfqId,
@@ -440,8 +440,7 @@ function RfqPage() {
 
       // Stamp the delivery warehouse on the new PO
       if (poResult.po_id && poForm.delivery_warehouse_id) {
-        await (supabase
-          .from("purchase_orders") as any)
+        await (supabase.from("purchase_orders") as any)
           .update({ delivery_warehouse_id: poForm.delivery_warehouse_id })
           .eq("id", poResult.po_id);
       }
