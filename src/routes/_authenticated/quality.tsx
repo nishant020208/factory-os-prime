@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   XCircle,
   MinusCircle,
+  Package,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
@@ -102,11 +103,38 @@ const QC_CATEGORIES: CategoryDef[] = [
     label: "Wood & Material Quality",
     icon: "🪵",
     params: [
-      { name: "Wood Moisture Content", unit: "%", range: "8–12%", type: "numeric", mandatory: true },
-      { name: "Wood Hardness", range: "Soft/Medium/Hard (match species)", type: "scale", scaleOptions: ["Soft", "Medium", "Hard"] },
-      { name: "Grain Consistency", range: "Consistent / Minor Variation / Inconsistent", type: "scale", scaleOptions: ["Consistent", "Minor Variation", "Inconsistent"] },
-      { name: "Knots & Defects Count", unit: "count", range: "0–2 per surface (grade A)", type: "numeric" },
-      { name: "Warping/Bowing", unit: "mm", range: "<2mm per 1000mm", type: "numeric", mandatory: true },
+      {
+        name: "Wood Moisture Content",
+        unit: "%",
+        range: "8–12%",
+        type: "numeric",
+        mandatory: true,
+      },
+      {
+        name: "Wood Hardness",
+        range: "Soft/Medium/Hard (match species)",
+        type: "scale",
+        scaleOptions: ["Soft", "Medium", "Hard"],
+      },
+      {
+        name: "Grain Consistency",
+        range: "Consistent / Minor Variation / Inconsistent",
+        type: "scale",
+        scaleOptions: ["Consistent", "Minor Variation", "Inconsistent"],
+      },
+      {
+        name: "Knots & Defects Count",
+        unit: "count",
+        range: "0–2 per surface (grade A)",
+        type: "numeric",
+      },
+      {
+        name: "Warping/Bowing",
+        unit: "mm",
+        range: "<2mm per 1000mm",
+        type: "numeric",
+        mandatory: true,
+      },
       { name: "Insect/Pest Damage", range: "Absent required", type: "passfail", mandatory: true },
     ],
   },
@@ -115,14 +143,40 @@ const QC_CATEGORIES: CategoryDef[] = [
     label: "Structural & Joinery",
     icon: "🔧",
     params: [
-      { name: "Joint Type Verification", range: "Match design spec", type: "scale", scaleOptions: ["Mortise-Tenon", "Dowel", "Dovetail", "Screw+Glue", "Biscuit", "Matched"] },
-      { name: "Joint Tightness", range: "No visible movement under lateral force", type: "passfail", mandatory: true },
-      { name: "Load-Bearing Test", unit: "kg", range: "Exceeds rated capacity", type: "numeric", naFor: ["decorative", "wall_art"] },
-      { name: "Screw/Hardware Torque", range: "All tightened, no stripped screws", type: "passfail" },
+      {
+        name: "Joint Type Verification",
+        range: "Match design spec",
+        type: "scale",
+        scaleOptions: ["Mortise-Tenon", "Dowel", "Dovetail", "Screw+Glue", "Biscuit", "Matched"],
+      },
+      {
+        name: "Joint Tightness",
+        range: "No visible movement under lateral force",
+        type: "passfail",
+        mandatory: true,
+      },
+      {
+        name: "Load-Bearing Test",
+        unit: "kg",
+        range: "Exceeds rated capacity",
+        type: "numeric",
+        naFor: ["decorative", "wall_art"],
+      },
+      {
+        name: "Screw/Hardware Torque",
+        range: "All tightened, no stripped screws",
+        type: "passfail",
+      },
       { name: "Dimensional Accuracy – Length", unit: "mm", range: "±3mm of spec", type: "numeric" },
       { name: "Dimensional Accuracy – Width", unit: "mm", range: "±3mm of spec", type: "numeric" },
       { name: "Dimensional Accuracy – Height", unit: "mm", range: "±3mm of spec", type: "numeric" },
-      { name: "Dimensional Accuracy – Depth", unit: "mm", range: "±3mm of spec", type: "numeric", naFor: ["decorative"] },
+      {
+        name: "Dimensional Accuracy – Depth",
+        unit: "mm",
+        range: "±3mm of spec",
+        type: "numeric",
+        naFor: ["decorative"],
+      },
     ],
   },
   {
@@ -130,10 +184,32 @@ const QC_CATEGORIES: CategoryDef[] = [
     label: "Surface Finish",
     icon: "✨",
     params: [
-      { name: "Polish/Lacquer Evenness", range: "Even / Minor Unevenness / Uneven", type: "scale", scaleOptions: ["Even", "Minor Unevenness", "Uneven"], mandatory: true },
-      { name: "Surface Smoothness", range: "Smooth / Minor Roughness / Rough", type: "scale", scaleOptions: ["Smooth", "Minor Roughness", "Rough"] },
-      { name: "Color Match", range: "Match / Minor Variance / Mismatch vs sample", type: "scale", scaleOptions: ["Match", "Minor Variance", "Mismatch"], mandatory: true },
-      { name: "Gloss Level", range: "Matte / Satin / Gloss — match spec", type: "scale", scaleOptions: ["Matte", "Satin", "Gloss", "N/A"] },
+      {
+        name: "Polish/Lacquer Evenness",
+        range: "Even / Minor Unevenness / Uneven",
+        type: "scale",
+        scaleOptions: ["Even", "Minor Unevenness", "Uneven"],
+        mandatory: true,
+      },
+      {
+        name: "Surface Smoothness",
+        range: "Smooth / Minor Roughness / Rough",
+        type: "scale",
+        scaleOptions: ["Smooth", "Minor Roughness", "Rough"],
+      },
+      {
+        name: "Color Match",
+        range: "Match / Minor Variance / Mismatch vs sample",
+        type: "scale",
+        scaleOptions: ["Match", "Minor Variance", "Mismatch"],
+        mandatory: true,
+      },
+      {
+        name: "Gloss Level",
+        range: "Matte / Satin / Gloss — match spec",
+        type: "scale",
+        scaleOptions: ["Matte", "Satin", "Gloss", "N/A"],
+      },
       { name: "Scratches/Dents Count", unit: "count", range: "0 for Grade A", type: "numeric" },
     ],
   },
@@ -142,10 +218,32 @@ const QC_CATEGORIES: CategoryDef[] = [
     label: "Upholstery",
     icon: "🛋️",
     params: [
-      { name: "Fabric Tension", range: "Even / Uneven", type: "scale", scaleOptions: ["Even", "Uneven"], naFor: ["dining_table", "desk", "bookshelf", "cabinet", "solid_wood"] },
-      { name: "Stitching Quality", range: "Consistent, no loose threads, strong seams", type: "passfail", naFor: ["dining_table", "desk", "bookshelf", "cabinet", "solid_wood"] },
-      { name: "Foam Density/Firmness", range: "Soft / Medium / Firm — match spec", type: "scale", scaleOptions: ["Soft", "Medium", "Firm"], naFor: ["dining_table", "desk", "bookshelf", "cabinet", "solid_wood"] },
-      { name: "Fabric Color/Pattern Match", range: "Match approved sample", type: "passfail", naFor: ["dining_table", "desk", "bookshelf", "cabinet", "solid_wood"] },
+      {
+        name: "Fabric Tension",
+        range: "Even / Uneven",
+        type: "scale",
+        scaleOptions: ["Even", "Uneven"],
+        naFor: ["dining_table", "desk", "bookshelf", "cabinet", "solid_wood"],
+      },
+      {
+        name: "Stitching Quality",
+        range: "Consistent, no loose threads, strong seams",
+        type: "passfail",
+        naFor: ["dining_table", "desk", "bookshelf", "cabinet", "solid_wood"],
+      },
+      {
+        name: "Foam Density/Firmness",
+        range: "Soft / Medium / Firm — match spec",
+        type: "scale",
+        scaleOptions: ["Soft", "Medium", "Firm"],
+        naFor: ["dining_table", "desk", "bookshelf", "cabinet", "solid_wood"],
+      },
+      {
+        name: "Fabric Color/Pattern Match",
+        range: "Match approved sample",
+        type: "passfail",
+        naFor: ["dining_table", "desk", "bookshelf", "cabinet", "solid_wood"],
+      },
     ],
   },
   {
@@ -153,9 +251,30 @@ const QC_CATEGORIES: CategoryDef[] = [
     label: "Hardware & Fittings",
     icon: "⚙️",
     params: [
-      { name: "Hinge Alignment & Function", range: "Opens/closes smoothly, no misalignment", type: "passfail" },
-      { name: "Drawer Slide Function", range: "Smooth glide, no sticking, correct alignment", type: "passfail", naFor: ["decorative", "wall_art"] },
-      { name: "Hardware Finish Match", range: "Matches specified finish", type: "scale", scaleOptions: ["Brass", "Chrome", "Matte Black", "Brushed Nickel", "Oil-Rubbed Bronze", "Matched"] },
+      {
+        name: "Hinge Alignment & Function",
+        range: "Opens/closes smoothly, no misalignment",
+        type: "passfail",
+      },
+      {
+        name: "Drawer Slide Function",
+        range: "Smooth glide, no sticking, correct alignment",
+        type: "passfail",
+        naFor: ["decorative", "wall_art"],
+      },
+      {
+        name: "Hardware Finish Match",
+        range: "Matches specified finish",
+        type: "scale",
+        scaleOptions: [
+          "Brass",
+          "Chrome",
+          "Matte Black",
+          "Brushed Nickel",
+          "Oil-Rubbed Bronze",
+          "Matched",
+        ],
+      },
     ],
   },
   {
@@ -163,9 +282,25 @@ const QC_CATEGORIES: CategoryDef[] = [
     label: "Safety & Compliance",
     icon: "🛡️",
     params: [
-      { name: "Edge/Corner Safety", range: "No sharp edges where rounded specified", type: "passfail", mandatory: true },
-      { name: "Stability Test", range: "No tip under normal expected use", type: "passfail", mandatory: true },
-      { name: "Weight Capacity Confirmation", unit: "kg", range: "Exceeds rated capacity", type: "numeric", naFor: ["decorative", "wall_art"] },
+      {
+        name: "Edge/Corner Safety",
+        range: "No sharp edges where rounded specified",
+        type: "passfail",
+        mandatory: true,
+      },
+      {
+        name: "Stability Test",
+        range: "No tip under normal expected use",
+        type: "passfail",
+        mandatory: true,
+      },
+      {
+        name: "Weight Capacity Confirmation",
+        unit: "kg",
+        range: "Exceeds rated capacity",
+        type: "numeric",
+        naFor: ["decorative", "wall_art"],
+      },
     ],
   },
   {
@@ -175,7 +310,11 @@ const QC_CATEGORIES: CategoryDef[] = [
     params: [
       { name: "Cleaning/Dusting Confirmed", range: "Clean and dust-free", type: "passfail" },
       { name: "Protective Wrapping Applied", range: "Wrapped per packing spec", type: "passfail" },
-      { name: "All Hardware/Accessories Present", range: "Matches packing checklist", type: "passfail" },
+      {
+        name: "All Hardware/Accessories Present",
+        range: "Matches packing checklist",
+        type: "passfail",
+      },
     ],
   },
 ];
@@ -254,7 +393,12 @@ function ParamPhotoUpload({
         {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
       </button>
       {currentUrl && (
-        <a href={currentUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline">
+        <a
+          href={currentUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[10px] text-primary hover:underline"
+        >
           📷 View
         </a>
       )}
@@ -330,8 +474,12 @@ function ParamRow({
             <SelectValue placeholder="Pass/Fail..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="Pass" className="text-xs">✅ Pass</SelectItem>
-            <SelectItem value="Fail" className="text-xs">❌ Fail</SelectItem>
+            <SelectItem value="Pass" className="text-xs">
+              ✅ Pass
+            </SelectItem>
+            <SelectItem value="Fail" className="text-xs">
+              ❌ Fail
+            </SelectItem>
           </SelectContent>
         </Select>
       )}
@@ -339,9 +487,13 @@ function ParamRow({
       {/* Result badge */}
       <div className="flex items-center gap-1">
         {value.result === "pass" ? (
-          <span className="text-[10px] font-medium text-emerald-400 flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3" /> Pass</span>
+          <span className="text-[10px] font-medium text-emerald-400 flex items-center gap-0.5">
+            <CheckCircle2 className="h-3 w-3" /> Pass
+          </span>
         ) : value.result === "fail" ? (
-          <span className="text-[10px] font-medium text-red-400 flex items-center gap-0.5"><XCircle className="h-3 w-3" /> Fail</span>
+          <span className="text-[10px] font-medium text-red-400 flex items-center gap-0.5">
+            <XCircle className="h-3 w-3" /> Fail
+          </span>
         ) : (
           <span className="text-[10px] text-muted-foreground">—</span>
         )}
@@ -438,11 +590,18 @@ function InspectionDetail({
                           {p.measured_value ?? "—"}
                           {p.unit ? ` ${p.unit}` : ""}
                         </span>
-                        {p.notes && <span className="text-muted-foreground italic ml-2">({p.notes})</span>}
+                        {p.notes && (
+                          <span className="text-muted-foreground italic ml-2">({p.notes})</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         {p.photo_url && (
-                          <a href={p.photo_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                          <a
+                            href={p.photo_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                          >
                             📷
                           </a>
                         )}
@@ -502,7 +661,10 @@ function QualityPage() {
 
   // Parameter values: { [category_key]: { [param_name]: { measured_value, result, notes, photo_url } } }
   const [paramValues, setParamValues] = useState<
-    Record<string, Record<string, { measured_value: string; result: string; notes: string; photo_url: string }>>
+    Record<
+      string,
+      Record<string, { measured_value: string; result: string; notes: string; photo_url: string }>
+    >
   >({});
 
   const toggleCat = (key: string) => setExpandedCats((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -510,7 +672,8 @@ function QualityPage() {
   const setParamValue = useCallback(
     (category: string, paramName: string, field: string, val: string) => {
       setParamValues((prev) => {
-        const cat = { ...(prev[category] ?? {}) };          const existing = cat[paramName] ?? {};
+        const cat = { ...(prev[category] ?? {}) };
+        const existing = cat[paramName] ?? {};
         const param = {
           measured_value: existing.measured_value ?? "",
           result: existing.result ?? "pending",
@@ -528,7 +691,9 @@ function QualityPage() {
           } else if (paramDef.type === "scale" && param.measured_value) {
             // Scale values: "Even", "Consistent", "Match", etc. = pass; "Uneven", "Inconsistent", "Mismatch" = fail
             const failWords = ["Uneven", "Inconsistent", "Mismatch", "Rough", "Uneven"];
-            param.result = failWords.some((w) => param.measured_value.includes(w)) ? "fail" : "pass";
+            param.result = failWords.some((w) => param.measured_value.includes(w))
+              ? "fail"
+              : "pass";
           } else if (paramDef.type === "numeric" && param.measured_value) {
             // For numeric, result is set manually via measured_value presence
             // The range check is informational — actual pass/fail for numeric is up to inspector
@@ -560,9 +725,10 @@ function QualityPage() {
   const { data: incomingInspections } = useQuery({
     queryKey: ["incoming-inspections", companyId, plantId],
     queryFn: async () => {
-      let q = (supabase
-        .from("incoming_material_inspections" as any) as any)
-        .select("*, materials(name, unit), warehouses(name, code, plant_id), purchase_orders(po_number)")
+      let q = (supabase.from("incoming_material_inspections" as any) as any)
+        .select(
+          "*, materials(name, unit), warehouses(name, code, plant_id), purchase_orders(po_number)",
+        )
         .eq("company_id", companyId!)
         .order("created_at", { ascending: false })
         .limit(100);
@@ -576,10 +742,35 @@ function QualityPage() {
     enabled: !!companyId,
   });
 
+  // Finished-goods queue: work orders at 100% with no final inspection yet —
+  // the same definition the Final Inspection page uses, surfaced here so the
+  // Quality dashboard shows both inspection types with their own counts.
+  const { data: finishedGoodsAwaiting } = useQuery({
+    queryKey: ["q-fg-awaiting", companyId],
+    queryFn: async () => {
+      if (!companyId) return 0;
+      const { data: wos } = await supabase
+        .from("work_orders")
+        .select("production_order_id")
+        .eq("company_id", companyId)
+        .gte("progress_percent", 100);
+      if (!wos?.length) return 0;
+      const { data: insp } = await supabase
+        .from("quality_inspections")
+        .select("production_order_id")
+        .eq("company_id", companyId);
+      const inspected = new Set((insp ?? []).map((i: any) => i.production_order_id));
+      return wos.filter((w: any) => !inspected.has(w.production_order_id)).length;
+    },
+    enabled: !!companyId,
+  });
+
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [inspNotes, setInspNotes] = useState<Record<string, string>>({});
   const [rejectDialogInspection, setRejectDialogInspection] = useState<any | null>(null);
-  const [rejectDialogReason, setRejectDialogReason] = useState<string>("Failed visual/dimensional inspection");
+  const [rejectDialogReason, setRejectDialogReason] = useState<string>(
+    "Failed visual/dimensional inspection",
+  );
   const [rejectDialogNotes, setRejectDialogNotes] = useState<string>("");
 
   const processInspectionMutation = useMutation({
@@ -598,7 +789,7 @@ function QualityPage() {
         p_inspection_id: id,
         p_decision: decision,
         p_notes: notes ?? inspNotes[id] ?? null,
-        p_rejection_reason: decision === "rejected" ? (reason || "Failed incoming inspection") : null,
+        p_rejection_reason: decision === "rejected" ? reason || "Failed incoming inspection" : null,
       });
       if (error) throw error;
       return data;
@@ -620,7 +811,9 @@ function QualityPage() {
       toast.error(e.message);
     },
   });
-  const pendingIncoming = (incomingInspections ?? []).filter((i: any) => i.status === "pending").length;
+  const pendingIncoming = (incomingInspections ?? []).filter(
+    (i: any) => i.status === "pending",
+  ).length;
 
   // Fetch parameters for detail view
   const { data: detailParams } = useQuery({
@@ -716,7 +909,8 @@ function QualityPage() {
           const v = catVals[p.name];
           if (!v) continue; // skip unfilled params
           // Skip N/A params
-          const isNA = p.naFor?.some((np) => formData.product_name.toLowerCase().includes(np)) ?? false;
+          const isNA =
+            p.naFor?.some((np) => formData.product_name.toLowerCase().includes(np)) ?? false;
           if (isNA) continue;
 
           paramRows.push({
@@ -743,7 +937,8 @@ function QualityPage() {
 
       // 3. The trigger will auto-compute overall_result, but let's also compute it here for immediate feedback
       const mandatoryFail = paramRows.some(
-        (r) => r.result === "fail" && ["wood_material", "structural", "safety"].includes(r.category),
+        (r) =>
+          r.result === "fail" && ["wood_material", "structural", "safety"].includes(r.category),
       );
       const anyFail = paramRows.some((r) => r.result === "fail");
       const hasPass = paramRows.some((r) => r.result === "pass");
@@ -846,7 +1041,14 @@ function QualityPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="inspections">Inspections</TabsTrigger>
+          <TabsTrigger value="inspections" className="relative">
+            Finished Goods
+            {(finishedGoodsAwaiting ?? 0) > 0 && (
+              <span className="ml-1.5 h-4 w-4 rounded-full bg-blue-500 text-[10px] font-medium text-white inline-flex items-center justify-center">
+                {finishedGoodsAwaiting}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="parameters">Parameter Trends</TabsTrigger>
           <TabsTrigger value="incoming" className="relative">
             Incoming Materials
@@ -860,24 +1062,49 @@ function QualityPage() {
 
         {/* ─── DASHBOARD TAB ─── */}
         <TabsContent value="dashboard" className="space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3 sm:gap-4">
             <Kpi
               label="First-Pass Yield"
               value={fmt(stats.firstPassYield)}
               icon={ShieldCheck}
               tone="success"
             />
-            <Kpi label="Defect Rate" value={fmt(stats.defectRate)} icon={AlertOctagon} tone="warning" />
+            <Kpi
+              label="Defect Rate"
+              value={fmt(stats.defectRate)}
+              icon={AlertOctagon}
+              tone="warning"
+            />
             <Kpi label="Passed" value={String(stats.passed)} icon={CheckCircle2} tone="success" />
             <Kpi label="Failed" value={String(stats.failed)} icon={XCircle} tone="destructive" />
-            <Kpi label="Conditional" value={String(stats.conditional)} icon={ClipboardCheck} tone="info" />
+            <Kpi
+              label="Conditional"
+              value={String(stats.conditional)}
+              icon={ClipboardCheck}
+              tone="info"
+            />
+            <Kpi
+              label="FG Awaiting Final"
+              value={String(finishedGoodsAwaiting ?? 0)}
+              icon={ClipboardCheck}
+              tone="info"
+            />
+            <Kpi
+              label="Incoming Awaiting QC"
+              value={String(pendingIncoming)}
+              icon={Package}
+              tone="warning"
+            />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2">
               <Panel title="Yield · last 12 weeks">
                 {(inspections ?? []).length === 0 ? (
-                  <EmptyState title="No inspections yet" sub="Record your first inspection to see yield trends." />
+                  <EmptyState
+                    title="No inspections yet"
+                    sub="Record your first inspection to see yield trends."
+                  />
                 ) : (
                   <div className="h-44 sm:h-64">
                     <ResponsiveContainer>
@@ -912,7 +1139,10 @@ function QualityPage() {
                 )}
               </Panel>
             </div>
-            <Panel title="Inspection Summary" right={<span className="text-[10px] text-primary">{stats.total} total</span>}>
+            <Panel
+              title="Inspection Summary"
+              right={<span className="text-[10px] text-primary">{stats.total} total</span>}
+            >
               <div className="space-y-3">
                 {(inspections ?? []).length === 0 ? (
                   <EmptyState title="No data yet" sub="Inspections will summarize automatically." />
@@ -922,7 +1152,11 @@ function QualityPage() {
                       { t: "Passed", c: stats.passed, color: "text-emerald-400" },
                       { t: "Failed", c: stats.failed, color: "text-red-400" },
                       { t: "Conditional Pass", c: stats.conditional, color: "text-yellow-400" },
-                      { t: "Pending", c: inspections?.filter((r) => r.result === "pending").length ?? 0, color: "text-muted-foreground" },
+                      {
+                        t: "Pending",
+                        c: inspections?.filter((r) => r.result === "pending").length ?? 0,
+                        color: "text-muted-foreground",
+                      },
                     ].map((r, i) => (
                       <div key={i} className="rounded-xl bg-card/60 border border-white/5 p-3">
                         <div className="flex items-center justify-between text-sm">
@@ -940,9 +1174,22 @@ function QualityPage() {
 
         {/* ─── INSPECTIONS TAB ─── */}
         <TabsContent value="inspections" className="space-y-4">
-          <Panel title="Inspection History">
+          <Panel
+            title="Finished Goods Inspections — History"
+            right={
+              (finishedGoodsAwaiting ?? 0) > 0 ? (
+                <span className="text-xs text-blue-400 font-medium">
+                  {finishedGoodsAwaiting} batch{(finishedGoodsAwaiting ?? 0) > 1 ? "es" : ""}{" "}
+                  awaiting final QC
+                </span>
+              ) : undefined
+            }
+          >
             {(inspections ?? []).length === 0 ? (
-              <EmptyState title="No inspections yet" sub="Run your first detailed QC inspection." />
+              <EmptyState
+                title="No finished-goods inspections yet"
+                sub="Completed final QC inspections appear here. Batches ready at 100% land in the Final Inspection queue."
+              />
             ) : (
               <div className="divide-y divide-white/5">
                 {(inspections ?? []).map((n: any) => (
@@ -953,10 +1200,13 @@ function QualityPage() {
                   >
                     <div className="font-mono text-xs">{n.inspection_number}</div>
                     <div>
-                      <div className="capitalize">{String(n.inspection_type).replace(/_/g, " ")}</div>
+                      <div className="capitalize">
+                        {String(n.inspection_type).replace(/_/g, " ")}
+                      </div>
                       <div className="text-[11px] text-muted-foreground">
                         {n.batch_reference ? `${n.batch_reference} · ` : ""}
-                        {n.quantity_checked ?? 0} checked · {n.defects_found ?? 0} defects · {safeDate(n.created_at)}
+                        {n.quantity_checked ?? 0} checked · {n.defects_found ?? 0} defects ·{" "}
+                        {safeDate(n.created_at)}
                       </div>
                     </div>
                     <StatusBadge status={n.result} />
@@ -972,9 +1222,11 @@ function QualityPage() {
         <TabsContent value="parameters" className="space-y-4">
           <Panel title="Which parameters fail most?">
             <div className="text-xs text-muted-foreground py-4 text-center">
-              Parameter-level trend analysis will populate as inspections with itemized parameters accumulate.
+              Parameter-level trend analysis will populate as inspections with itemized parameters
+              accumulate.
               <br />
-              Check back after running several inspections — the system tracks pass/fail rates per individual parameter.
+              Check back after running several inspections — the system tracks pass/fail rates per
+              individual parameter.
             </div>
           </Panel>
         </TabsContent>
@@ -1001,13 +1253,27 @@ function QualityPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent border-white/5">
-                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Material</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">PO #</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Destination Warehouse</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Qty</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Status</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">Notes / Reason</TableHead>
-                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground text-right">Actions</TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        Material
+                      </TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        PO #
+                      </TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        Destination Warehouse
+                      </TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        Qty
+                      </TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        Status
+                      </TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        Notes / Reason
+                      </TableHead>
+                      <TableHead className="text-[11px] uppercase tracking-wider text-muted-foreground text-right">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1021,20 +1287,30 @@ function QualityPage() {
                         <TableRow key={insp.id} className="border-white/5">
                           <TableCell className="font-medium text-sm">
                             {mat?.name ?? "—"}{" "}
-                            {mat?.unit && <span className="text-muted-foreground text-xs font-normal">({mat.unit})</span>}
+                            {mat?.unit && (
+                              <span className="text-muted-foreground text-xs font-normal">
+                                ({mat.unit})
+                              </span>
+                            )}
                           </TableCell>
-                          <TableCell className="font-mono text-xs text-primary">{po?.po_number ?? "—"}</TableCell>
+                          <TableCell className="font-mono text-xs text-primary">
+                            {po?.po_number ?? "—"}
+                          </TableCell>
                           <TableCell className="text-xs">
                             {wh ? (
                               <span>
-                                <span className="font-mono text-muted-foreground">{wh.code ? `[${wh.code}] ` : ""}</span>
+                                <span className="font-mono text-muted-foreground">
+                                  {wh.code ? `[${wh.code}] ` : ""}
+                                </span>
                                 {wh.name}
                               </span>
                             ) : (
                               "—"
                             )}
                           </TableCell>
-                          <TableCell className="font-mono text-xs font-semibold">{insp.quantity}</TableCell>
+                          <TableCell className="font-mono text-xs font-semibold">
+                            {insp.quantity}
+                          </TableCell>
                           <TableCell>
                             <StatusBadge status={insp.status} />
                           </TableCell>
@@ -1050,7 +1326,9 @@ function QualityPage() {
                               />
                             ) : (
                               <span className="text-xs text-muted-foreground">
-                                {insp.rejection_reason ? `Rejected: ${insp.rejection_reason}` : insp.notes ?? "—"}
+                                {insp.rejection_reason
+                                  ? `Rejected: ${insp.rejection_reason}`
+                                  : (insp.notes ?? "—")}
                               </span>
                             )}
                           </TableCell>
@@ -1060,7 +1338,9 @@ function QualityPage() {
                                 <Button
                                   size="sm"
                                   className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                                  loading={processingId === insp.id && processInspectionMutation.isPending}
+                                  loading={
+                                    processingId === insp.id && processInspectionMutation.isPending
+                                  }
                                   disabled={processingId !== null}
                                   onClick={() => {
                                     setProcessingId(insp.id);
@@ -1103,7 +1383,10 @@ function QualityPage() {
             <div className="mt-3 p-3 rounded-lg bg-card/60 border border-white/5 flex items-start gap-2">
               <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <div className="text-[11px] text-muted-foreground leading-relaxed">
-                <strong className="text-foreground font-medium">Quality Gate Architecture:</strong> Goods receipts do not enter active inventory until verified here. Approving credits the usable stock in the assigned warehouse. Rejecting quarantines the batch, triggers an alert for procurement, and flags the PO line item.
+                <strong className="text-foreground font-medium">Quality Gate Architecture:</strong>{" "}
+                Goods receipts do not enter active inventory until verified here. Approving credits
+                the usable stock in the assigned warehouse. Rejecting quarantines the batch,
+                triggers an alert for procurement, and flags the PO line item.
               </div>
             </div>
           </Panel>
@@ -1123,7 +1406,9 @@ function QualityPage() {
                 <Label className="text-xs">Inspection # *</Label>
                 <Input
                   value={formData.inspection_number}
-                  onChange={(e) => setFormData((d) => ({ ...d, inspection_number: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((d) => ({ ...d, inspection_number: e.target.value }))
+                  }
                   placeholder="QI-2026-001"
                 />
               </div>
@@ -1210,7 +1495,9 @@ function QualityPage() {
                           {filledCount}/{cat.params.length}
                         </span>
                         {failCount > 0 && (
-                          <span className="text-[10px] text-red-400 font-medium">{failCount} FAIL</span>
+                          <span className="text-[10px] text-red-400 font-medium">
+                            {failCount} FAIL
+                          </span>
                         )}
                       </div>
                     </button>
@@ -1220,8 +1507,17 @@ function QualityPage() {
                           <ParamRow
                             key={param.name}
                             param={param}
-                            value={catVals[param.name] ?? { measured_value: "", result: "pending", notes: "", photo_url: "" }}
-                            onChange={(field, val) => setParamValue(cat.key, param.name, field, val)}
+                            value={
+                              catVals[param.name] ?? {
+                                measured_value: "",
+                                result: "pending",
+                                notes: "",
+                                photo_url: "",
+                              }
+                            }
+                            onChange={(field, val) =>
+                              setParamValue(cat.key, param.name, field, val)
+                            }
                             productType={formData.product_name}
                           />
                         ))}
@@ -1233,7 +1529,13 @@ function QualityPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowNew(false); resetForm(); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowNew(false);
+                resetForm();
+              }}
+            >
               Cancel
             </Button>
             <Button
@@ -1261,7 +1563,9 @@ function QualityPage() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Rejecting this material will quarantine the stock. It will <strong className="text-foreground">not</strong> enter usable inventory, and procurement will be flagged.
+              Rejecting this material will quarantine the stock. It will{" "}
+              <strong className="text-foreground">not</strong> enter usable inventory, and
+              procurement will be flagged.
             </p>
             <div className="space-y-1.5">
               <Label className="text-xs">Rejection Reason *</Label>
@@ -1270,12 +1574,24 @@ function QualityPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Failed visual/dimensional inspection">Failed visual/dimensional inspection</SelectItem>
-                  <SelectItem value="Damaged packaging / moisture damage">Damaged packaging / moisture damage</SelectItem>
-                  <SelectItem value="Incorrect specifications / wrong grade">Incorrect specifications / wrong grade</SelectItem>
-                  <SelectItem value="Moisture content above tolerance">Moisture content above tolerance</SelectItem>
-                  <SelectItem value="Contamination or surface defects">Contamination or surface defects</SelectItem>
-                  <SelectItem value="Missing compliance certificates / COC">Missing compliance certificates / COC</SelectItem>
+                  <SelectItem value="Failed visual/dimensional inspection">
+                    Failed visual/dimensional inspection
+                  </SelectItem>
+                  <SelectItem value="Damaged packaging / moisture damage">
+                    Damaged packaging / moisture damage
+                  </SelectItem>
+                  <SelectItem value="Incorrect specifications / wrong grade">
+                    Incorrect specifications / wrong grade
+                  </SelectItem>
+                  <SelectItem value="Moisture content above tolerance">
+                    Moisture content above tolerance
+                  </SelectItem>
+                  <SelectItem value="Contamination or surface defects">
+                    Contamination or surface defects
+                  </SelectItem>
+                  <SelectItem value="Missing compliance certificates / COC">
+                    Missing compliance certificates / COC
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
