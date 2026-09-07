@@ -43,7 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
-import { fireNotification } from "@/lib/notifications";
+import { fireNotification, notifyQcTransferInitiated } from "@/lib/notifications";
 import { safeDate } from "@/lib/utils";
 import { fmtNumberShort } from "@/lib/currency";
 import { toast } from "sonner";
@@ -225,6 +225,29 @@ function TransfersPage() {
 
       qc.invalidateQueries({ queryKey: ["tr-transfers"] });
       qc.invalidateQueries({ queryKey: ["tr-stock"] });
+
+      // If transfer involves inspection bay, staging, quarantine, or QC notes -> notify Quality Inspector
+      const isQcTransfer =
+        fromName.toLowerCase().includes("stage") ||
+        fromName.toLowerCase().includes("inspect") ||
+        fromName.toLowerCase().includes("quarantine") ||
+        toName.toLowerCase().includes("stage") ||
+        toName.toLowerCase().includes("inspect") ||
+        toName.toLowerCase().includes("quarantine") ||
+        res.notes.toLowerCase().includes("qc") ||
+        res.notes.toLowerCase().includes("quality");
+
+      if (isQcTransfer && companyId) {
+        void notifyQcTransferInitiated(
+          companyId,
+          sku,
+          fromName,
+          toName,
+          res.qty,
+          res.result?.id ?? "",
+        );
+      }
+
       // Notify Company Admin (role-targeted, never broadcast) of the completed move
       void fireNotification(
         companyId,
