@@ -1646,6 +1646,68 @@ export async function getUnreadNotificationCount(
   }
 }
 
+/** Outbound Dispatch QC Update → Quality Inspector */
+export async function notifyDispatchQcUpdate(
+  companyId: string,
+  shipmentNumber: string,
+  soNumber: string,
+  status: string,
+  shipmentId: string,
+) {
+  await fireNotification(
+    companyId,
+    "quality_inspector",
+    null,
+    "🚚 Outbound Dispatch QC Update",
+    `Shipment ${shipmentNumber} (Order ${soNumber}) is ${status.replace(/_/g, " ")}. Pre-dispatch QC logged.`,
+    "info",
+    "shipments",
+    shipmentId,
+  );
+}
+
+/** QC Stock Transfer → Quality Inspector */
+export async function notifyQcTransferInitiated(
+  companyId: string,
+  itemSkuOrName: string,
+  fromWhName: string,
+  toWhName: string,
+  quantity: number,
+  transferId: string,
+) {
+  await fireNotification(
+    companyId,
+    "quality_inspector",
+    null,
+    "🔬 QC Stock Transfer",
+    `${quantity} × ${itemSkuOrName} transferred from ${fromWhName} to ${toWhName} for quality inspection / quarantine.`,
+    "info",
+    "stock_transfers",
+    transferId,
+  );
+}
+
+/** Incoming Material Inspection Required → Quality Inspector */
+export async function notifyIncomingQcUpdate(
+  companyId: string,
+  poNumber: string,
+  materialName: string,
+  warehouseName: string,
+  quantity: number,
+  inspectionId: string,
+) {
+  await fireNotification(
+    companyId,
+    "quality_inspector",
+    null,
+    "🔬 Incoming QC Required",
+    `${materialName} (${quantity} units) arrived at ${warehouseName} (PO ${poNumber}) awaiting inspection.`,
+    "warning",
+    "incoming_material_inspections",
+    inspectionId,
+  );
+}
+
 export async function fetchNotifications(
   companyId: string | null,
   role: string | null,
@@ -1687,3 +1749,4 @@ export async function fetchNotifications(
     return [];
   }
 }
+
