@@ -10,6 +10,7 @@
  *      the company's primary plant.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { getCompanyPlantsServerFn } from "@/lib/plants.server";
 
 /** Deterministic city → [lat, lng] for the demo's plant cities. */
 const CITY_COORDS: Record<string, [number, number]> = {
@@ -135,14 +136,69 @@ export async function plantsForLocation(
   lat?: number | null,
   lng?: number | null,
 ): Promise<PlantWithDistance[]> {
-  const { data: plants, error } = await supabase
-    .from("plants")
-    .select("id, name, code, city, latitude, longitude, status")
-    .eq("company_id", companyId)
-    .eq("status", "active");
-  if (error || !plants?.length) return [];
+  if (!companyId) return [];
 
-  const rows: PlantWithDistance[] = plants;
+  let rawPlants: any[] = [];
+
+  // 1. Try server function first (works for both anon and authenticated)
+  try {
+    const serverResult = await getCompanyPlantsServerFn({ data: { companyId } });
+    if (Array.isArray(serverResult) && serverResult.length > 0) {
+      rawPlants = serverResult;
+    }
+  } catch (_) {
+    // Non-fatal, fall back to direct client / RPC
+  }
+
+  // 2. Try get_active_plants RPC fallback
+  if (rawPlants.length === 0) {
+    try {
+      const { data: rpcData, error: rpcErr } = await supabase.rpc("get_active_plants" as any, {
+        p_company_id: companyId,
+      });
+      if (!rpcErr && Array.isArray(rpcData) && rpcData.length > 0) {
+        rawPlants = rpcData;
+      }
+    } catch (_) {}
+  }
+
+  // 3. Try direct table query fallback
+  if (rawPlants.length === 0) {
+    const { data: plants } = await supabase
+      .from("plants")
+      .select("id, name, code, city, latitude, longitude, status")
+      .eq("company_id", companyId)
+      .eq("status", "active");
+    if (plants && plants.length > 0) {
+      rawPlants = plants;
+    }
+  }
+
+  // 4. If still empty, check find_nearest_plant RPC
+  if (rawPlants.length === 0) {
+    try {
+      const { data: nearestId } = await supabase.rpc("find_nearest_plant", {
+        p_company_id: companyId,
+        p_lat: lat ?? null,
+        p_lng: lng ?? null,
+      } as never);
+      if (nearestId) {
+        rawPlants = [{ id: nearestId, name: "Primary Plant", status: "active" }];
+      }
+    } catch (_) {}
+  }
+
+  if (!rawPlants.length) return [];
+
+  const rows: PlantWithDistance[] = rawPlants.map((p) => ({
+    id: p.id,
+    name: p.name,
+    code: p.code ?? null,
+    city: p.city ?? null,
+    latitude: p.latitude != null ? Number(p.latitude) : null,
+    longitude: p.longitude != null ? Number(p.longitude) : null,
+  }));
+
   if (lat != null && lng != null) {
     for (const p of rows) {
       if (p.latitude != null && p.longitude != null) {
