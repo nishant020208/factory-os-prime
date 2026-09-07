@@ -134,7 +134,7 @@ function SupplierPosPage() {
       (
         await supabase
           .from("warehouses")
-          .select("id, name, code, address, city")
+          .select("id, name, code, address")
           .eq("company_id", companyId ?? "")
           .order("name")
       ).data ?? [],
