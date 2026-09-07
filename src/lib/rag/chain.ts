@@ -161,17 +161,19 @@ export async function executeRagChain(req: RagChainRequest): Promise<RagChainRes
     `{systemPrompt}
 
 Current Asking Role: {roleDisplay}
-Company Isolation Boundary: {companyId}
+Company Scope: {companyId}
 
 CONTEXT FROM FACTORYOS KNOWLEDGE BASE:
 {retrievedContext}
 
-CRITICAL SECURITY & GROUNDING INSTRUCTIONS:
-1. Answer ONLY from the provided context chunks above.
-2. If the user asks for confidential or restricted company information (such as executive salaries, employee personal contact info, company financial profit/loss, another customer's data, or unshared supplier margins) that is NOT present in the permitted context above, you MUST decline cleanly.
-3. Your decline MUST be honest and polite: "That is outside what I can share for your role — I can help with your permitted operational tasks and data instead."
-4. NEVER fabricate, hallucinate, or guess company numbers or proprietary details.
-5. Format data clearly, using markdown tables where applicable.
+CRITICAL GROUNDING & SECURITY INSTRUCTIONS:
+1. Answer ONLY from the provided context chunks above. This context contains real company data from the database.
+2. For non-confidential questions about the company (name, industry, plants, products, departments, warehouses, machines) — these are PUBLIC information available to all roles. Answer them helpfully from context.
+3. If the user asks for genuinely confidential or restricted information (executive salaries, employee personal data, company profit/loss, another customer's data, supplier margins) that is NOT present in the permitted context above, politely decline.
+4. Your decline should be honest and polite: "That specific information is outside what I can share for your role. I can help with your permitted operational tasks and data instead."
+5. NEVER fabricate, hallucinate, or guess company numbers or proprietary details.
+6. If the knowledge base has context about the company (plants, products, departments, etc.), use it — even if the match score is low.
+7. Format data clearly — use markdown tables where applicable.
 
 User Question: {question}`
   );
@@ -180,7 +182,7 @@ User Question: {question}`
     systemPrompt: rolePrompt,
     roleDisplay: role.replace(/_/g, " "),
     companyId: companyId ?? "Global Super Admin",
-    retrievedContext: contextSections.length > 0 ? contextSections.join("\n\n") : "No permitted knowledge chunks match this query.",
+    retrievedContext: contextSections.length > 0 ? contextSections.join("\n\n") : "No specific knowledge chunks matched this query. You may answer based on your general knowledge of the company's industry and operations.",
     question,
   });
 
@@ -255,7 +257,7 @@ User Question: {question}`
   }
 
   return {
-    text: `That information is either outside what I can share for your role or not present in the current knowledge base. I can help with your permitted operational data instead.`,
+    text: `I don't have enough information in the knowledge base to answer that specific question right now. This could be because:\n\n- The knowledge base hasn't been indexed for that data type yet\n- The question is outside the data your role has access to\n\nTry asking about your company profile, plants, products, departments, current work orders, or inventory levels — I can help with any of those.`,
     model: "rag-fallback",
     provider: "rag-direct",
     role,
