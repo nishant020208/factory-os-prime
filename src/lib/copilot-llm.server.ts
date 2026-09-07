@@ -42,7 +42,7 @@ export interface CopilotLlmRequest {
 export interface CopilotLlmResponse {
   text: string;
   model: string;
-  provider: "groq" | "cerebras";
+  provider: "ollama" | "groq" | "cerebras";
   /** Server-verified role/company actually used for scoping. */
   role: string;
   companyId: string | null;
@@ -219,7 +219,11 @@ export const askCopilotLlm = createServerFn({ method: "POST" })
 
 /** Server-side provider health check (keys never leave the server). */
 export const checkCopilotProviderHealth = createServerFn({ method: "POST" }).handler(
-  async (): Promise<{ groq: { connected: boolean; message: string }; cerebras: { connected: boolean; message: string } }> => {
+  async (): Promise<{
+    ollama: { connected: boolean; message: string };
+    groq: { connected: boolean; message: string };
+    cerebras: { connected: boolean; message: string };
+  }> => {
     async function ping(apiUrl: string, key: string | null, label: string) {
       if (!key) return { connected: false, message: "API key not configured" };
       try {
@@ -237,8 +241,26 @@ export const checkCopilotProviderHealth = createServerFn({ method: "POST" }).han
         return { connected: false, message: "Network error" };
       }
     }
-    const groq = await ping(GROQ_API_URL, getGroqKey(), "groq");
-    const cerebras = await ping(CEREBRAS_API_URL, getCerebrasKey(), "cerebras");
-    return { groq, cerebras };
+
+    async function pingOllama(): Promise<{ connected: boolean; message: string }> {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 1200);
+        const res = await fetch("http://localhost:11434/api/tags", { signal: controller.signal });
+        clearTimeout(timer);
+        if (res.ok) return { connected: true, message: "Local Ollama Active" };
+        return { connected: false, message: `Ollama returned ${res.status}` };
+      } catch {
+        return { connected: false, message: "Local Ollama offline (using Groq fallback)" };
+      }
+    }
+
+    const [ollama, groq, cerebras] = await Promise.all([
+      pingOllama(),
+      ping(GROQ_API_URL, getGroqKey(), "groq"),
+      ping(CEREBRAS_API_URL, getCerebrasKey(), "cerebras"),
+    ]);
+
+    return { ollama, groq, cerebras };
   },
 );
