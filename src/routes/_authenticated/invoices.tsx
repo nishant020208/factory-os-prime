@@ -21,10 +21,17 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { notifyInvoiceGenerated, notifyPaymentStatusChanged } from "@/lib/notifications";
+import { QrDialog } from "@/components/qr-dialog";
 import { getCustomerUserId } from "@/lib/customer-lookup";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 
@@ -99,7 +106,11 @@ function InvoicesPage() {
     generating: false,
   });
 
-  const [genDialog, setGenDialog] = useState<{ open: boolean; order: any | null; gstPercent: string }>({
+  const [genDialog, setGenDialog] = useState<{
+    open: boolean;
+    order: any | null;
+    gstPercent: string;
+  }>({
     open: false,
     order: null,
     gstPercent: "18",
@@ -258,7 +269,13 @@ function InvoicesPage() {
           .from("customer_orders")
           .select("*, customers!left(business_name, name)")
           .eq("company_id", companyId!)
-          .in("status", ["advance_paid", "in_production", "dispatch_ready", "delivered", "completed"])
+          .in("status", [
+            "advance_paid",
+            "in_production",
+            "dispatch_ready",
+            "delivered",
+            "completed",
+          ])
           .gt("balance_due", 0)
           .order("created_at", { ascending: false })
       ).data ?? [],
@@ -331,12 +348,7 @@ function InvoicesPage() {
 
         {/* KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-          <Kpi
-            label="Total Billed"
-            value={fmtMoneyK(total)}
-            icon={Receipt}
-            tone="primary"
-          />
+          <Kpi label="Total Billed" value={fmtMoneyK(total)} icon={Receipt} tone="primary" />
           <Kpi label="Paid" value={String(paid)} icon={CheckCircle2} tone="success" />
           <Kpi label="Outstanding" value={String(outstanding)} icon={Clock} tone="warning" />
         </div>
@@ -429,7 +441,8 @@ function InvoicesPage() {
                 <div>
                   <div className="font-medium">{o.order_number}</div>
                   <div className="text-[11px] text-muted-foreground">
-                    {o.customers?.business_name ?? o.customers?.name ?? "—"} · Balance {fmtMoney(o.balance_due)}
+                    {o.customers?.business_name ?? o.customers?.name ?? "—"} · Balance{" "}
+                    {fmtMoney(o.balance_due)}
                   </div>
                 </div>
                 <Button
@@ -453,63 +466,62 @@ function InvoicesPage() {
         rows={rows}
         searchKeys={["invoice_number", "customer_name", "status"]}
         formFields={isAuditor ? undefined : INVOICE_FORM_FIELDS}
-        onSubmit={isAuditor ? undefined : async (formData) => {
-          if (!companyId) return;
-          const { data: inserted, error } = await supabase
-            .from("invoices")
-            .insert({
-              company_id: companyId,
-              invoice_number: formData.invoice_number,
-              total_amount: parseFloat(formData.total_amount) || 0,
-              tax_amount: parseFloat(formData.tax_amount) || 0,
-              due_date: formData.due_date || null,
-              status: formData.status || "draft",
-              issue_date: new Date().toISOString(),
-            })
-            .select("id")
-            .single();
-          if (error) throw error;
+        onSubmit={
+          isAuditor
+            ? undefined
+            : async (formData) => {
+                if (!companyId) return;
+                const { data: inserted, error } = await supabase
+                  .from("invoices")
+                  .insert({
+                    company_id: companyId,
+                    invoice_number: formData.invoice_number,
+                    total_amount: parseFloat(formData.total_amount) || 0,
+                    tax_amount: parseFloat(formData.tax_amount) || 0,
+                    due_date: formData.due_date || null,
+                    status: formData.status || "draft",
+                    issue_date: new Date().toISOString(),
+                  })
+                  .select("id")
+                  .single();
+                if (error) throw error;
 
-          if (inserted) {
-            // Auto-generate QR code for the newly created invoice
-            try {
-              await supabase.from("qr_codes").insert({
-                company_id: companyId,
-                entity_type: "invoice",
-                entity_id: inserted.id,
-                type: "invoice",
-                status: "active",
-                qr_data: inserted.id,
-                label: formData.invoice_number,
-                sub_label: `Status: ${formData.status || "draft"}`,
-              });
-            } catch (qrError) {
-              console.error("Failed to auto-generate QR code for invoice:", qrError);
-            }
+                if (inserted) {
+                  // Auto-generate QR code for the newly created invoice
+                  try {
+                    await supabase.from("qr_codes").insert({
+                      company_id: companyId,
+                      entity_type: "invoice",
+                      entity_id: inserted.id,
+                      type: "invoice",
+                      status: "active",
+                      qr_data: inserted.id,
+                      label: formData.invoice_number,
+                      sub_label: `Status: ${formData.status || "draft"}`,
+                    });
+                  } catch (qrError) {
+                    console.error("Failed to auto-generate QR code for invoice:", qrError);
+                  }
 
-            if (formData.customer_id) {
-              try {
-                const customerUserId = await getCustomerUserId(formData.customer_id);
-                await notifyInvoiceGenerated(
-                  companyId,
-                  formData.invoice_number,
-                  customerUserId ?? "",
-                  inserted.id,
-                );
-              } catch (notifyErr) {
-                console.error("Failed to notify customer for invoice:", notifyErr);
+                  if (formData.customer_id) {
+                    try {
+                      const customerUserId = await getCustomerUserId(formData.customer_id);
+                      await notifyInvoiceGenerated(
+                        companyId,
+                        formData.invoice_number,
+                        customerUserId ?? "",
+                        inserted.id,
+                      );
+                    } catch (notifyErr) {
+                      console.error("Failed to notify customer for invoice:", notifyErr);
+                    }
+                  }
+                }
               }
-            }
-          }
-        }}
+        }
         kpis={
           <>
-            <Kpi
-              label="Total Invoiced"
-              value={fmtMoneyK(total)}
-              icon={Receipt}
-              tone="primary"
-            />
+            <Kpi label="Total Invoiced" value={fmtMoneyK(total)} icon={Receipt} tone="primary" />
             <Kpi label="Paid" value={String(paid)} icon={CheckCircle2} tone="success" />
             <Kpi label="Outstanding" value={String(outstanding)} icon={Clock} tone="warning" />
             {overdue > 0 && (
@@ -615,8 +627,8 @@ function InvoicesPage() {
           {genDialog.order && (
             <div className="space-y-4 py-2">
               <div className="text-sm">
-                <span className="text-muted-foreground">Order:</span>{" "}
-                {genDialog.order.order_number} —{" "}
+                <span className="text-muted-foreground">Order:</span> {genDialog.order.order_number}{" "}
+                —{" "}
                 {genDialog.order.customers?.business_name ?? genDialog.order.customers?.name ?? ""}
               </div>
               <div className="rounded-xl bg-card/60 border border-white/5 p-4 space-y-2 text-sm">
@@ -637,7 +649,11 @@ function InvoicesPage() {
                   <span className="text-muted-foreground">GST Amount</span>
                   <span className="font-medium text-primary">
                     $
-                    {((Number(genDialog.order.balance_due ?? 0) * (parseFloat(genDialog.gstPercent) || 0)) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    {(
+                      (Number(genDialog.order.balance_due ?? 0) *
+                        (parseFloat(genDialog.gstPercent) || 0)) /
+                      100
+                    ).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="border-t border-white/5 pt-2 flex justify-between">
@@ -651,7 +667,10 @@ function InvoicesPage() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setGenDialog({ open: false, order: null, gstPercent: "18" })}>
+            <Button
+              variant="outline"
+              onClick={() => setGenDialog({ open: false, order: null, gstPercent: "18" })}
+            >
               Cancel
             </Button>
             <Button
@@ -677,96 +696,25 @@ function QrCodeDialog({
   onOpenChange: (o: boolean) => void;
 }) {
   return (
-    <Dialog open={dialog.open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[380px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <QrCode className="h-4 w-4 text-primary" />
-            Invoice QR Code
-          </DialogTitle>
-        </DialogHeader>
-        {dialog.invoice && (
-          <div className="flex flex-col items-center gap-4 py-2">
-            <div className="bg-white rounded-2xl p-4 shadow-lg flex items-center justify-center">
-              {dialog.generating ? (
-                <div className="w-48 h-48 flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                </div>
-              ) : dialog.scanUrl ? (
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(dialog.scanUrl)}`}
-                  alt="Invoice QR Code"
-                  className="w-48 h-48 rounded-lg object-contain"
-                />
-              ) : (
-                <div className="w-48 h-48 flex items-center justify-center text-xs text-muted-foreground text-center p-4">
-                  QR code not available for this invoice
-                </div>
-              )}
-            </div>
-
-            <div className="text-center space-y-1">
-              <div className="font-semibold">{dialog.invoice.invoice_number}</div>
-              <div className="text-xs text-muted-foreground">
-                Status: <StatusBadge status={dialog.invoice.status} />
-              </div>
-            </div>
-
-            {dialog.scanUrl && (
-              <div className="w-full rounded-lg bg-muted/50 border border-border px-3 py-2 flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground flex-1 truncate font-mono">
-                  {dialog.scanUrl}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 shrink-0"
-                  onClick={() => {
-                    navigator.clipboard.writeText(dialog.scanUrl!);
-                    toast.success("Scan link copied!");
-                  }}
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-              </div>
-            )}
-
-            <p className="text-[10px] text-muted-foreground text-center max-w-xs">
-              Scan with any phone camera — no app needed. Links to the public FactoryOS
-              verification page.
-            </p>
-
-            <div className="flex gap-2">
-              {dialog.scanUrl && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(dialog.scanUrl!, "_blank")}
-                >
-                  <Eye className="h-3.5 w-3.5 mr-1" />
-                  Preview
-                </Button>
-              )}
-              {dialog.scanUrl && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const link = document.createElement("a");
-                    link.href = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(dialog.scanUrl!)}`;
-                    link.download = `qr-${dialog.invoice!.invoice_number}.png`;
-                    link.click();
-                    toast.success("QR code downloaded");
-                  }}
-                >
-                  <Download className="h-3.5 w-3.5 mr-1" />
-                  Download
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+    <QrDialog
+      open={dialog.open}
+      onOpenChange={onOpenChange}
+      title="Invoice QR"
+      reference={dialog.invoice?.invoice_number ?? null}
+      status={dialog.invoice?.status ?? null}
+      scanUrl={dialog.scanUrl}
+      loading={dialog.generating}
+      downloadName={`qr-${dialog.invoice?.invoice_number ?? "invoice"}`}
+      helperText="Scan with any phone camera — no app needed. Links to the public FactoryOS verification page."
+    >
+      {dialog.invoice && Number(dialog.invoice.total_amount ?? 0) > 0 && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          Amount:{" "}
+          <span className="font-mono font-semibold text-foreground">
+            {fmtMoney(dialog.invoice.total_amount)}
+          </span>
+        </div>
+      )}
+    </QrDialog>
   );
 }
