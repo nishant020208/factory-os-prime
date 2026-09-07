@@ -15,6 +15,7 @@ import { retrieveKnowledge } from "./retriever.ts";
 import type { RetrievedChunk } from "./retriever.ts";
 import { ROLE_SYSTEM_PROMPTS, SCOPE_RULE } from "../llm-prompts.ts";
 import { checkRoleScope, DOMAIN_LABELS, getAllowedLabels, ROLE_LABELS } from "../role-scope.ts";
+import { callOllamaChat } from "../ollama.ts";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "openai/gpt-oss-120b";
@@ -198,7 +199,27 @@ User Question: {question}`
   }
   messages.push({ role: "user", content: question });
 
-  // 5. Model Execution (Groq primary, Cerebras fallback)
+  // 5. Model Execution: Ollama (local primary) -> Groq (cloud primary) -> Cerebras (cloud fallback)
+  // Step 5a: Local Ollama (Developer Laptop)
+  try {
+    const ollamaAnswer = await callOllamaChat(messages, 6000);
+    if (ollamaAnswer?.text) {
+      return {
+        text: ollamaAnswer.text,
+        model: ollamaAnswer.model,
+        provider: "ollama" as any,
+        role,
+        companyId,
+        retrievedChunksCount: retrieval.chunks.length,
+        retrievedChunks: formattedChunksSummary,
+        latencyMs: Date.now() - t0,
+      };
+    }
+  } catch (ollamaErr) {
+    console.warn("[rag-chain] Local Ollama call bypassed — using Groq cloud:", ollamaErr);
+  }
+
+  // Step 5b: Groq Cloud (Primary Cloud Provider)
   const groqKey = getGroqKey();
   if (groqKey) {
     try {
@@ -220,6 +241,7 @@ User Question: {question}`
     }
   }
 
+  // Step 5c: Cerebras Cloud (Secondary Cloud Fallback)
   const cerebrasKey = getCerebrasKey();
   if (cerebrasKey) {
     try {
