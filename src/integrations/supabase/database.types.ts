@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       access_logs: {
@@ -349,6 +374,61 @@ export type Database = {
             columns: ["job_posting_id"]
             isOneToOne: false
             referencedRelation: "job_postings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      canvas_positions: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          plant_id: string | null
+          position_x: number
+          position_y: number
+          updated_at: string
+          whitelist_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          plant_id?: string | null
+          position_x?: number
+          position_y?: number
+          updated_at?: string
+          whitelist_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          plant_id?: string | null
+          position_x?: number
+          position_y?: number
+          updated_at?: string
+          whitelist_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canvas_positions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_positions_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "canvas_positions_whitelist_id_fkey"
+            columns: ["whitelist_id"]
+            isOneToOne: false
+            referencedRelation: "whitelist"
             referencedColumns: ["id"]
           },
         ]
@@ -4330,6 +4410,7 @@ export type Database = {
           gst_amount: number | null
           id: string
           invoice_number: string
+          origin: string
           po_id: string | null
           status: string
           supplier_id: string
@@ -4342,6 +4423,7 @@ export type Database = {
           gst_amount?: number | null
           id?: string
           invoice_number: string
+          origin?: string
           po_id?: string | null
           status?: string
           supplier_id: string
@@ -4354,6 +4436,7 @@ export type Database = {
           gst_amount?: number | null
           id?: string
           invoice_number?: string
+          origin?: string
           po_id?: string | null
           status?: string
           supplier_id?: string
@@ -5146,6 +5229,77 @@ export type Database = {
           },
         ]
       }
+      workflow_links: {
+        Row: {
+          child_id: string
+          company_id: string
+          created_at: string
+          from_role: Database["public"]["Enums"]["app_role"]
+          id: string
+          linked_at: string
+          linked_by: string | null
+          parent_id: string
+          plant_id: string | null
+          status: string
+          to_role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          child_id: string
+          company_id: string
+          created_at?: string
+          from_role: Database["public"]["Enums"]["app_role"]
+          id?: string
+          linked_at?: string
+          linked_by?: string | null
+          parent_id: string
+          plant_id?: string | null
+          status?: string
+          to_role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          child_id?: string
+          company_id?: string
+          created_at?: string
+          from_role?: Database["public"]["Enums"]["app_role"]
+          id?: string
+          linked_at?: string
+          linked_by?: string | null
+          parent_id?: string
+          plant_id?: string | null
+          status?: string
+          to_role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_links_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "whitelist"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_links_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_links_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "whitelist"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_links_plant_id_fkey"
+            columns: ["plant_id"]
+            isOneToOne: false
+            referencedRelation: "plants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       inventory_available: {
@@ -5388,10 +5542,12 @@ export type Database = {
         }
         Returns: Json
       }
-      resume_orders_when_stocked: {
-        Args: { p_company_id: string }
-        Returns: Json
-      }
+      resume_orders_when_stocked:
+        | { Args: { p_company_id: string }; Returns: Json }
+        | {
+            Args: { p_company_id: string; p_material_id: string }
+            Returns: Json
+          }
       transfer_stock: {
         Args: {
           p_company_id: string
@@ -5558,6 +5714,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: [
