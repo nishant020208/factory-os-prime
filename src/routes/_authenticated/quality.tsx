@@ -721,22 +721,17 @@ function QualityPage() {
     enabled: !!companyId,
   });
 
-  // Incoming material inspections (from GRN)
+  // Incoming material inspections (from GRN / warehouse receiving)
   const { data: incomingInspections } = useQuery({
-    queryKey: ["incoming-inspections", companyId, plantId],
+    queryKey: ["incoming-inspections", companyId],
     queryFn: async () => {
-      let q = (supabase.from("incoming_material_inspections" as any) as any)
+      const q = (supabase.from("incoming_material_inspections" as any) as any)
         .select(
           "*, materials(name, unit), warehouses(name, code, plant_id), purchase_orders(po_number)",
         )
         .eq("company_id", companyId!)
         .order("created_at", { ascending: false })
         .limit(100);
-      // Plant-scope: quality inspectors only see their plant's inspections
-      const isQc = roles.includes("quality_inspector");
-      if (isQc && plantId) {
-        q = q.eq("warehouses.plant_id", plantId);
-      }
       return (await q).data ?? [];
     },
     enabled: !!companyId,
