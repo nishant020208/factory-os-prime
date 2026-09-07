@@ -17,7 +17,11 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
 import { fmtMoney } from "@/lib/currency";
-import { notifyGRNConfirmed, notifyGRNToSupplier, notifyMaterialsReceivedForOrder, notifyIncomingInspectionPending } from "@/lib/notifications";
+import {
+  notifyGRNConfirmed,
+  notifyGRNToSupplier,
+  notifyMaterialsReceivedForOrder,
+} from "@/lib/notifications";
 import { toast } from "sonner";
 import { useState } from "react";
 import { QrCameraScanner } from "@/components/qr-camera-scanner";
@@ -62,13 +66,17 @@ function GoodsReceiptPage() {
   const { data: allWarehouses } = useQuery({
     queryKey: ["warehouses", companyId],
     queryFn: async () =>
-      (await supabase.from("warehouses").select("id, name, code, plant_id").eq("company_id", companyId ?? "").order("name"))
-        .data ?? [],
+      (
+        await supabase
+          .from("warehouses")
+          .select("id, name, code, plant_id")
+          .eq("company_id", companyId ?? "")
+          .order("name")
+      ).data ?? [],
     enabled: !!companyId,
   });
 
-  const awaiting =
-    pos?.filter((p) => ["dispatched", "accepted"].includes(p.status)).length ?? 0;
+  const awaiting = pos?.filter((p) => ["dispatched", "accepted"].includes(p.status)).length ?? 0;
   const received = pos?.filter((p) => ["received", "fulfilled"].includes(p.status)).length ?? 0;
 
   const grnMutation = useMutation({
@@ -120,7 +128,8 @@ function GoodsReceiptPage() {
       let whId: string | null = poWarehouseObj?.id ?? null;
       if (!whId) {
         const rawWh = (allWarehouses ?? []).find(
-          (w: any) => w.code?.toLowerCase().includes("raw") || w.name?.toLowerCase().includes("raw"),
+          (w: any) =>
+            w.code?.toLowerCase().includes("raw") || w.name?.toLowerCase().includes("raw"),
         );
         whId = (rawWh as any)?.id ?? (allWarehouses as any[])?.[0]?.id ?? null;
       }
@@ -140,8 +149,7 @@ function GoodsReceiptPage() {
       let grId: string | null = null;
       try {
         const userRes = await supabase.auth.getUser();
-        const { data: grRow, error: grErr } = await (supabase
-          .from("goods_receipts" as any) as any)
+        const { data: grRow, error: grErr } = await (supabase.from("goods_receipts" as any) as any)
           .insert({
             company_id: companyId,
             purchase_order_id: poId,
@@ -171,15 +179,15 @@ function GoodsReceiptPage() {
             quantity: Number(it.quantity ?? 0),
             status: "pending",
           });
-        } catch (_) {/* non-fatal */}
+        } catch (_) {
+          /* non-fatal */
+        }
       }
 
-      // Notify Quality Inspector that incoming materials need QC inspection
-      try {
-        const matNames = items?.map((it: any) => it.material_id).join(", ") ?? "materials";
-        const whName = (whObj as any)?.name ?? "warehouse";
-        await notifyIncomingInspectionPending(companyId, (po as any).po_number ?? "PO", matNames, whName);
-      } catch (_) { /* non-fatal */ }
+      // Quality Inspector notification is handled server-side by the
+      // incoming_material_inspections INSERT trigger (trg_incoming_qc_assign) —
+      // one targeted "🔬 Incoming QC Required" per inspection row, with the
+      // real material/quantity/warehouse. No client-side duplicate here.
 
       // 8) Resume waiting production orders (stock check will pass post-inspection,
       //    but run it anyway so approved backlog auto-resumes)
@@ -201,14 +209,17 @@ function GoodsReceiptPage() {
 
       // 9) Notify Finance + Supplier
       await notifyGRNConfirmed(companyId, po.po_number ?? "PO", supplier?.name ?? "Supplier");
-      await notifyGRNToSupplier(companyId, po.po_number ?? "PO", supplier?.name ?? "Supplier", supplier?.user_id ?? null);
+      await notifyGRNToSupplier(
+        companyId,
+        po.po_number ?? "PO",
+        supplier?.name ?? "Supplier",
+        supplier?.user_id ?? null,
+      );
     },
     onSuccess: (_d, poId) => {
       queryClient.invalidateQueries({ queryKey: ["grn-pos"] });
       queryClient.invalidateQueries({ queryKey: ["incoming-inspections"] });
-      toast.success(
-        "Goods receipt confirmed — pending Quality Inspection before stock is usable",
-      );
+      toast.success("Goods receipt confirmed — pending Quality Inspection before stock is usable");
       setReceivingId(null);
       setTokens((t) => ({ ...t, [poId]: "" }));
     },
@@ -231,7 +242,12 @@ function GoodsReceiptPage() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <Kpi label="Awaiting Receipt" value={String(awaiting)} icon={PackageOpen} tone="warning" />
         <Kpi label="Received" value={String(received)} icon={CheckCircle2} tone="success" />
-        <Kpi label="All Supplier POs" value={String(pos?.length ?? 0)} icon={ScanLine} tone="primary" />
+        <Kpi
+          label="All Supplier POs"
+          value={String(pos?.length ?? 0)}
+          icon={ScanLine}
+          tone="primary"
+        />
       </div>
 
       <Panel title={`${pos?.length ?? 0} Supplier Purchase Orders`}>
@@ -239,8 +255,19 @@ function GoodsReceiptPage() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-white/5">
-                {["PO #", "Supplier", "Dest. Warehouse", "Amount", "Status", "Inbound QR Token", "Action"].map((h) => (
-                  <TableHead key={h} className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                {[
+                  "PO #",
+                  "Supplier",
+                  "Dest. Warehouse",
+                  "Amount",
+                  "Status",
+                  "Inbound QR Token",
+                  "Action",
+                ].map((h) => (
+                  <TableHead
+                    key={h}
+                    className="text-[11px] uppercase tracking-wider text-muted-foreground"
+                  >
                     {h}
                   </TableHead>
                 ))}
@@ -253,7 +280,9 @@ function GoodsReceiptPage() {
                 const canReceive = ["dispatched", "accepted"].includes(po.status);
                 return (
                   <TableRow key={po.id} className="border-white/5">
-                    <TableCell className="font-medium">{po.po_number ?? po.id.slice(0, 8)}</TableCell>
+                    <TableCell className="font-medium">
+                      {po.po_number ?? po.id.slice(0, 8)}
+                    </TableCell>
                     <TableCell className="text-xs">{supplier?.name ?? "—"}</TableCell>
                     <TableCell>
                       {wh?.name ? (
@@ -266,9 +295,7 @@ function GoodsReceiptPage() {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {fmtMoney(po.total_amount)}
-                    </TableCell>
+                    <TableCell className="font-mono text-xs">{fmtMoney(po.total_amount)}</TableCell>
                     <TableCell>
                       <StatusBadge status={po.status} />
                     </TableCell>
