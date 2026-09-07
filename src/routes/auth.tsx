@@ -28,11 +28,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ROLES, ROLE_MAP, type AppRole } from "@/lib/roles";
 import { notifyCompanyRegistrationRequest, notifyCustomerAccessRequest } from "@/lib/notifications";
 import { recordAccessLog } from "@/lib/access-log";
-import {
-  geocodeAddress,
-  plantsForLocation,
-  type PlantWithDistance,
-} from "@/lib/plant-location";
+import { geocodeAddress, plantsForLocation, type PlantWithDistance } from "@/lib/plant-location";
 
 const searchSchema = z.object({
   role: z.string().optional(),
@@ -304,8 +300,7 @@ function AuthPage() {
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pb-16">
         {deactivated && (
           <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            Your account has been deactivated by your Company Admin. Contact them to
-            restore access.
+            Your account has been deactivated by your Company Admin. Contact them to restore access.
           </div>
         )}
         <AnimatePresence mode="wait">
@@ -521,6 +516,43 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
   const [locLoading, setLocLoading] = useState(false);
   const lastLocQuery = useRef("");
 
+  // Plants of the selected company — drives the confirm/override dropdown.
+  const [companyPlants, setCompanyPlants] = useState<PlantWithDistance[]>([]);
+  const [plantsLoading, setPlantsLoading] = useState(false);
+  const [selectedPlantId, setSelectedPlantId] = useState("");
+  const plantTouched = useRef(false);
+
+  // Load the real plant list whenever the company changes, so the customer can
+  // confirm (or deliberately override) which plant serves them — never another
+  // company's plants.
+  useEffect(() => {
+    let mounted = true;
+    if (!form.company_id) {
+      setCompanyPlants([]);
+      setSelectedPlantId("");
+      plantTouched.current = false;
+      return;
+    }
+    setPlantsLoading(true);
+    (async () => {
+      const { data } = await supabase
+        .from("plants")
+        .select("id, name, code, city, latitude, longitude")
+        .eq("company_id", form.company_id)
+        .eq("status", "active")
+        .order("name");
+      if (mounted) {
+        const rows = (data ?? []) as PlantWithDistance[];
+        setCompanyPlants(rows);
+        setSelectedPlantId((prev) => (rows.some((p) => p.id === prev) ? prev : ""));
+        setPlantsLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [form.company_id]);
+
   useEffect(() => {
     const q = [form.address, form.city].filter(Boolean).join(", ").trim();
     // Guard with a ref, not state: writing state here would re-run the effect
@@ -536,6 +568,11 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
       if (coords) {
         const rows = await plantsForLocation(form.company_id, coords.lat, coords.lng);
         if (!cancelled) setPlants(rows);
+        // Pre-select the nearest plant — but only until the customer makes an
+        // explicit choice of their own (plantTouched).
+        if (!cancelled && rows[0] && !plantTouched.current) {
+          setSelectedPlantId(rows[0].id);
+        }
       } else {
         if (!cancelled) setPlants([]);
       }
@@ -587,16 +624,21 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
     setBusy(true);
     try {
       // Location → coordinates (city dictionary first, Nominatim fallback),
-      // so the nearest plant is resolved at submission time (anon-safe RPC)
-      // and stored on the request. The right Plant Admin then sees this
-      // request in their Customer tab.
+      // so the nearest plant can be resolved (anon-safe RPC). The customer may
+      // confirm that auto-selection or deliberately override it in the serving
+      // plant dropdown — their choice is stored on the request and the right
+      // Plant Admin then sees it in their Customer tab.
       const geoQuery = [form.address, form.city].filter(Boolean).join(", ");
       const coords = geoQuery ? await geocodeAddress(geoQuery) : null;
-      const { data: nearestPlantId } = await supabase.rpc("find_nearest_plant", {
-        p_company_id: form.company_id,
-        p_lat: (coords?.lat ?? null) as number | null,
-        p_lng: (coords?.lng ?? null) as number | null,
-      } as never);
+      let plantId: string | null = selectedPlantId || null;
+      if (!plantId) {
+        const { data: nearestPlantId } = await supabase.rpc("find_nearest_plant", {
+          p_company_id: form.company_id,
+          p_lat: (coords?.lat ?? null) as number | null,
+          p_lng: (coords?.lng ?? null) as number | null,
+        } as never);
+        plantId = nearestPlantId ?? null;
+      }
 
       // No .select() here on purpose: anonymous visitors may submit a request
       // but must never be able to read customer_requests back.
@@ -611,7 +653,7 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
         city: form.city || null,
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
-        plant_id: nearestPlantId ?? null,
+        plant_id: plantId,
         status: "pending",
       });
       if (error) throw error;
@@ -715,9 +757,51 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
             value={form.city}
             onChange={(v) => setForm((f) => ({ ...f, city: v }))}
           />
-          <p className="text-xs text-muted-foreground">
-            Your nearest plant is chosen automatically from this location.
-          </p>
+          {/* Serving plant — confirm the auto-selected nearest plant or override */}
+          {form.company_id && (
+            <div className="space-y-1.5">
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <MapPin className="h-3.5 w-3.5" />
+                Serving plant
+                {!plantTouched.current && selectedPlantId ? (
+                  <span className="text-[10px] rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-500 px-2 py-0.5">
+                    auto-selected · confirm or change
+                  </span>
+                ) : null}
+              </label>
+              {plantsLoading ? (
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Loading plants…
+                </div>
+              ) : companyPlants.length === 0 ? (
+                <div className="text-xs text-amber-500">
+                  No active plant found for this company yet — we'll route you to its primary plant.
+                </div>
+              ) : (
+                <select
+                  value={selectedPlantId}
+                  onChange={(e) => {
+                    plantTouched.current = true;
+                    setSelectedPlantId(e.target.value);
+                  }}
+                  className="flex w-full rounded-md border border-input bg-background/40 px-3 py-2 text-sm h-11 appearance-none cursor-pointer focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20"
+                >
+                  <option value="">Select a plant…</option>
+                  {companyPlants.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {p.code ? ` (${p.code})` : ""}
+                      {p.city ? ` · ${p.city}` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                We pre-select the nearest plant from your location — switch to another plant of the
+                same company if you prefer. Your orders route to the plant you confirm here.
+              </p>
+            </div>
+          )}
 
           {/* Live location → plant map preview */}
           {locLoading && (
@@ -759,16 +843,16 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
                         )}
                       </span>
                       <span className="font-mono tabular-nums text-[10px] shrink-0">
-                        {p.distanceKm != null
-                          ? `${p.distanceKm.toFixed(1)} km`
-                          : p.city ?? ""}
+                        {p.distanceKm != null ? `${p.distanceKm.toFixed(1)} km` : (p.city ?? "")}
                       </span>
                     </div>
                   ))}
-                  {plants[0] && (
+                  {selectedPlantId && (
                     <div className="text-[11px] text-muted-foreground pt-1">
                       ✓ Your request will route to{" "}
-                      <span className="font-medium text-teal-500">{plants[0].name}</span>
+                      <span className="font-medium text-teal-500">
+                        {companyPlants.find((p) => p.id === selectedPlantId)?.name ?? "your plant"}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -777,8 +861,8 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
           )}
           {!locLoading && !locCoords && form.city.trim() && (
             <div className="text-[11px] text-amber-500">
-              Couldn't pinpoint this location — we'll route you to the company's
-              primary plant instead.
+              Couldn't pinpoint this location — we'll route you to the company's primary plant
+              instead.
             </div>
           )}
 
