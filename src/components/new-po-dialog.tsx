@@ -72,15 +72,14 @@ export function NewPoDialog({
   // Warehouses for "Deliver To" dropdown
   const { data: warehouses } = useQuery({
     queryKey: ["warehouses", companyId],
-    queryFn: async () =>
-      (
-        await supabase
-          .from("warehouses")
-          .select("id, name, code")
-          .eq("company_id", companyId ?? "")
-          .order("name")
-      ).data ?? [],
-    enabled: !!companyId,
+    queryFn: async () => {
+      let query = supabase.from("warehouses").select("id, name, code").order("name");
+      if (companyId) {
+        query = query.eq("company_id", companyId);
+      }
+      const { data } = await query;
+      return data ?? [];
+    },
   });
 
   // The suppliers' priced catalogs; only the selected supplier's rows are
