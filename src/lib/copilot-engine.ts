@@ -1587,6 +1587,17 @@ export async function gatherRoleData(
         );
       }
     }
+    if (allowed.has("company") || allowed.has("companies") || allowed.has("plants") || mentions(["company", "plant", "registered", "about", "who"])) {
+      const { rows: cos } = await safeQuery("companies", "Company Profile");
+      const { rows: plants } = await safeQuery("plants", "Plants");
+      if (cos.length) {
+        const co = cos[0];
+        parts.push(`COMPANY PROFILE:\n  Name: ${co.name} (${co.legal_name || co.name}) | Industry: ${co.industry || "Custom Furniture Manufacturing"} | Country: ${co.country || "USA"} | Status: ${co.status}`);
+      }
+      if (plants.length) {
+        parts.push(`PLANTS (${plants.length}):\n${plants.slice(0, 5).map((p: any) => `  ${p.name} (Code: ${p.code}) | Location: ${p.city || "Main Campus"} | Status: ${p.status}`).join("\n")}`);
+      }
+    }
     if (role === "root_super_admin") {
       const { rows: companies } = await safeQuery("companies", "Companies");
       const { rows: registrations } = await safeQuery("company_registrations", "Registrations");
@@ -1768,6 +1779,17 @@ export async function answerCopilot(opts: {
       "plant",
       "factory",
       "manufacturing",
+      "company",
+      "registered",
+      "about",
+      "profile",
+      "address",
+      "facility",
+      "facilities",
+      "who",
+      "catalog",
+      "items",
+      "item",
     ];
     const isManufacturingRelated = manufacturingTerms.some((t) => lower.includes(t));
     if (!isManufacturingRelated) {
@@ -2005,6 +2027,17 @@ export async function answerCopilotStream(opts: {
       "plant",
       "factory",
       "manufacturing",
+      "company",
+      "registered",
+      "about",
+      "profile",
+      "address",
+      "facility",
+      "facilities",
+      "who",
+      "catalog",
+      "items",
+      "item",
     ];
     const isManufacturingRelated = manufacturingTerms.some((t) => lower.includes(t));
     if (!isManufacturingRelated) {
