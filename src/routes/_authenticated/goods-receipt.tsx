@@ -22,6 +22,7 @@ import {
   notifyGRNToSupplier,
   notifyMaterialsReceivedForOrder,
 } from "@/lib/notifications";
+import { recordMaterialArrivalAndRequestQC } from "@/lib/warehouse-qc";
 import { toast } from "sonner";
 import { useState } from "react";
 import { QrCameraScanner } from "@/components/qr-camera-scanner";
@@ -112,84 +113,21 @@ function GoodsReceiptPage() {
         .from("supplier_deliveries")
         .update({ status: "received" })
         .eq("po_id", poId);
-      if (delErr) throw delErr;
+      if (delErr) console.warn("supplier_deliveries update non-fatal:", delErr);
 
-      // 3) Mark the PO received
-      const { error: poErr } = await supabase
-        .from("purchase_orders")
-        .update({ status: "received" })
-        .eq("id", poId)
-        .eq("company_id", companyId);
-      if (poErr) throw poErr;
+      // 3) Record material arrival and create Quality Inspector inspection requests
+      const userRes = await supabase.auth.getUser();
+      const qcResult = await recordMaterialArrivalAndRequestQC({
+        companyId,
+        poId,
+        receivedBy: userRes.data.user?.id,
+      });
 
-      // 4) Resolve delivery warehouse: use PO's delivery_warehouse_id if set,
-      //    else fall back to raw-materials or first warehouse.
-      const poWarehouseObj = (po as any).warehouses as { id?: string } | null;
-      let whId: string | null = poWarehouseObj?.id ?? null;
-      if (!whId) {
-        const rawWh = (allWarehouses ?? []).find(
-          (w: any) =>
-            w.code?.toLowerCase().includes("raw") || w.name?.toLowerCase().includes("raw"),
-        );
-        whId = (rawWh as any)?.id ?? (allWarehouses as any[])?.[0]?.id ?? null;
+      if (!qcResult.success) {
+        throw new Error(qcResult.error || "Failed to create incoming inspection request");
       }
 
-      // Resolve plant_id from the warehouse for plant-scoped inspections
-      const whObj = (allWarehouses ?? []).find((w: any) => w.id === whId);
-      const plantId: string | null = whObj?.plant_id ?? null;
-
-      // 5) Fetch PO items
-      const { data: items } = await supabase
-        .from("purchase_order_items")
-        .select("material_id, quantity")
-        .eq("purchase_order_id", poId);
-
-      // 6) Create goods receipt header (audit record)
-      //    Do NOT stock directly — stock flows in only after Quality Inspector approves.
-      let grId: string | null = null;
-      try {
-        const userRes = await supabase.auth.getUser();
-        const { data: grRow, error: grErr } = await (supabase.from("goods_receipts" as any) as any)
-          .insert({
-            company_id: companyId,
-            purchase_order_id: poId,
-            received_by: userRes.data.user?.id,
-            received_at: new Date().toISOString(),
-            status: "received",
-            inspection_status: "pending",
-          })
-          .select("id")
-          .single();
-        if (!grErr && grRow?.id) grId = grRow.id;
-      } catch (_) {
-        // goods_receipts table may not exist in all environments — non-fatal
-      }
-
-      // 7) Insert pending inspection records for each line
-      for (const it of items ?? []) {
-        if (!it.material_id || !whId) continue;
-        try {
-          await (supabase.from("incoming_material_inspections" as any) as any).insert({
-            company_id: companyId,
-            plant_id: plantId,
-            goods_receipt_id: grId,
-            purchase_order_id: poId,
-            material_id: it.material_id,
-            warehouse_id: whId,
-            quantity: Number(it.quantity ?? 0),
-            status: "pending",
-          });
-        } catch (_) {
-          /* non-fatal */
-        }
-      }
-
-      // Quality Inspector notification is handled server-side by the
-      // incoming_material_inspections INSERT trigger (trg_incoming_qc_assign) —
-      // one targeted "🔬 Incoming QC Required" per inspection row, with the
-      // real material/quantity/warehouse. No client-side duplicate here.
-
-      // 8) Resume waiting production orders (stock check will pass post-inspection,
+      // 4) Resume waiting production orders (stock check will pass post-inspection,
       //    but run it anyway so approved backlog auto-resumes)
       try {
         const { data: rpc } = await supabase.rpc("resume_orders_when_stocked", {
@@ -207,7 +145,7 @@ function GoodsReceiptPage() {
         console.warn("Order resume skipped:", e);
       }
 
-      // 9) Notify Finance + Supplier
+      // 5) Notify Finance + Supplier
       await notifyGRNConfirmed(companyId, po.po_number ?? "PO", supplier?.name ?? "Supplier");
       await notifyGRNToSupplier(
         companyId,
@@ -219,7 +157,9 @@ function GoodsReceiptPage() {
     onSuccess: (_d, poId) => {
       queryClient.invalidateQueries({ queryKey: ["grn-pos"] });
       queryClient.invalidateQueries({ queryKey: ["incoming-inspections"] });
-      toast.success("Goods receipt confirmed — pending Quality Inspection before stock is usable");
+      queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
+      queryClient.invalidateQueries({ queryKey: ["receiving-pos"] });
+      toast.success("Goods receipt confirmed — pending Quality Inspection requested for Quality Inspector");
       setReceivingId(null);
       setTokens((t) => ({ ...t, [poId]: "" }));
     },
