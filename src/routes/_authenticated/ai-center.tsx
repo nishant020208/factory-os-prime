@@ -83,6 +83,10 @@ function AICenter() {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  const [ollamaStatus, setOllamaStatus] = useState<{ connected: boolean; message: string }>({
+    connected: false,
+    message: "Checking local...",
+  });
   const [groqStatus, setGroqStatus] = useState<{ connected: boolean; message: string }>({
     connected: false,
     message: "Checking...",
@@ -91,14 +95,16 @@ function AICenter() {
     connected: false,
     message: "Checking...",
   });
+  const ollamaReady = ollamaStatus.connected;
   const groqReady = groqStatus.connected;
   const cerebrasReady = cerebrasStatus.connected;
 
   // Check provider health on mount
   useEffect(() => {
-    checkCopilotProviderHealth().then((h) => {
-      setGroqStatus(h.groq);
-      setCerebrasStatus(h.cerebras);
+    checkCopilotProviderHealth().then((h: any) => {
+      if (h.ollama) setOllamaStatus(h.ollama);
+      if (h.groq) setGroqStatus(h.groq);
+      if (h.cerebras) setCerebrasStatus(h.cerebras);
     });
   }, []);
   const greetingMap: Record<string, string> = {
@@ -203,13 +209,22 @@ function AICenter() {
           right={
             <div className="flex items-center gap-3">
               <span
+                className={`text-[10px] flex items-center gap-1 ${ollamaReady ? "text-emerald-400" : "text-muted-foreground/60"}`}
+                title={ollamaStatus.message}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${ollamaReady ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground/40"}`}
+                />
+                {ollamaReady ? "Ollama Local Active" : "Local AI (Offline)"}
+              </span>
+              <span
                 className={`text-[10px] flex items-center gap-1 ${groqReady ? "text-green-400" : "text-yellow-400"}`}
                 title={groqStatus.message}
               >
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${groqReady ? "bg-green-400 animate-pulse" : "bg-yellow-400"}`}
                 />
-                {groqReady ? "Groq Connected" : `Groq: ${groqStatus.message}`}
+                {groqReady ? "Groq Cloud Primary" : `Groq: ${groqStatus.message}`}
               </span>
               <span
                 className={`text-[10px] flex items-center gap-1 ${cerebrasReady ? "text-green-400" : "text-yellow-400"}`}
@@ -218,7 +233,7 @@ function AICenter() {
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${cerebrasReady ? "bg-green-400 animate-pulse" : "bg-yellow-400"}`}
                 />
-                {cerebrasReady ? "Cerebras Connected" : `Cerebras: ${cerebrasStatus.message}`}
+                {cerebrasReady ? "Cerebras Fallback" : `Cerebras: ${cerebrasStatus.message}`}
               </span>
               {streaming && (
                 <span className="text-[10px] text-primary flex items-center gap-1 animate-pulse">
