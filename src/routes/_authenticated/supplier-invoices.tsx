@@ -66,17 +66,24 @@ function SupplierInvoicesPage() {
     enabled: !!mySupplier?.id,
   });
 
-  // Own fulfilled POs eligible for invoicing
+  // Own fulfilled POs eligible for manual invoicing. POs whose invoice was
+  // auto-generated when their delivery cleared QC are excluded — raising twice
+  // for the same PO would create a duplicate record.
   const { data: fulfilledPos } = useQuery({
     queryKey: ["supplier-fulfilled-pos", companyId, mySupplier?.id],
     queryFn: async () => {
       if (!mySupplier?.id) return [];
+      const { data: invoiced } = await supabase
+        .from("supplier_invoices")
+        .select("po_id")
+        .eq("supplier_id", mySupplier.id);
+      const alreadyInvoiced = new Set((invoiced ?? []).map((i: any) => i.po_id));
       const { data } = await supabase
         .from("purchase_orders")
         .select("id, po_number, total_amount")
         .eq("supplier_id", mySupplier.id)
         .in("status", ["received", "fulfilled"]);
-      return data ?? [];
+      return (data ?? []).filter((p: any) => !alreadyInvoiced.has(p.id));
     },
     enabled: !!mySupplier?.id,
   });
@@ -84,22 +91,55 @@ function SupplierInvoicesPage() {
   const raiseInvoice = useMutation({
     mutationFn: async () => {
       if (!mySupplier?.id || !companyId) throw new Error("Supplier not linked");
-      if (!form.po_id || !form.invoice_number.trim()) throw new Error("PO and invoice number are required");
+      if (!form.po_id || !form.invoice_number.trim())
+        throw new Error("PO and invoice number are required");
+
+      const total = parseFloat(form.total_amount) || 0;
+      const gst = parseFloat(form.gst_amount) || 0;
+      const fileUrl = form.file_url.trim() || null;
+
+      // Single invoice per PO: if an auto purchase invoice already exists for
+      // this PO, update it instead of inserting a conflicting duplicate.
+      const { data: existing } = await supabase
+        .from("supplier_invoices")
+        .select("id")
+        .eq("po_id", form.po_id)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from("supplier_invoices")
+          .update({
+            invoice_number: form.invoice_number.trim(),
+            gst_amount: gst,
+            total_amount: total,
+            file_url: fileUrl,
+            status: "pending",
+          })
+          .eq("id", existing.id);
+        if (error) throw error;
+        return { updated: true };
+      }
+
       const { error } = await supabase.from("supplier_invoices").insert({
         company_id: companyId,
         supplier_id: mySupplier.id,
         po_id: form.po_id || null,
         invoice_number: form.invoice_number.trim(),
-        gst_amount: parseFloat(form.gst_amount) || 0,
-        total_amount: parseFloat(form.total_amount) || 0,
+        gst_amount: gst,
+        total_amount: total,
         status: "pending",
-        file_url: form.file_url.trim() || null,
+        file_url: fileUrl,
+        origin: "supplier",
       });
       if (error) throw error;
+      return { updated: false };
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["supplier-invoices"] });
-      toast.success("Invoice submitted");
+      toast.success(
+        res?.updated ? "Existing invoice updated — no duplicate created" : "Invoice submitted",
+      );
       setOpen(false);
       setForm({ po_id: "", invoice_number: "", gst_amount: "", total_amount: "", file_url: "" });
     },
@@ -134,7 +174,12 @@ function SupplierInvoicesPage() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <Kpi label="Total Raised" value={fmtMoney(totalRaised)} icon={Receipt} tone="primary" />
         <Kpi label="Pending" value={String(pending)} icon={FileText} tone="warning" />
-        <Kpi label="All Invoices" value={String(invoices?.length ?? 0)} icon={Receipt} tone="info" />
+        <Kpi
+          label="All Invoices"
+          value={String(invoices?.length ?? 0)}
+          icon={Receipt}
+          tone="info"
+        />
       </div>
 
       <Panel title={`${invoices?.length ?? 0} Invoices`}>
@@ -143,7 +188,10 @@ function SupplierInvoicesPage() {
             <TableHeader>
               <TableRow className="hover:bg-transparent border-white/5">
                 {["Invoice #", "PO", "GST", "Total", "Status", "Date"].map((h) => (
-                  <TableHead key={h} className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <TableHead
+                    key={h}
+                    className="text-[11px] uppercase tracking-wider text-muted-foreground"
+                  >
                     {h}
                   </TableHead>
                 ))}
@@ -154,11 +202,16 @@ function SupplierInvoicesPage() {
                 const po = inv.purchase_orders as unknown as { po_number?: string } | null;
                 return (
                   <TableRow key={inv.id} className="border-white/5">
-                    <TableCell className="font-medium">{inv.invoice_number}</TableCell>
-                    <TableCell className="text-xs">{po?.po_number ?? "—"}</TableCell>
-                    <TableCell className="text-xs font-mono">
-                      {fmtMoney(inv.gst_amount)}
+                    <TableCell className="font-medium">
+                      {inv.invoice_number}
+                      {(inv as any).origin === "auto" && (
+                        <span className="ml-2 rounded-full bg-teal-500/10 border border-teal-500/30 px-1.5 py-0.5 text-[9px] font-medium text-teal-500">
+                          AUTO
+                        </span>
+                      )}
                     </TableCell>
+                    <TableCell className="text-xs">{po?.po_number ?? "—"}</TableCell>
+                    <TableCell className="text-xs font-mono">{fmtMoney(inv.gst_amount)}</TableCell>
                     <TableCell className="text-xs font-mono">
                       {fmtMoney(inv.total_amount)}
                     </TableCell>
@@ -189,6 +242,11 @@ function SupplierInvoicesPage() {
             <DialogTitle>Raise an Invoice</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            <p className="text-[11px] text-muted-foreground rounded-lg bg-muted/30 border border-white/5 px-2.5 py-2">
+              When a delivery clears the buyer's incoming quality inspection, a purchase invoice is
+              auto-generated for that PO (marked AUTO in your list). This form only lists POs
+              without an invoice yet — use it to raise one manually.
+            </p>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Purchase Order *</Label>
               <select
