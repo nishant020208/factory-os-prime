@@ -16,6 +16,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { ROLE_SYSTEM_PROMPTS, SCOPE_RULE } from "@/lib/llm-prompts";
 import { checkRoleScope, getAllowedLabels, DOMAIN_LABELS } from "@/lib/role-scope";
+import { executeRagChain } from "@/lib/rag/chain";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "openai/gpt-oss-120b";
@@ -197,53 +198,23 @@ export const askCopilotLlm = createServerFn({ method: "POST" })
       return { text: "", model: "", provider: "groq", role, companyId: null, error: "no-company" };
     }
 
-    // 3. Server-side scope gate — the same rules as the client, enforced
-    //    where they can't be bypassed.
-    const blockedDomain = checkRoleScope(role, data.question);
-    if (blockedDomain) {
-      return {
-        text: "",
-        model: "",
-        provider: "groq",
-        role,
-        companyId,
-        scopeBlocked: {
-          domain: blockedDomain,
-          label: DOMAIN_LABELS[blockedDomain] ?? blockedDomain,
-          allowed: getAllowedLabels(role),
-        },
-      };
-    }
-
-    // 4. Build messages and call Groq first, then Cerebras.
-    const messages = buildMessages({
+    // 3. Execute LangChain RAG Chain (Retriever + Prompt Template + LLM execution)
+    const ragResponse = await executeRagChain({
       question: data.question,
       role,
-      dataContext: data.dataContext,
+      companyId,
       history: data.history,
+      liveDataContext: data.dataContext,
     });
 
-    const groqKey = getGroqKey();
-    if (groqKey) {
-      try {
-        const text = await callOpenAiCompatible(GROQ_API_URL, groqKey, GROQ_MODEL, messages);
-        if (text) return { text, model: GROQ_MODEL, provider: "groq", role, companyId };
-      } catch (err) {
-        console.warn("[copilot-llm] Groq request failed", err);
-      }
-    }
-
-    const cerebrasKey = getCerebrasKey();
-    if (cerebrasKey) {
-      try {
-        const text = await callOpenAiCompatible(CEREBRAS_API_URL, cerebrasKey, CEREBRAS_MODEL, messages);
-        if (text) return { text, model: CEREBRAS_MODEL, provider: "cerebras", role, companyId };
-      } catch (err) {
-        console.warn("[copilot-llm] Cerebras request failed", err);
-      }
-    }
-
-    return { text: "", model: "", provider: "groq", role, companyId, error: "no-provider" };
+    return {
+      text: ragResponse.text,
+      model: ragResponse.model,
+      provider: ragResponse.provider === "rag-direct" ? "groq" : ragResponse.provider,
+      role,
+      companyId,
+      scopeBlocked: ragResponse.scopeBlocked,
+    };
   });
 
 /** Server-side provider health check (keys never leave the server). */
