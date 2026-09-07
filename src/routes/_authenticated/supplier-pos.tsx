@@ -9,9 +9,7 @@ import {
   MessageSquare,
   QrCode,
   Loader2,
-  Eye,
-  Download,
-  Copy,
+  Warehouse,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, MaterialsCell } from "@/components/ui-parts";
@@ -40,10 +38,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useSupplier } from "@/hooks/use-supplier";
 import { toast } from "sonner";
 import { useState } from "react";
-import {
-  notifySupplierPOResponse,
-  notifySupplierShipped,
-} from "@/lib/notifications";
+import { notifySupplierPOResponse, notifySupplierShipped } from "@/lib/notifications";
+import { QrDialog } from "@/components/qr-dialog";
 
 export const Route = createFileRoute("/_authenticated/supplier-pos")({
   head: () => ({
@@ -121,7 +117,9 @@ function SupplierPosPage() {
       if (!supplierId) return [];
       const { data } = await supabase
         .from("purchase_orders")
-        .select("*, purchase_order_items(id, quantity, unit_price, materials(name, unit))")
+        .select(
+          "*, purchase_order_items(id, quantity, unit_price, materials(name, unit)), warehouses:delivery_warehouse_id(id, name, code, address)",
+        )
         .eq("supplier_id", supplierId)
         .order("created_at", { ascending: false });
       return data ?? [];
@@ -192,13 +190,7 @@ function SupplierPosPage() {
   });
 
   const dispatchMutation = useMutation({
-    mutationFn: async ({
-      poId,
-      form,
-    }: {
-      poId: string;
-      form: typeof dispatchForm;
-    }) => {
+    mutationFn: async ({ poId, form }: { poId: string; form: typeof dispatchForm }) => {
       setDispatching(true);
       const po = data?.find((p) => p.id === poId);
       if (!po) throw new Error("PO not found");
@@ -220,7 +212,11 @@ function SupplierPosPage() {
       // 2) Mark PO as dispatched
       const { error: poErr } = await supabase
         .from("purchase_orders")
-        .update({ status: "dispatched", carrier: form.carrier || null, tracking_number: form.tracking_number || null })
+        .update({
+          status: "dispatched",
+          carrier: form.carrier || null,
+          tracking_number: form.tracking_number || null,
+        })
         .eq("id", poId)
         .eq("supplier_id", supplierId ?? "");
       if (poErr) throw poErr;
@@ -276,7 +272,8 @@ function SupplierPosPage() {
   });
 
   const totalOpen = data?.filter((p) => ["sent", "pending"].includes(p.status)).length ?? 0;
-  const totalAccepted = data?.filter((p) => ["accepted", "in_progress"].includes(p.status)).length ?? 0;
+  const totalAccepted =
+    data?.filter((p) => ["accepted", "in_progress"].includes(p.status)).length ?? 0;
   const totalDispatched = data?.filter((p) => p.status === "dispatched").length ?? 0;
   const totalFulfilled = data?.filter((p) => p.status === "received").length ?? 0;
 
@@ -291,10 +288,20 @@ function SupplierPosPage() {
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        <Kpi label="Awaiting Response" value={String(totalOpen)} icon={ShoppingCart} tone="primary" />
+        <Kpi
+          label="Awaiting Response"
+          value={String(totalOpen)}
+          icon={ShoppingCart}
+          tone="primary"
+        />
         <Kpi label="Accepted" value={String(totalAccepted)} icon={CheckCircle2} tone="success" />
         <Kpi label="Dispatched" value={String(totalDispatched)} icon={Truck} tone="info" />
-        <Kpi label="Received / Fulfilled" value={String(totalFulfilled)} icon={FileText} tone="primary" />
+        <Kpi
+          label="Received / Fulfilled"
+          value={String(totalFulfilled)}
+          icon={FileText}
+          tone="primary"
+        />
       </div>
 
       <Panel title={`${data?.length ?? 0} Purchase Orders — Respond Only`}>
@@ -316,17 +323,19 @@ function SupplierPosPage() {
             </TableHeader>
             <TableBody>
               {(data ?? []).map((po) => {
-                const canRespond = ["sent", "pending", "modification_requested"].includes(po.status);
+                const canRespond = ["sent", "pending", "modification_requested"].includes(
+                  po.status,
+                );
                 const canDispatch = ["accepted", "in_progress"].includes(po.status);
                 return (
                   <TableRow key={po.id} className="border-white/5">
-                    <TableCell className="font-medium">{po.po_number ?? po.id.slice(0, 8)}</TableCell>
+                    <TableCell className="font-medium">
+                      {po.po_number ?? po.id.slice(0, 8)}
+                    </TableCell>
                     <TableCell>
                       <MaterialsCell items={(po as any).purchase_order_items} />
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {fmtMoney(po.total_amount)}
-                    </TableCell>
+                    <TableCell className="font-mono text-xs">{fmtMoney(po.total_amount)}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {po.expected_date ? new Date(po.expected_date).toLocaleDateString() : "—"}
                     </TableCell>
@@ -404,7 +413,8 @@ function SupplierPosPage() {
                     </TableCell>
                   </TableRow>
                 );
-              })}              {(data ?? []).length === 0 && (
+              })}{" "}
+              {(data ?? []).length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
                     No purchase orders yet. When the buyer sends you a PO, it will appear here.
@@ -503,6 +513,44 @@ function SupplierPosPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            {/* Destination warehouse — Procurement's choice, shown read-only so
+                the supplier knows exactly where to physically ship. */}
+            {(() => {
+              const po = (data ?? []).find((p) => p.id === dispatchDialog.poId);
+              const wh = (po as any)?.warehouses as {
+                name?: string;
+                code?: string;
+                address?: string | null;
+              } | null;
+              return (
+                <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    <Warehouse className="h-3 w-3" />
+                    Deliver To (set by Procurement)
+                  </div>
+                  {wh?.name ? (
+                    <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+                      <span className="font-semibold">{wh.name}</span>
+                      {wh.code && (
+                        <span className="font-mono text-[10px] text-muted-foreground">
+                          {wh.code}
+                        </span>
+                      )}
+                      {wh.address && (
+                        <span className="w-full text-[11px] text-muted-foreground">
+                          {wh.address}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Warehouse not specified on this PO — the buyer's warehouse will assign the
+                      receiving location.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Dispatch Date *</Label>
@@ -593,97 +641,18 @@ function SupplierPosPage() {
         </DialogContent>
       </Dialog>
 
-      {/* QR Dialog */}
-      <Dialog open={qrDialog.open} onOpenChange={(o) => setQrDialog((d) => ({ ...d, open: o }))}>
-        <DialogContent className="sm:max-w-[380px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <QrCode className="h-4 w-4 text-primary" />
-              Inbound Shipment QR Code
-            </DialogTitle>
-          </DialogHeader>
-          {qrDialog.po && (
-            <div className="flex flex-col items-center gap-4 py-2">
-              <div className="bg-white rounded-2xl p-4 shadow-lg flex items-center justify-center">
-                {qrDialog.loading ? (
-                  <div className="w-48 h-48 flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                  </div>
-                ) : qrDialog.scanUrl ? (
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(qrDialog.scanUrl)}`}
-                    alt="Inbound Shipment QR Code"
-                    className="w-48 h-48 rounded-lg object-contain"
-                  />
-                ) : (
-                  <div className="w-48 h-48 flex items-center justify-center text-xs text-muted-foreground text-center p-4">
-                    QR code not available for this shipment
-                  </div>
-                )}
-              </div>
-
-              <div className="text-center space-y-1">
-                <div className="font-semibold">{qrDialog.po.po_number ?? "PO"}</div>
-                <div className="text-xs text-muted-foreground">
-                  Status: <StatusBadge status={qrDialog.po.status} />
-                </div>
-              </div>
-
-              {qrDialog.scanUrl && (
-                <div className="w-full rounded-lg bg-muted/50 border border-border px-3 py-2 flex items-center gap-2">
-                  <span className="text-[10px] text-muted-foreground flex-1 truncate font-mono">
-                    {qrDialog.scanUrl}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 shrink-0"
-                    onClick={() => {
-                      navigator.clipboard.writeText(qrDialog.scanUrl!);
-                      toast.success("Scan link copied!");
-                    }}
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
-
-              <p className="text-[10px] text-muted-foreground text-center max-w-xs">
-                Scan with any phone camera — no app needed. Links to the warehouse receipt and verification page.
-              </p>
-
-              <div className="flex gap-2">
-                {qrDialog.scanUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(qrDialog.scanUrl!, "_blank")}
-                  >
-                    <Eye className="h-3.5 w-3.5 mr-1" />
-                    Preview
-                  </Button>
-                )}
-                {qrDialog.scanUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const link = document.createElement("a");
-                      link.href = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(qrDialog.scanUrl!)}`;
-                      link.download = `qr-shipment-${qrDialog.po.po_number ?? "po"}.png`;
-                      link.click();
-                      toast.success("QR code downloaded");
-                    }}
-                  >
-                    <Download className="h-3.5 w-3.5 mr-1" />
-                    Download
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* QR Dialog — shared polished viewer */}
+      <QrDialog
+        open={qrDialog.open}
+        onOpenChange={(o) => setQrDialog((d) => ({ ...d, open: o }))}
+        title="Shipment-Inbound QR"
+        reference={qrDialog.po?.po_number ?? null}
+        status={qrDialog.po?.status ?? null}
+        scanUrl={qrDialog.scanUrl}
+        loading={qrDialog.loading}
+        downloadName={`qr-shipment-${qrDialog.po?.po_number ?? "po"}`}
+        helperText="Warehouse scans this at goods receipt. Links to the receipt and verification page."
+      />
     </div>
   );
 }
