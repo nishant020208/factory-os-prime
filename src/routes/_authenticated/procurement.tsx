@@ -9,6 +9,7 @@ import {
   Pencil,
   Trash2,
   Search as SearchIcon,
+  Warehouse,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, MaterialsCell } from "@/components/ui-parts";
@@ -42,6 +43,7 @@ import { NewPoDialog } from "@/components/new-po-dialog";
 import { PO_STATUS_OPTIONS } from "@/lib/po";
 import { useAuth } from "@/hooks/use-auth";
 import { fmtMoney, fmtMoneyK } from "@/lib/currency";
+import { recordMaterialArrivalAndRequestQC } from "@/lib/warehouse-qc";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -63,10 +65,12 @@ function ProcurementPage() {
   const isAuditor = roles.includes("auditor");
 
   const [q, setQ] = useState("");
+  const [warehouseFilter, setWarehouseFilter] = useState<string>("all");
   const [newOpen, setNewOpen] = useState(false);
   const [editRow, setEditRow] = useState<any | null>(null);
   const [editStatus, setEditStatus] = useState("sent");
   const [editDate, setEditDate] = useState("");
+  const [editWarehouseId, setEditWarehouseId] = useState<string>("");
 
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers", companyId],
@@ -76,31 +80,59 @@ function ProcurementPage() {
     enabled: !!companyId,
   });
 
+  const { data: warehouses } = useQuery({
+    queryKey: ["warehouses", companyId],
+    queryFn: async () =>
+      (
+        await supabase
+          .from("warehouses")
+          .select("id, name, code, plant_id")
+          .eq("company_id", companyId ?? "")
+          .order("name")
+      ).data ?? [],
+    enabled: !!companyId,
+  });
+
   const { data } = useQuery({
-    queryKey: ["purchase_orders"],
+    queryKey: ["purchase_orders", companyId],
     queryFn: async () =>
       (
         await supabase
           .from("purchase_orders")
-          .select("*, purchase_order_items(id, material_id, quantity, unit_price, materials(name, unit))")
+          .select("*, purchase_order_items(id, material_id, quantity, unit_price, materials(name, unit)), warehouses:delivery_warehouse_id(id, name, code)")
           .order("created_at", { ascending: false })
       ).data ?? [],
   });
 
   const supplierMap = new Map((suppliers ?? []).map((s: any) => [s.id, s.name]));
+  const warehouseMap = new Map((warehouses ?? []).map((w: any) => [w.id, w.name]));
 
-  const rows = (data ?? []).map((po: any) => ({
-    ...po,
-    supplier_name: po.supplier_id ? (supplierMap.get(po.supplier_id) ?? "—") : "—",
-  }));
-  const filtered = q.trim()
-    ? rows.filter((r: any) =>
-        [r.po_number, r.supplier_name, r.status]
-          .join(" ")
-          .toLowerCase()
-          .includes(q.toLowerCase()),
-      )
-    : rows;
+  const rows = (data ?? []).map((po: any) => {
+    const whName =
+      (po.warehouses as any)?.name ??
+      (po.delivery_warehouse_id ? warehouseMap.get(po.delivery_warehouse_id) : null) ??
+      "—";
+    return {
+      ...po,
+      supplier_name: po.supplier_id ? (supplierMap.get(po.supplier_id) ?? "—") : "—",
+      delivery_warehouse_name: whName,
+    };
+  });
+
+  const filtered = rows.filter((r: any) => {
+    if (warehouseFilter !== "all") {
+      const whId = r.delivery_warehouse_id || (r.warehouses as any)?.id;
+      if (whId !== warehouseFilter) return false;
+    }
+    if (q.trim()) {
+      const needle = q.toLowerCase();
+      const match = [r.po_number, r.supplier_name, r.status, r.delivery_warehouse_name]
+        .join(" ")
+        .toLowerCase();
+      if (!match.includes(needle)) return false;
+    }
+    return true;
+  });
 
   const totalValue = rows.reduce((s: number, p: any) => s + Number(p.total_amount ?? 0), 0);
   const sentCount = rows.filter((p: any) => p.status === "sent").length;
@@ -108,16 +140,42 @@ function ProcurementPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
+      const payload: any = {
+        status: editStatus,
+        expected_date: editDate || null,
+      };
+      if (editWarehouseId) {
+        payload.delivery_warehouse_id = editWarehouseId;
+      }
+
       const { error } = await supabase
         .from("purchase_orders")
-        .update({ status: editStatus, expected_date: editDate || null })
+        .update(payload)
         .eq("id", id);
       if (error) throw error;
+
+      // If status changed to received, automatically trigger QC inspection request
+      if (editStatus === "received" && companyId) {
+        const userRes = await supabase.auth.getUser();
+        await recordMaterialArrivalAndRequestQC({
+          companyId,
+          poId: id,
+          warehouseId: editWarehouseId || null,
+          receivedBy: userRes.data.user?.id,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase_orders"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-pos"] });
-      toast.success("Purchase order updated");
+      queryClient.invalidateQueries({ queryKey: ["incoming-inspections"] });
+      queryClient.invalidateQueries({ queryKey: ["receiving-pos"] });
+      queryClient.invalidateQueries({ queryKey: ["grn-pos"] });
+      toast.success(
+        editStatus === "received"
+          ? "Purchase order marked received & Quality Inspection requested!"
+          : "Purchase order updated successfully",
+      );
       setEditRow(null);
     },
     onError: (err: any) => toast.error(err.message),
@@ -139,6 +197,9 @@ function ProcurementPage() {
     setEditRow(po);
     setEditStatus(po.status || "sent");
     setEditDate(po.expected_date ? String(po.expected_date).slice(0, 10) : "");
+    setEditWarehouseId(
+      po.delivery_warehouse_id || (po.warehouses as any)?.id || (warehouses?.[0] as any)?.id || "",
+    );
   };
 
   return (
@@ -167,21 +228,37 @@ function ProcurementPage() {
       <Panel
         title={`${filtered.length} record${filtered.length === 1 ? "" : "s"}`}
         right={
-          <div className="relative">
-            <SearchIcon className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search…"
-              className="h-8 pl-8 w-56 bg-background/40"
-            />
+          <div className="flex items-center gap-2">
+            <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
+              <SelectTrigger className="h-8 w-44 text-xs bg-background/40">
+                <SelectValue placeholder="All Warehouses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Warehouses</SelectItem>
+                {(warehouses ?? []).map((w: any) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name} ({w.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="relative">
+              <SearchIcon className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search PO, supplier, warehouse…"
+                className="h-8 pl-8 w-56 bg-background/40 text-xs"
+              />
+            </div>
           </div>
         }
       >
         <Table>
           <TableHeader>
             <TableRow className="border-white/5">
-              {["PO #", "Supplier", "Materials Ordered", "Status", "Amount", "Expected", "Created"].map(
+              {["PO #", "Supplier", "Delivery Warehouse", "Materials Ordered", "Status", "Amount", "Expected", "Created"].map(
                 (h) => (
                   <TableHead
                     key={h}
@@ -197,8 +274,20 @@ function ProcurementPage() {
           <TableBody>
             {filtered.map((po: any) => (
               <TableRow key={po.id} className="border-white/5">
-                <TableCell className="font-medium">{po.po_number}</TableCell>
+                <TableCell className="font-medium font-mono text-xs text-primary">
+                  {po.po_number}
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{po.supplier_name}</TableCell>
+                <TableCell>
+                  {po.delivery_warehouse_name && po.delivery_warehouse_name !== "—" ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-secondary/40 text-xs">
+                      <Warehouse className="h-3 w-3 text-muted-foreground" />
+                      <span>{po.delivery_warehouse_name}</span>
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground italic">Main Store</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <MaterialsCell items={po.purchase_order_items} />
                 </TableCell>
@@ -237,10 +326,10 @@ function ProcurementPage() {
             {filtered.length === 0 && (
               <TableRow className="border-white/5">
                 <TableCell
-                  colSpan={8}
+                  colSpan={9}
                   className="text-center text-muted-foreground py-10 text-sm"
                 >
-                  No purchase orders yet
+                  No purchase orders matching filters
                 </TableCell>
               </TableRow>
             )}
@@ -251,16 +340,37 @@ function ProcurementPage() {
       {/* New Purchase Order — multi-material builder */}
       <NewPoDialog open={newOpen} onOpenChange={setNewOpen} companyId={companyId} />
 
-      {/* Edit status / expected date */}
+      {/* Edit PO Dialog with Warehouse Selection */}
       <Dialog open={!!editRow} onOpenChange={(o) => !o && setEditRow(null)}>
-        <DialogContent className="sm:max-w-[440px]">
+        <DialogContent className="sm:max-w-[460px]">
           <DialogHeader>
             <DialogTitle>Update {editRow?.po_number ?? "Purchase Order"}</DialogTitle>
             <DialogDescription>
-              Status and expected date only — materials and prices stay as sent.
+              Assign the delivery warehouse destination, update status or adjust the expected date.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* Delivery Destination Warehouse */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Warehouse className="h-3.5 w-3.5 text-primary" />
+                Delivery Destination Warehouse *
+              </Label>
+              <Select value={editWarehouseId} onValueChange={setEditWarehouseId}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Select destination warehouse" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(warehouses ?? []).map((w: any) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      <span className="font-mono text-xs text-muted-foreground mr-1.5">{w.code}</span>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Status</Label>
               <Select value={editStatus} onValueChange={setEditStatus}>
@@ -275,7 +385,13 @@ function ProcurementPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {editStatus === "received" && (
+                <p className="text-[11px] text-amber-400/90 mt-1">
+                  Marking as Received will automatically send an inspection request to the Quality Inspector.
+                </p>
+              )}
             </div>
+
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Expected Date</Label>
               <Input
@@ -304,3 +420,4 @@ function ProcurementPage() {
     </div>
   );
 }
+
