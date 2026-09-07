@@ -39,6 +39,8 @@ export const ROLE_DOMAIN_MAP: Record<string, string[]> = {
     "payroll",
     "attendance",
     "recruitment",
+    "company",
+    "companies",
   ],
   plant_admin: [
     "production",
@@ -49,8 +51,21 @@ export const ROLE_DOMAIN_MAP: Record<string, string[]> = {
     "orders",
     "plants",
     "departments",
+    "products",
+    "company",
+    "companies",
   ],
-  plant_manager: ["production", "inventory", "quality", "maintenance", "machines", "orders"],
+  plant_manager: [
+    "production",
+    "inventory",
+    "quality",
+    "maintenance",
+    "machines",
+    "orders",
+    "products",
+    "company",
+    "companies",
+  ],
   production_manager: [
     "production",
     "orders",
@@ -60,12 +75,50 @@ export const ROLE_DOMAIN_MAP: Record<string, string[]> = {
     "quality",
     "products",
     "bom",
+    "company",
+    "companies",
   ],
-  production_operator: ["orders", "machines", "maintenance"],
-  warehouse_manager: ["inventory", "dispatch", "products"],
-  procurement_manager: ["procurement", "suppliers", "inventory"],
-  quality_inspector: ["quality", "defects", "capa", "incoming-inspection", "final-inspection"],
-  maintenance_engineer: ["maintenance", "machines", "breakdowns", "spare-parts"],
+  production_operator: [
+    "orders",
+    "machines",
+    "maintenance",
+    "products",
+    "company",
+    "companies",
+  ],
+  warehouse_manager: [
+    "inventory",
+    "dispatch",
+    "products",
+    "company",
+    "companies",
+  ],
+  procurement_manager: [
+    "procurement",
+    "suppliers",
+    "inventory",
+    "products",
+    "company",
+    "companies",
+  ],
+  quality_inspector: [
+    "quality",
+    "defects",
+    "capa",
+    "incoming-inspection",
+    "final-inspection",
+    "products",
+    "company",
+    "companies",
+  ],
+  maintenance_engineer: [
+    "maintenance",
+    "machines",
+    "breakdowns",
+    "spare-parts",
+    "company",
+    "companies",
+  ],
   finance_manager: [
     "finance",
     "invoices",
@@ -75,8 +128,21 @@ export const ROLE_DOMAIN_MAP: Record<string, string[]> = {
     "taxes",
     "profit-loss",
     "suppliers",
+    "products",
+    "company",
+    "companies",
   ],
-  hr_manager: ["hr", "leaves", "training", "performance", "payroll", "attendance", "recruitment"],
+  hr_manager: [
+    "hr",
+    "leaves",
+    "training",
+    "performance",
+    "payroll",
+    "attendance",
+    "recruitment",
+    "company",
+    "companies",
+  ],
   customer_portal: [
     "orders",
     "dispatch",
@@ -226,21 +292,12 @@ export function checkRoleScope(role: string | null, question: string): string | 
   const allowed = ROLE_DOMAIN_MAP[role ?? ""] ?? [];
   const allowedSet = new Set(allowed);
 
+  // Keywords that firmly identify a domain question.
+  // NOTE: "company" domain is NOT listed here because ALL employees can ask about
+  // their own company (it's public information). The company_id isolation is enforced
+  // at the RAG retrieval (pgvector SQL) level — not at keyword gate level.
+  // Only truly cross-boundary or confidential domain keywords are gated here.
   const domainKeywords: Record<string, string[]> = {
-    production: ["manufacturing schedule", "oee", "throughput", "shift schedule"],
-    inventory: [
-      "warehouse bin",
-      "bin location",
-      "reorder level",
-    ],
-    quality: ["quality inspection", "defect rate", "ncr", "capa", "rejection rate"],
-    maintenance: [
-      "machine breakdown",
-      "mtbf",
-      "mttr",
-      "machine downtime",
-      "spare part inventory",
-    ],
     finance: [
       "total company revenue",
       "net profit",
@@ -251,17 +308,18 @@ export function checkRoleScope(role: string | null, question: string): string | 
       "payroll expense",
       "financial p&l",
       "balance sheet",
+      "quarterly profit",
+      "annual revenue",
     ],
     hr: [
       "employee salary",
       "manager salary",
       "employee compensation",
       "payroll total",
-      "employee contact",
       "employee home address",
-      "employee phone",
       "leave reason",
       "medical leave",
+      "annual ctc",
     ],
     customers: [
       "another customer",
@@ -278,12 +336,6 @@ export function checkRoleScope(role: string | null, question: string): string | 
       "negotiated contract rate",
       "all suppliers' bank",
     ],
-    orders: ["sales order", "so-", "wo-", "purchase order"],
-    procurement: ["requisition", "rfq response"],
-    dispatch: ["dispatch", "shipment", "delivery", "tracking", "carrier", "out for delivery"],
-    machines: ["cnc", "panel saw", "edge bander", "machine spec"],
-    products: ["product catalog", "products we make", "what products", "furniture catalog", "sku", "dimensions"],
-    company: ["company", "company name", "registered company", "about the company", "who are we", "our plants", "what factory"],
   };
 
   const lowerQ = question.toLowerCase();
