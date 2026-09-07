@@ -535,16 +535,13 @@ function RegisterCustomer({ onBack }: { onBack: () => void }) {
     }
     setPlantsLoading(true);
     (async () => {
-      const { data } = await supabase
-        .from("plants")
-        .select("id, name, code, city, latitude, longitude")
-        .eq("company_id", form.company_id)
-        .eq("status", "active")
-        .order("name");
+      const rows = await plantsForLocation(form.company_id);
       if (mounted) {
-        const rows = (data ?? []) as PlantWithDistance[];
         setCompanyPlants(rows);
-        setSelectedPlantId((prev) => (rows.some((p) => p.id === prev) ? prev : ""));
+        setSelectedPlantId((prev) => {
+          if (prev && rows.some((p) => p.id === prev)) return prev;
+          return rows[0]?.id || "";
+        });
         setPlantsLoading(false);
       }
     })();
