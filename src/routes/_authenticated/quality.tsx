@@ -17,6 +17,8 @@ import {
   XCircle,
   MinusCircle,
   Package,
+  RefreshCw,
+  Search,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Kpi, Panel, StatusBadge, EmptyState } from "@/components/ui-parts";
@@ -56,7 +58,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useMemo, useState, useCallback, useRef, type DragEvent } from "react";
+import { useMemo, useState, useCallback, useRef, useEffect, type DragEvent } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { safeDate, resolveRelation } from "@/lib/utils";
@@ -722,20 +724,48 @@ function QualityPage() {
   });
 
   // Incoming material inspections (from GRN / warehouse receiving)
-  const { data: incomingInspections } = useQuery({
+  const {
+    data: incomingInspections,
+    isLoading: incomingLoading,
+    refetch: refetchIncoming,
+  } = useQuery({
     queryKey: ["incoming-inspections", companyId],
     queryFn: async () => {
-      const q = (supabase.from("incoming_material_inspections" as any) as any)
+      if (!companyId) return [];
+      const { data, error } = await (supabase.from("incoming_material_inspections" as any) as any)
         .select(
-          "*, materials(name, unit), warehouses(name, code, plant_id), purchase_orders(po_number)",
+          "*, materials(name, unit), warehouses(name, code, plant_id), purchase_orders(id, po_number, suppliers(name))",
         )
-        .eq("company_id", companyId!)
+        .eq("company_id", companyId)
         .order("created_at", { ascending: false })
-        .limit(100);
-      return (await q).data ?? [];
+        .limit(200);
+      if (error) throw error;
+      return data ?? [];
     },
     enabled: !!companyId,
+    staleTime: 0,
+    refetchOnMount: true,
   });
+
+  // Realtime subscription — incoming material inspections
+  useEffect(() => {
+    if (!companyId) return;
+    const ch = supabase
+      .channel(`q-incoming-inspections-${companyId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "incoming_material_inspections" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["incoming-inspections"] });
+        },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [companyId, queryClient]);
+
+  // Local search / filter for the Incoming tab
+  const [incomingSearch, setIncomingSearch] = useState("");
+  const [incomingStatusFilter, setIncomingStatusFilter] = useState("all");
 
   // Finished-goods queue: work orders at 100% with no final inspection yet —
   // the same definition the Final Inspection page uses, surfaced here so the
@@ -1228,8 +1258,58 @@ function QualityPage() {
 
         {/* ─── INCOMING MATERIALS TAB ─── */}
         <TabsContent value="incoming" className="space-y-4">
+          {/* Search & filter bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search material, PO, supplier..."
+                value={incomingSearch}
+                onChange={(e) => setIncomingSearch(e.target.value)}
+                className="pl-8 h-9 text-xs"
+              />
+            </div>
+            <Select value={incomingStatusFilter} onValueChange={setIncomingStatusFilter}>
+              <SelectTrigger className="w-[140px] h-9 text-xs">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5"
+              onClick={() => refetchIncoming()}
+              disabled={incomingLoading}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${incomingLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
+
           <Panel
-            title={`Incoming Material Inspections · ${(incomingInspections ?? []).length} records`}
+            title={`Incoming Material Inspections · ${
+              (() => {
+                const rows = incomingInspections ?? [];
+                const filtered = rows.filter((r: any) => {
+                  if (incomingStatusFilter !== "all" && r.status !== incomingStatusFilter) return false;
+                  if (incomingSearch.trim()) {
+                    const needle = incomingSearch.toLowerCase();
+                    const mat = (r.materials?.name ?? "").toLowerCase();
+                    const po = (r.purchase_orders?.po_number ?? "").toLowerCase();
+                    const supp = (r.purchase_orders?.suppliers?.name ?? "").toLowerCase();
+                    if (!mat.includes(needle) && !po.includes(needle) && !supp.includes(needle)) return false;
+                  }
+                  return true;
+                });
+                return filtered.length;
+              })()
+            } records`}
             right={
               pendingIncoming > 0 ? (
                 <span className="text-xs text-amber-400 font-medium">
@@ -1238,10 +1318,31 @@ function QualityPage() {
               ) : undefined
             }
           >
-            {(incomingInspections ?? []).length === 0 ? (
+            {incomingLoading ? (
+              <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading inspections...
+              </div>
+            ) : (() => {
+              const allRows = incomingInspections ?? [];
+              const filteredRows = allRows.filter((r: any) => {
+                if (incomingStatusFilter !== "all" && r.status !== incomingStatusFilter) return false;
+                if (incomingSearch.trim()) {
+                  const needle = incomingSearch.toLowerCase();
+                  const mat = (r.materials?.name ?? "").toLowerCase();
+                  const po = (r.purchase_orders?.po_number ?? "").toLowerCase();
+                  const supp = (r.purchase_orders?.suppliers?.name ?? "").toLowerCase();
+                  if (!mat.includes(needle) && !po.includes(needle) && !supp.includes(needle)) return false;
+                }
+                return true;
+              });
+              return filteredRows.length === 0 ? (
               <EmptyState
-                title="No incoming material inspections"
-                sub="Confirm a Goods Receipt in the Goods Receipt module to trigger incoming QC inspections."
+                title={allRows.length === 0 ? "No incoming material inspections" : "No results match your filters"}
+                sub={allRows.length === 0
+                  ? "When warehouse staff receive a PO (Goods Receipt or Receiving page), incoming QC inspection requests will appear here automatically."
+                  : "Try clearing the search or changing the status filter."
+                }
               />
             ) : (
               <div className="overflow-x-auto">
@@ -1272,10 +1373,10 @@ function QualityPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(incomingInspections ?? []).map((insp: any) => {
+                    {filteredRows.map((insp: any) => {
                       const mat = resolveRelation<{ name?: string; unit?: string }>(insp.materials);
                       const wh = resolveRelation<{ name?: string; code?: string }>(insp.warehouses);
-                      const po = resolveRelation<{ po_number?: string }>(insp.purchase_orders);
+                      const po = resolveRelation<{ po_number?: string; suppliers?: { name?: string } }>(insp.purchase_orders);
                       const isPending = insp.status === "pending";
 
                       return (
@@ -1290,6 +1391,11 @@ function QualityPage() {
                           </TableCell>
                           <TableCell className="font-mono text-xs text-primary">
                             {po?.po_number ?? "—"}
+                            {(po as any)?.suppliers?.name && (
+                              <div className="text-[11px] text-muted-foreground font-sans font-normal mt-0.5">
+                                {(po as any).suppliers.name}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell className="text-xs">
                             {wh ? (
@@ -1374,7 +1480,9 @@ function QualityPage() {
                   </TableBody>
                 </Table>
               </div>
-            )}
+            );
+            })()
+            }
             <div className="mt-3 p-3 rounded-lg bg-card/60 border border-white/5 flex items-start gap-2">
               <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <div className="text-[11px] text-muted-foreground leading-relaxed">
