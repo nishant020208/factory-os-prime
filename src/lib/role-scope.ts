@@ -77,8 +77,32 @@ export const ROLE_DOMAIN_MAP: Record<string, string[]> = {
     "suppliers",
   ],
   hr_manager: ["hr", "leaves", "training", "performance", "payroll", "attendance", "recruitment"],
-  customer_portal: ["orders", "dispatch", "finance", "documents", "crm", "support"],
-  supplier_portal: ["suppliers", "inventory", "dispatch", "finance", "orders", "procurement"],
+  customer_portal: [
+    "orders",
+    "dispatch",
+    "finance",
+    "documents",
+    "crm",
+    "support",
+    "company",
+    "companies",
+    "plants",
+    "departments",
+    "products",
+  ],
+  supplier_portal: [
+    "suppliers",
+    "inventory",
+    "dispatch",
+    "finance",
+    "orders",
+    "procurement",
+    "company",
+    "companies",
+    "plants",
+    "departments",
+    "products",
+  ],
   auditor: [
     "production",
     "inventory",
@@ -107,6 +131,8 @@ export const ROLE_DOMAIN_MAP: Record<string, string[]> = {
     "payroll",
     "attendance",
     "recruitment",
+    "company",
+    "companies",
   ],
 };
 
@@ -123,22 +149,23 @@ export const ROLE_BLOCKED_MESSAGE: Record<string, string> = {
   production_manager:
     "This information is managed by the Warehouse or Finance team. I can only show production, orders, machines, inventory, and maintenance data.",
   production_operator:
-    "You can view your assigned work orders, machines, and maintenance flags only.",
+    "You can view your assigned work orders, machines, maintenance flags, and public company info.",
   warehouse_manager:
-    "I can show inventory, dispatch/shipments, and product data only. Production orders and financial data are managed by other teams.",
+    "I can show inventory, dispatch/shipments, product catalog, and public company data.",
   procurement_manager:
-    "I can show procurement, supplier, and inventory data only. Production and financial details are managed by other teams.",
+    "I can show procurement, supplier, inventory, and public company data.",
   quality_inspector:
     "I can show quality inspections, defects, and CAPA data only. Production and warehouse details are managed by other teams.",
   maintenance_engineer:
     "I can show maintenance tickets, machine status, breakdowns, and spare parts only. Production scheduling is managed by the Production team.",
   finance_manager:
-    "I can show financial data only — invoices, payments, expenses, budgets, taxes, and supplier payments. Production details are managed by the Production team.",
+    "I can show financial data only — invoices, payments, expenses, budgets, taxes, and supplier payments.",
   hr_manager:
     "I can show employee, leave, training, performance, payroll, attendance, and recruitment data only.",
   customer_portal:
-    "You can view your own orders, shipments, invoices, payments, documents, and support tickets only.",
-  supplier_portal: "You can view your received POs, shipments, invoices, and payments only.",
+    "You can view company overview, product catalog, and your own orders, shipments, invoices, payments, documents, and support tickets.",
+  supplier_portal:
+    "You can view company overview, product catalog, and your received POs, shipments, invoices, and payments.",
   auditor:
     "You have read-only access to all modules. No create/edit/delete actions are available for any data.",
 };
@@ -151,8 +178,8 @@ export const DOMAIN_LABELS: Record<string, string> = {
   maintenance: "Maintenance",
   finance: "Finance",
   hr: "Human Resources",
-  customers: "Customers",
-  suppliers: "Suppliers",
+  customers: "Other Customers' Confidential Data",
+  suppliers: "Other Suppliers' Confidential Data",
   orders: "Orders/Work Orders",
   procurement: "Procurement",
   dispatch: "Dispatch/Shipments",
@@ -168,6 +195,7 @@ export const DOMAIN_LABELS: Record<string, string> = {
   whitelist: "Whitelist",
   audit: "Audit Logs",
   companies: "Companies",
+  company: "Company Overview",
   platform: "Platform",
   capa: "CAPA",
   defects: "Defects",
@@ -193,66 +221,73 @@ export const DOMAIN_LABELS: Record<string, string> = {
 /**
  * Check if a user's question mentions a domain outside their role's allowed scope.
  * Returns the blocked domain name (slug) if found, or null if the question is within scope.
- *
- * Uses keyword matching. It is intentionally strict: a match on a restricted domain
- * blocks the answer. The only exception is for roles that have "orders" in their
- * scope — the bare word "order" is skipped to avoid false-positives.
  */
 export function checkRoleScope(role: string | null, question: string): string | null {
   const allowed = ROLE_DOMAIN_MAP[role ?? ""] ?? [];
   const allowedSet = new Set(allowed);
 
-  // Keywords that indicate which domain the user is asking about.
-  // The broader a keyword list, the more likely a false-positive — but
-  // we prefer a safe block over an accidental data leak across roles.
   const domainKeywords: Record<string, string[]> = {
-    production: ["production", "manufacturing", "batch", "oee", "throughput", "work order"],
+    production: ["manufacturing schedule", "oee", "throughput", "shift schedule"],
     inventory: [
-      "inventory",
-      "stock",
-      "warehouse",
-      "sku",
-      "reorder level",
+      "warehouse bin",
       "bin location",
-      "material",
+      "reorder level",
     ],
-    quality: ["quality", "inspection", "defect", "yield", "ncr", "capa", "pass rate", "rejection"],
+    quality: ["quality inspection", "defect rate", "ncr", "capa", "rejection rate"],
     maintenance: [
-      "maintenance",
-      "repair",
-      "breakdown",
+      "machine breakdown",
       "mtbf",
       "mttr",
       "machine downtime",
-      "spare part",
+      "spare part inventory",
     ],
-    finance: ["revenue", "invoice", "payment", "budget", "cash flow", "profit", "expense", "tax"],
+    finance: [
+      "total company revenue",
+      "net profit",
+      "gross margin",
+      "company cash flow",
+      "ebitda",
+      "tax liability",
+      "payroll expense",
+      "financial p&l",
+      "balance sheet",
+    ],
     hr: [
-      "employee",
-      "headcount",
-      "payroll",
-      "leave",
-      "training",
-      "attendance",
-      "recruitment",
-      "onboarding",
+      "employee salary",
+      "manager salary",
+      "employee compensation",
+      "payroll total",
+      "employee contact",
+      "employee home address",
+      "employee phone",
+      "leave reason",
+      "medical leave",
     ],
-    customers: ["customer", "client"],
-    suppliers: ["supplier", "vendor"],
+    customers: [
+      "another customer",
+      "other customer",
+      "other clients",
+      "customer database",
+      "all customers' addresses",
+      "all customer gst",
+    ],
+    suppliers: [
+      "other supplier",
+      "another supplier",
+      "supplier margin",
+      "negotiated contract rate",
+      "all suppliers' bank",
+    ],
     orders: ["sales order", "so-", "wo-", "purchase order"],
-    procurement: ["procurement", "purchase order", "requisition", "rfq"],
+    procurement: ["requisition", "rfq response"],
     dispatch: ["dispatch", "shipment", "delivery", "tracking", "carrier", "out for delivery"],
-    machines: ["cnc", "robot", "equipment", "asset"],
-    products: ["product", "sku", "catalog", "bom", "bill of material"],
+    machines: ["cnc", "panel saw", "edge bander", "machine spec"],
+    products: ["product catalog", "products we make", "what products", "furniture catalog", "sku", "dimensions"],
+    company: ["company", "company name", "registered company", "about the company", "who are we", "our plants", "what factory"],
   };
 
   const lowerQ = question.toLowerCase();
 
-  // A question can legitimately straddle domains ("purchase order" matches
-  // both `orders` and `procurement`). Resolve the ambiguity in the caller's
-  // favour: block only when NO matched domain is allowed for the role —
-  // a procurement manager asking about purchase orders is in scope, while a
-  // warehouse manager asking the same is still blocked (neither matches).
   const matchedDomains = [];
   for (const [domain, keywords] of Object.entries(domainKeywords)) {
     if (keywords.some((kw) => lowerQ.includes(kw))) {
