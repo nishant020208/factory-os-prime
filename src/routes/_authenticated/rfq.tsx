@@ -46,7 +46,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useSupplier } from "@/hooks/use-supplier";
 import { toast } from "sonner";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { safeDate } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/rfq")({
@@ -173,12 +173,25 @@ function RfqPage() {
       (
         await supabase
           .from("warehouses")
-          .select("id, name, code")
+          .select("id, name, code, status")
           .eq("company_id", companyId!)
           .order("name")
       ).data ?? [],
-    enabled: !!companyId && !isSupplier,
+    enabled: !!companyId,
   });
+
+  // Auto-populate delivery warehouse when convertToPo dialog opens or warehouses load
+  useEffect(() => {
+    if (convertToPo && !poForm.delivery_warehouse_id && (warehouses ?? []).length > 0) {
+      const rawWh = (warehouses as any[]).find(
+        (w: any) => w.code?.toLowerCase().includes("raw") || w.name?.toLowerCase().includes("raw"),
+      );
+      const chosen = rawWh?.id || (warehouses as any[])[0]?.id || "";
+      if (chosen) {
+        setPoForm((f) => ({ ...f, delivery_warehouse_id: chosen }));
+      }
+    }
+  }, [convertToPo, warehouses, poForm.delivery_warehouse_id]);
 
   // Edit an auto-created (or any draft) RFQ before sending it out.
   const updateRfq = useMutation({
