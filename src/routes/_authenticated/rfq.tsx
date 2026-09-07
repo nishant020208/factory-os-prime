@@ -1237,29 +1237,97 @@ function RfqPage() {
                       )}
 
                       {/* Supplier Actions */}
-                      {isSupplier && rfq.status === "sent" && !myResponse && (
-                        <Button
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={() => setRespondTo(rfq.id)}
-                        >
-                          <Reply className="h-3 w-3 mr-1" /> Submit Quote
-                        </Button>
+                      {isSupplier && rfq.status !== "converted" && rfq.status !== "closed" && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {(!myResponse || myResponse.status === "pending") && (
+                            <>
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
+                                onClick={() => {
+                                  setRespondTo(rfq.id);
+                                  setRespForm({
+                                    unit_price: "",
+                                    delivery_days: "7",
+                                    minimum_order_quantity: "",
+                                    notes: "",
+                                  });
+                                }}
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Accept & Quote
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-destructive hover:bg-destructive/10"
+                                onClick={() => declineRfq.mutate({ rfqId: rfq.id })}
+                                disabled={declineRfq.isPending}
+                              >
+                                <XCircle className="h-3.5 w-3.5 mr-1" /> Decline
+                              </Button>
+                            </>
+                          )}
+
+                          {myResponse?.status === "quoted" && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-success font-medium flex items-center gap-1">
+                                <CheckCircle2 className="h-3.5 w-3.5" /> Quoted: {fmtMoney(myResponse.unit_price)}/unit
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  setRespondTo(rfq.id);
+                                  setRespForm({
+                                    unit_price: String(myResponse.unit_price ?? ""),
+                                    delivery_days: String(myResponse.delivery_days ?? "7"),
+                                    minimum_order_quantity: String((myResponse as any)?.minimum_order_quantity ?? ""),
+                                    notes: myResponse.notes ?? "",
+                                  });
+                                }}
+                              >
+                                <Reply className="h-3 w-3 mr-1" /> Update Quote
+                              </Button>
+                            </div>
+                          )}
+
+                          {myResponse?.status === "accepted" && (
+                            <span className="text-xs text-success font-semibold flex items-center gap-1">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Quote Accepted → PO Created
+                            </span>
+                          )}
+
+                          {myResponse?.status === "declined" && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">Declined</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 text-[11px] text-primary"
+                                onClick={() => {
+                                  setRespondTo(rfq.id);
+                                  setRespForm({
+                                    unit_price: "",
+                                    delivery_days: "7",
+                                    minimum_order_quantity: "",
+                                    notes: "",
+                                  });
+                                }}
+                              >
+                                Reopen & Quote
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       )}
 
-                      {isSupplier && myResponse && (
+                      {isSupplier && (rfq.status === "converted" || rfq.status === "closed") && (
                         <div className="text-xs text-muted-foreground">
-                          {myResponse.status === "quoted" && (
-                            <span className="text-success">✓ Quote Submitted</span>
-                          )}
-                          {myResponse.status === "accepted" && (
-                            <span className="text-success font-medium">✓ Quote Accepted → PO</span>
-                          )}
-                          {myResponse.status === "declined" && (
-                            <span className="text-muted-foreground">Declined</span>
-                          )}
-                          {myResponse.status === "pending" && (
-                            <span className="text-warning">Awaiting your response</span>
+                          {myResponse?.status === "accepted" ? (
+                            <span className="text-success font-medium">✓ Awarded to you → Purchase Order</span>
+                          ) : (
+                            <span>RFQ Closed</span>
                           )}
                         </div>
                       )}
