@@ -31,7 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
-import { notifyDispatchReady, notifyShipmentUpdate } from "@/lib/notifications";
+import { notifyDispatchReady, notifyShipmentUpdate, notifyDispatchQcUpdate } from "@/lib/notifications";
 import { toast } from "sonner";
 import { useState } from "react";
 import { safeDate } from "@/lib/utils";
@@ -173,8 +173,9 @@ function DispatchPage() {
         .update({ status: "shipped" })
         .eq("id", form.sales_order_id);
 
-      // 5) Notify Finance + the specific Customer
+      // 5) Notify Finance, Customer, and Quality Inspector (Pre-dispatch QC status update)
       await notifyDispatchReady(companyId, order?.so_number ?? shipmentNumber, ship.id);
+      await notifyDispatchQcUpdate(companyId, shipmentNumber, order?.so_number ?? shipmentNumber, "dispatch_ready", ship.id);
       const customerUser = order?.customers?.user_id ?? null;
       if (customerUser) {
         await notifyShipmentUpdate(companyId, order?.so_number ?? shipmentNumber, customerUser, "dispatch_ready", ship.id);
@@ -201,6 +202,16 @@ function DispatchPage() {
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const { error } = await supabase.from("shipments").update({ status }).eq("id", id);
       if (error) throw error;
+      const ship = shipments?.find((s: any) => s.id === id);
+      if (companyId && ship) {
+        void notifyDispatchQcUpdate(
+          companyId,
+          ship.shipment_number ?? "Shipment",
+          ship.sales_orders?.so_number ?? "Order",
+          status,
+          id,
+        );
+      }
       return status;
     },
     onSuccess: (status) => {
