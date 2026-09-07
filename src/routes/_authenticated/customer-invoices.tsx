@@ -21,7 +21,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { QrDialog } from "@/components/qr-dialog";
 
 export const Route = createFileRoute("/_authenticated/customer-invoices")({
   head: () => ({
@@ -136,12 +136,7 @@ function CustomerInvoicesPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-        <Kpi
-          label="Total Billed"
-          value={fmtMoneyK(total)}
-          icon={Receipt}
-          tone="primary"
-        />
+        <Kpi label="Total Billed" value={fmtMoneyK(total)} icon={Receipt} tone="primary" />
         <Kpi label="Paid" value={String(paid)} icon={CheckCircle2} tone="success" />
         <Kpi label="Outstanding" value={String(outstanding)} icon={Clock} tone="warning" />
       </div>
@@ -210,98 +205,18 @@ function CustomerInvoicesPage() {
         </div>
       )}
 
-      {/* QR Dialog */}
-      <Dialog open={qrDialog.open} onOpenChange={(o) => setQrDialog((d) => ({ ...d, open: o }))}>
-        <DialogContent className="sm:max-w-[380px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <QrCode className="h-4 w-4 text-primary" />
-              Invoice QR Code
-            </DialogTitle>
-          </DialogHeader>
-          {qrDialog.invoice && (
-            <div className="flex flex-col items-center gap-4 py-2">
-              <div className="bg-white rounded-2xl p-4 shadow-lg flex items-center justify-center">
-                {qrDialog.generating ? (
-                  <div className="w-48 h-48 flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                  </div>
-                ) : qrDialog.scanUrl ? (
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(qrDialog.scanUrl)}`}
-                    alt="Invoice QR Code"
-                    className="w-48 h-48 rounded-lg object-contain"
-                  />
-                ) : (
-                  <div className="w-48 h-48 flex items-center justify-center text-xs text-muted-foreground text-center p-4">
-                    QR code not yet available for this invoice
-                  </div>
-                )}
-              </div>
-
-              <div className="text-center space-y-1">
-                <div className="font-semibold">{qrDialog.invoice.invoice_number}</div>
-                <div className="text-xs text-muted-foreground">
-                  Status: <StatusBadge status={qrDialog.invoice.status} />
-                </div>
-              </div>
-
-              {qrDialog.scanUrl && (
-                <div className="w-full rounded-lg bg-muted/50 border border-border px-3 py-2 flex items-center gap-2">
-                  <span className="text-[10px] text-muted-foreground flex-1 truncate font-mono">
-                    {qrDialog.scanUrl}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 shrink-0"
-                    onClick={() => {
-                      navigator.clipboard.writeText(qrDialog.scanUrl!);
-                      toast.success("Scan link copied!");
-                    }}
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
-
-              <p className="text-[10px] text-muted-foreground text-center max-w-xs">
-                Scan with any phone camera — no app needed. Links to the public FactoryOS
-                verification page.
-              </p>
-
-              <div className="flex gap-2">
-                {qrDialog.scanUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(qrDialog.scanUrl!, "_blank")}
-                  >
-                    <Eye className="h-3.5 w-3.5 mr-1" />
-                    Preview
-                  </Button>
-                )}
-                {qrDialog.scanUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const link = document.createElement("a");
-                      link.href = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(qrDialog.scanUrl!)}`;
-                      link.download = `qr-${qrDialog.invoice!.invoice_number}.png`;
-                      link.click();
-                      toast.success("QR code downloaded");
-                    }}
-                  >
-                    <Download className="h-3.5 w-3.5 mr-1" />
-                    Download
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* QR Dialog — shared polished viewer */}
+      <QrDialog
+        open={qrDialog.open}
+        onOpenChange={(o) => setQrDialog((d) => ({ ...d, open: o }))}
+        title="Invoice QR"
+        reference={qrDialog.invoice?.invoice_number ?? null}
+        status={qrDialog.invoice?.status ?? null}
+        scanUrl={qrDialog.scanUrl}
+        loading={qrDialog.generating}
+        downloadName={`qr-${qrDialog.invoice?.invoice_number ?? "invoice"}`}
+        helperText="Scan with any phone camera — no app needed. Links to the public FactoryOS verification page."
+      />
     </div>
   );
 }
