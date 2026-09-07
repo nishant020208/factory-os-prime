@@ -31,6 +31,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { fmtMoney, fmtMoneyK } from "@/lib/currency";
 import { notifyAdvancePaymentQRGenerated } from "@/lib/notifications";
 import { getCustomerUserId } from "@/lib/customer-lookup";
+import { QrDialog } from "@/components/qr-dialog";
 import { toast } from "sonner";
 import { useState, useMemo } from "react";
 
@@ -210,12 +211,7 @@ function ApprovedOrdersPage() {
           tone="info"
         />
         <Kpi label="Advance Paid" value={String(paid)} icon={CheckCircle2} tone="success" />
-        <Kpi
-          label="Total Value"
-          value={fmtMoneyK(totalValue)}
-          icon={ShoppingCart}
-          tone="primary"
-        />
+        <Kpi label="Total Value" value={fmtMoneyK(totalValue)} icon={ShoppingCart} tone="primary" />
       </div>
 
       <Panel title={`${orders?.length ?? 0} approved orders`}>
@@ -240,7 +236,12 @@ function ApprovedOrdersPage() {
                       size="sm"
                       className="h-6 text-xs mt-1 text-primary"
                       onClick={() =>
-                        setQrDialog({ open: true, order: o, scanUrl: o.advance_qr_url, generating: false })
+                        setQrDialog({
+                          open: true,
+                          order: o,
+                          scanUrl: o.advance_qr_url,
+                          generating: false,
+                        })
                       }
                     >
                       <QrCode className="h-3 w-3 mr-1" />
@@ -360,14 +361,17 @@ function ApprovedOrdersPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Advance ({Number(advancePercent)}%)</span>
                   <span className="font-medium text-primary">
-                    {fmtMoney((Number(confirmDialog.order.order_total ?? 0) * Number(advancePercent)) / 100)}
+                    {fmtMoney(
+                      (Number(confirmDialog.order.order_total ?? 0) * Number(advancePercent)) / 100,
+                    )}
                   </span>
                 </div>
                 <div className="border-t border-white/5 pt-2 flex justify-between text-sm">
                   <span className="font-medium">Balance Due</span>
                   <span className="font-medium">
                     {fmtMoney(
-                      Number(confirmDialog.order.order_total ?? 0) * (1 - Number(advancePercent) / 100)
+                      Number(confirmDialog.order.order_total ?? 0) *
+                        (1 - Number(advancePercent) / 100),
                     )}
                   </span>
                 </div>
@@ -393,106 +397,31 @@ function ApprovedOrdersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* QR Code Dialog */}
-      <Dialog open={qrDialog.open} onOpenChange={(o) => setQrDialog((d) => ({ ...d, open: o }))}>
-        <DialogContent className="sm:max-w-[380px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <QrCode className="h-4 w-4 text-primary" />
-              Advance Payment QR
-            </DialogTitle>
-          </DialogHeader>
-          {qrDialog.order && (
-            <div className="flex flex-col items-center gap-4 py-2">
-              {/* QR image */}
-              <div className="bg-white rounded-2xl p-4 shadow-lg flex items-center justify-center">
-                {qrDialog.generating ? (
-                  <div className="w-48 h-48 flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 text-primary animate-spin" />
-                  </div>
-                ) : qrDialog.scanUrl ? (
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(qrDialog.scanUrl)}`}
-                    alt="Payment QR"
-                    className="w-44 h-44 rounded-lg object-contain"
-                  />
-                ) : (
-                  <div className="w-48 h-48 flex items-center justify-center text-xs text-muted-foreground">
-                    No QR available
-                  </div>
-                )}
-              </div>
-
-              {/* Info */}
-              <div className="text-center space-y-1">
-                <div className="font-semibold">{qrDialog.order.order_number}</div>
-                <div className="text-xs text-muted-foreground">
-                  Advance: $
-                  {(
-                    (Number(qrDialog.order.order_total ?? 0) *
-                      Number(qrDialog.order.advance_payment_percent ?? 20)) /
-                    100
-                  ).toFixed(2)}
-                </div>
-              </div>
-
-              {/* Scan URL */}
-              {qrDialog.scanUrl && (
-                <div className="w-full rounded-lg bg-muted/50 border border-border px-3 py-2 flex items-center gap-2">
-                  <span className="text-[10px] text-muted-foreground flex-1 truncate font-mono">
-                    {qrDialog.scanUrl}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 shrink-0"
-                    onClick={() => {
-                      navigator.clipboard.writeText(qrDialog.scanUrl!);
-                      toast.success("Scan link copied!");
-                    }}
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
+      {/* QR Code Dialog — shared polished viewer */}
+      <QrDialog
+        open={qrDialog.open}
+        onOpenChange={(o) => setQrDialog((d) => ({ ...d, open: o }))}
+        title="Advance Payment QR"
+        reference={qrDialog.order?.order_number ?? null}
+        status={qrDialog.order?.advance_payment_status ?? qrDialog.order?.status ?? null}
+        scanUrl={qrDialog.scanUrl}
+        loading={qrDialog.generating}
+        downloadName={`qr-${qrDialog.order?.order_number ?? "advance"}`}
+        helperText="Share with your customer. Scan with any phone camera — no app needed."
+      >
+        {qrDialog.order && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Advance amount:{" "}
+            <span className="font-mono font-semibold text-foreground">
+              {fmtMoney(
+                (Number(qrDialog.order.order_total ?? 0) *
+                  Number(qrDialog.order.advance_payment_percent ?? 20)) /
+                  100,
               )}
-
-              <p className="text-[10px] text-muted-foreground text-center max-w-xs">
-                Share with your customer. Scan with any phone camera — no app needed.
-              </p>
-
-              {/* Actions */}
-              <div className="flex gap-2">
-                {qrDialog.scanUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(qrDialog.scanUrl!, "_blank")}
-                  >
-                    <Eye className="h-3.5 w-3.5 mr-1" />
-                    Preview
-                  </Button>
-                )}
-                {qrDialog.scanUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const link = document.createElement("a");
-                      link.href = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(qrDialog.scanUrl!)}`;
-                      link.download = `qr-${qrDialog.order!.order_number}.png`;
-                      link.click();
-                      toast.success("QR downloaded");
-                    }}
-                  >
-                    <Download className="h-3.5 w-3.5 mr-1" />
-                    Download
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            </span>
+          </div>
+        )}
+      </QrDialog>
     </div>
   );
 }
