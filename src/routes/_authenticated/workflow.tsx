@@ -153,15 +153,23 @@ function WorkflowPage() {
     queryKey: ["workflow-links", companyId, plantId, refreshKey],
     queryFn: async () => {
       if (!companyId) return [];
-      let query = supabase
-        .from("workflow_links" as any)
-        .select("id, parent_id, child_id, from_role, to_role, plant_id, status")
-        .eq("company_id", companyId)
-        .eq("status", "active");
+      try {
+        let query = supabase
+          .from("workflow_links" as any)
+          .select("id, parent_id, child_id, from_role, to_role, plant_id, status")
+          .eq("company_id", companyId)
+          .eq("status", "active");
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []) as unknown as WorkflowLink[];
+        const { data, error } = await query;
+        if (error) {
+          console.warn("workflow_links table may not exist yet:", error.message);
+          return [];
+        }
+        return (data ?? []) as unknown as WorkflowLink[];
+      } catch (e) {
+        console.warn("workflow_links query failed (table may not exist):", e);
+        return [];
+      }
     },
     enabled: !!companyId,
   });
@@ -171,18 +179,26 @@ function WorkflowPage() {
     queryKey: ["canvas-positions", companyId, plantId, refreshKey],
     queryFn: async () => {
       if (!companyId) return [];
-      let query = supabase
-        .from("canvas_positions" as any)
-        .select("whitelist_id, position_x, position_y")
-        .eq("company_id", companyId);
+      try {
+        let query = supabase
+          .from("canvas_positions" as any)
+          .select("whitelist_id, position_x, position_y")
+          .eq("company_id", companyId);
 
-      if (isPlantAdmin && plantId) {
-        query = query.eq("plant_id", plantId);
+        if (isPlantAdmin && plantId) {
+          query = query.eq("plant_id", plantId);
+        }
+
+        const { data, error } = await query;
+        if (error) {
+          console.warn("canvas_positions table may not exist yet:", error.message);
+          return [];
+        }
+        return (data ?? []) as unknown as CanvasPosition[];
+      } catch (e) {
+        console.warn("canvas_positions query failed (table may not exist):", e);
+        return [];
       }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []) as unknown as CanvasPosition[];
     },
     enabled: !!companyId,
   });
@@ -322,6 +338,41 @@ function WorkflowPage() {
     },
   });
 
+  // 6) Create link mutation
+  const createLinkMutation = useMutation({
+    mutationFn: async ({ parent, child }: { parent: WorkflowUser; child: WorkflowUser }) => {
+      if (!companyId) return;
+      const { error } = await supabase.from("workflow_links" as any).upsert(
+        {
+          company_id: companyId,
+          parent_id: parent.whitelist_id,
+          child_id: child.whitelist_id,
+          from_role: parent.role,
+          to_role: child.role,
+          plant_id: child.plant_id ?? parent.plant_id ?? null,
+          status: "active",
+        },
+        { onConflict: "company_id,parent_id,child_id" }
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => handleRefresh(),
+  });
+
+  // 7) Delete link mutation
+  const deleteLinkMutation = useMutation({
+    mutationFn: async (linkId: string) => {
+      if (!companyId) return;
+      if (linkId.startsWith("derived-")) return;
+      const { error } = await supabase
+        .from("workflow_links" as any)
+        .delete()
+        .eq("id", linkId);
+      if (error) throw error;
+    },
+    onSuccess: () => handleRefresh(),
+  });
+
   const handleRefresh = useCallback(() => {
     setRefreshKey((k) => k + 1);
   }, []);
@@ -392,6 +443,8 @@ function WorkflowPage() {
               companyId={companyId}
               plantId={plantId}
               onNodeDragStop={handleNodeDragStop}
+              onNodeConnect={(parent, child) => createLinkMutation.mutate({ parent, child })}
+              onEdgeDisconnect={(edgeId) => deleteLinkMutation.mutate(edgeId)}
             />
 
             {isLoading && (

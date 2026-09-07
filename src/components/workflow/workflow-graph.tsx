@@ -6,11 +6,16 @@ import {
   MiniMap,
   useNodesState,
   useEdgesState,
+  Handle,
+  Position,
   type Node,
   type Edge,
   type OnNodesChange,
   type NodeTypes,
+  type Connection,
   BackgroundVariant,
+  MarkerType,
+  ConnectionLineType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,6 +63,8 @@ interface Props {
   companyId: string | null;
   plantId: string | null;
   onNodeDragStop?: (userId: string, x: number, y: number) => void;
+  onNodeConnect?: (parent: WorkflowUser, child: WorkflowUser) => void;
+  onEdgeDisconnect?: (edgeId: string) => void;
 }
 
 const NODE_W = 220;
@@ -87,6 +94,16 @@ function EmployeeNode({ data }: { data: any }) {
         borderColor: isSelected ? colors.solid : "hsl(220, 10%, 22%)",
       }}
     >
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!w-2.5 !h-2.5 !-left-1.5 !rounded-full !border-2 !border-[hsl(220,15%,25%)] !bg-slate-500 hover:!bg-indigo-400 !transition-colors !cursor-crosshair"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!w-2.5 !h-2.5 !-right-1.5 !rounded-full !border-2 !border-[hsl(220,15%,25%)] !bg-slate-500 hover:!bg-indigo-400 !transition-colors !cursor-crosshair"
+      />
       <div className="flex items-center gap-2.5 px-3 h-full">
         {/* Avatar with colored ring */}
         <div className="relative shrink-0">
@@ -174,13 +191,19 @@ function computeTreeLayout(
   const positions = new Map<string, { x: number; y: number }>();
   if (users.length === 0) return positions;
 
-  // Build adjacency: parentId → childIds (only IDs that exist in users)
+  // Build adjacency: parentId → childIds (using whitelist_id → user.id mapping)
+  const whitelistToUserId = new Map<string, string>();
+  for (const u of users) {
+    whitelistToUserId.set(u.whitelist_id, u.id);
+  }
   const userIdSet = new Set(users.map((u) => u.id));
   const childrenOf = new Map<string, string[]>();
   for (const link of links) {
-    if (!userIdSet.has(link.parent_id) || !userIdSet.has(link.child_id)) continue;
-    if (!childrenOf.has(link.parent_id)) childrenOf.set(link.parent_id, []);
-    childrenOf.get(link.parent_id)!.push(link.child_id);
+    const parentId = whitelistToUserId.get(link.parent_id);
+    const childId = whitelistToUserId.get(link.child_id);
+    if (!parentId || !childId) continue;
+    if (!childrenOf.has(parentId)) childrenOf.set(parentId, []);
+    childrenOf.get(parentId)!.push(childId);
   }
 
   // Find root
@@ -270,6 +293,8 @@ export function WorkflowGraph({
   companyId,
   plantId,
   onNodeDragStop,
+  onNodeConnect,
+  onEdgeDisconnect,
 }: Props) {
   const [draggedOver, setDraggedOver] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -305,9 +330,16 @@ export function WorkflowGraph({
           target: child.id,
           type: "smoothstep" as const,
           animated: false,
+          interactionWidth: 12,
           style: {
-            stroke: isHighlighted ? "#818cf8" : "rgba(148,163,184,0.6)",
-            strokeWidth: isHighlighted ? 3 : 2,
+            stroke: isHighlighted ? "#818cf8" : "#64748b",
+            strokeWidth: isHighlighted ? 3 : 2.5,
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 16,
+            height: 16,
+            color: isHighlighted ? "#818cf8" : "#64748b",
           },
         };
       })
@@ -341,9 +373,16 @@ export function WorkflowGraph({
             target: child.id,
             type: "smoothstep" as const,
             animated: false,
+            interactionWidth: 12,
             style: {
-              stroke: isHighlighted ? "#818cf8" : "rgba(148,163,184,0.6)",
-              strokeWidth: isHighlighted ? 3 : 2,
+              stroke: isHighlighted ? "#818cf8" : "#64748b",
+              strokeWidth: isHighlighted ? 3 : 2.5,
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 16,
+              height: 16,
+              color: isHighlighted ? "#818cf8" : "#64748b",
             },
           };
         })
@@ -404,6 +443,12 @@ export function WorkflowGraph({
       const toUser = users.find((u) => u.id === nearestId);
       if (!toUser) return;
 
+      // Role-based validation
+      if (isPlantAdmin) {
+        if (!fromUser.plant_id || !toUser.plant_id) return;
+        if (fromUser.plant_id !== toUser.plant_id) return;
+      }
+
       const { error } = await supabase.from("workflow_links" as any).upsert(
         {
           company_id: companyId,
@@ -419,7 +464,47 @@ export function WorkflowGraph({
 
       if (!error) onRefresh();
     },
-    [companyId, users, nodes, onRefresh]
+    [companyId, users, nodes, onRefresh, isPlantAdmin]
+  );
+
+  // Validate connection based on role rules
+  const isValidConnection = useCallback(
+    (connection: Connection | Edge) => {
+      if (!canEdit) return false;
+      const source = users.find((u) => u.id === connection.source);
+      const target = users.find((u) => u.id === connection.target);
+      if (!source || !target || source.id === target.id) return false;
+      // Plant Admin: only link within same plant
+      if (isPlantAdmin) {
+        if (!source.plant_id || !target.plant_id) return false;
+        return source.plant_id === target.plant_id;
+      }
+      return true;
+    },
+    [canEdit, isPlantAdmin, users]
+  );
+
+  // Handle manual connection from node handles
+  const handleNodeConnect = useCallback(
+    (connection: Connection) => {
+      if (!canEdit || !connection.source || !connection.target) return;
+      const parent = users.find((u) => u.id === connection.source);
+      const child = users.find((u) => u.id === connection.target);
+      if (!parent || !child || parent.id === child.id) return;
+      onNodeConnect?.(parent, child);
+    },
+    [canEdit, users, onNodeConnect]
+  );
+
+  // Handle edge double-click for disconnect
+  const handleEdgeDoubleClick = useCallback(
+    (_: any, edge: Edge) => {
+      if (!canEdit || !onEdgeDisconnect) return;
+      if (window.confirm("Remove this workflow connection?")) {
+        onEdgeDisconnect(edge.id);
+      }
+    },
+    [canEdit, onEdgeDisconnect]
   );
 
   return (
@@ -434,12 +519,29 @@ export function WorkflowGraph({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
+      <style>{`
+        .react-flow__edge:hover path {
+          stroke: #94a3b8 !important;
+          stroke-width: 3 !important;
+        }
+        .react-flow__edge.selected path {
+          stroke: #818cf8 !important;
+          stroke-width: 3 !important;
+        }
+        .react-flow__connection-line path {
+          stroke: #818cf8 !important;
+          stroke-width: 2 !important;
+          stroke-dasharray: 5 5;
+        }
+      `}</style>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange as OnNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeDragStop={handleNodeDragStop}
+        onConnect={handleNodeConnect}
+        onEdgeDoubleClick={handleEdgeDoubleClick}
         onNodeClick={(_, node) =>
           onSelectUser(selectedUserId === node.id ? null : node.id)
         }
@@ -449,9 +551,14 @@ export function WorkflowGraph({
         fitViewOptions={{ padding: 0.15 }}
         minZoom={0.08}
         maxZoom={2}
+        connectionLineStyle={{ stroke: "#818cf8", strokeWidth: 2 }}
+        connectionLineType={ConnectionLineType.SmoothStep}
+        isValidConnection={isValidConnection}
         defaultEdgeOptions={{
           type: "smoothstep",
-          style: { stroke: "rgba(148,163,184,0.6)", strokeWidth: 2 },
+          style: { stroke: "#64748b", strokeWidth: 2.5 },
+          markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: "#64748b" },
+          interactionWidth: 12,
         }}
         proOptions={{ hideAttribution: true }}
         className="!bg-transparent"
