@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, type ErrorComponentProps } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
@@ -77,9 +77,14 @@ export const Route = createFileRoute("/_authenticated")({
   errorComponent: AuthErrorBoundary,
 });
 
-function AuthErrorBoundary({ error, reset }: { error: Error; reset: () => void }) {
+function AuthErrorBoundary({ error, reset }: ErrorComponentProps) {
   const [expanded, setExpanded] = useState(false);
-  const msg = error?.message || "Unknown error";
+  const msg =
+    error instanceof Error
+      ? error.message
+      : typeof error === "object" && error !== null && "message" in error
+        ? String((error as { message: unknown }).message)
+        : String(error || "Unknown error");
   const isAuthError = msg.includes("auth") || msg.includes("session") || msg.includes("JWT");
   const isNotFound =
     msg.includes("relation") || msg.includes("does not exist") || msg.includes("42P01");
@@ -131,7 +136,7 @@ function AuthErrorBoundary({ error, reset }: { error: Error; reset: () => void }
 }
 
 function Layout() {
-  const { role } = Route.useRouteContext();
+  const { role } = Route.useRouteContext() as { role?: AppRole | null };
 
   // Keep the navigation flag for the life of the tab (sessionStorage survives
   // same-tab reloads, so refreshing keeps the user signed in to their page) and
