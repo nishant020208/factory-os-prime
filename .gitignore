@@ -1,7 +1,9 @@
 # Environment variables — NEVER commit these
-.env
-.env.local
-.env.production
+.env*
+
+# Markdown docs except README.md
+*.md
+!README.md
 
 # Logs
 logs
@@ -15,6 +17,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+build
+.vercel
 .output
 .vinxi
 .tanstack/**
