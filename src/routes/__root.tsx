@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useEffect, useState, lazy, Suspense, type ReactNode } from "react";
 
@@ -39,7 +40,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
   const [showDetails, setShowDetails] = useState(false);
@@ -48,9 +49,18 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   // Extract meaningful error info
-  const errorMessage = error?.message || "Unknown error";
-  const errorName = error?.name || "Error";
-  const errorStack = error?.stack || "";
+  const errObj = error instanceof Error ? error : null;
+  const errorMessage =
+    errObj?.message ||
+    (typeof error === "object" && error !== null && "message" in error
+      ? String((error as { message: unknown }).message)
+      : String(error || "Unknown error"));
+  const errorName =
+    errObj?.name ||
+    (typeof error === "object" && error !== null && "name" in error
+      ? String((error as { name: unknown }).name)
+      : "Error");
+  const errorStack = errObj?.stack || "";
   const isAuthError =
     errorMessage.includes("supabase") ||
     errorMessage.includes("auth") ||
