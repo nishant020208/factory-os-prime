@@ -1,4 +1,4 @@
-# 🏭 Factory OS Prime — AI-Powered Smart Manufacturing Platforms
+# 🏭 Factory OS...
 
 [![React 19](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev/)
 [![TanStack Start](https://img.shields.io/badge/TanStack-Start-FF4154?style=for-the-badge&logo=tanstack&logoColor=white)](https://tanstack.com/)
